@@ -32,6 +32,8 @@ FOCUS_FILES = [
     Path("part4_transformer/transformer_models.py"),
     Path("part1_foundations/classical_ml.py"),
     Path("part1_foundations/math_primer.py"),
+    Path("part2_cnn/cnn_architectures.py"),
+    Path("part2_cnn/advanced_cnn.py"),
 ]
 
 TEXT_SCAN_EXCLUDES = {
@@ -42,6 +44,8 @@ FOCUS_ROUTES = [
     "part4_transformer/transformer_models",
     "part1_foundations/classical_ml",
     "part1_foundations/math_primer",
+    "part2_cnn/cnn_architectures",
+    "part2_cnn/advanced_cnn",
 ]
 
 EXPECTED_CONTROL_REFERENCES = {
@@ -83,6 +87,33 @@ EXPECTED_CONTROL_REFERENCES = {
         "学习率",
         "动量",
     ],
+    Path("part2_cnn/cnn_architectures.py"): [
+        "选择网络",
+        "查看内容",
+        "前向传播步骤",
+        "输入模式",
+        "观察层级",
+        "输入/输出维度不一致时使用 1x1 投影",
+        "残差分支 F(x) 强度",
+    ],
+    Path("part2_cnn/advanced_cnn.py"): [
+        "卷积类型",
+        "输入尺寸 H=W",
+        "输入通道数",
+        "输出通道数",
+        "卷积核大小",
+        "步长 stride",
+        "填充 padding",
+        "空洞率 dilation",
+        "分组数 groups",
+        "转置卷积 output_padding",
+        "池化核",
+        "池化步长",
+        "batch size",
+        "通道数",
+        "丢弃概率 p",
+        "训练模式：开启 Dropout",
+    ],
 }
 
 SMOKE_FUNCTIONS = {
@@ -106,6 +137,21 @@ SMOKE_FUNCTIONS = {
         "render_probability",
         "render_gradient_descent",
         "render_cheatsheet",
+    ],
+    Path("part2_cnn/cnn_architectures.py"): [
+        "render_evolution_guide",
+        "render_forward_guide",
+        "render_feature_map_guide",
+        "render_residual_guide",
+        "render_inception_guide",
+        "render_detection_segmentation_guide",
+    ],
+    Path("part2_cnn/advanced_cnn.py"): [
+        "render_conv_experiment_guide",
+        "render_conv_overview_guide",
+        "render_pooling_guide",
+        "render_bn_guide",
+        "render_dropout_guide",
     ],
 }
 
@@ -225,6 +271,27 @@ def call_smoke_function(namespace: dict[str, object], name: str) -> None:
         "render_knn",
     }:
         func(42)
+    elif name == "render_forward_guide":
+        arch = namespace["ARCHITECTURES"][0]
+        func(arch, 1)
+    elif name == "render_feature_map_guide":
+        func("几何图形", "浅层：边缘/方向", (1, 6, 64, 64))
+    elif name == "render_residual_guide":
+        func(0.7, False)
+    elif name == "render_inception_guide":
+        func("亮斑目标", 4)
+    elif name == "render_conv_experiment_guide":
+        result_cls = namespace["ConvResult"]
+        import torch
+
+        result = result_cls(torch.zeros(1, 4, 32, 32), "smoke formula", 144, 3)
+        func("标准卷积", 32, 4, 4, 3, 1, 1, 1, 2, 0, result)
+    elif name == "render_pooling_guide":
+        func(2, 2)
+    elif name == "render_bn_guide":
+        func(16, 6)
+    elif name == "render_dropout_guide":
+        func(0.35, True, 0.35)
     else:
         func()
 

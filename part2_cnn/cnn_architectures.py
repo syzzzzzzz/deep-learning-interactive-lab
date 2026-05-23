@@ -790,6 +790,112 @@ def segmentation_demo_figure() -> plt.Figure:
     return fig
 
 
+def render_cnn_arch_learning_map() -> None:
+    st.markdown(
+        """
+        <div class="note">
+        <strong>学习地图：</strong>这一页把 CNN 放在两条线里读：
+        第一条是<strong>架构演进</strong>，看 LeNet、AlexNet、VGG、GoogLeNet、ResNet、DenseNet、MobileNet 为什么一代代出现；
+        第二条是<strong>任务迁移</strong>，看同一个 CNN 骨干如何服务分类、检测和分割。左侧“选择网络”决定你研究哪一个骨干，“查看内容”决定你看历史、前向传播、特征图还是下游任务。
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        > 互动顺序：先在“架构演进”里看时间线和参数量；再切到“网络结构与前向传播”，拖动“前向传播步骤”；然后到“特征图可视化”切换“输入模式”和“观察层级”。最后看残差、Inception、检测与分割，把“卷积特征如何被下游任务使用”串起来。
+        >
+        > 进阶思考：CNN 的历史不是单纯把网络做大。请一边看图一边问：这一代网络主要解决的是表达能力、训练稳定性、参数效率，还是下游任务适配？
+        """
+    )
+
+
+def render_evolution_guide() -> None:
+    st.markdown(
+        """
+        **图怎么看：**时间线图里的每个节点是一代代表性 CNN，节点大小和参数规模相关；参数量柱状图使用 log 坐标，所以 VGG 与 MobileNet 的差距会被压缩显示，真实参数差距更大。右侧表格把“年份、典型输入、核心思想”放在一起，适合读技术演进的因果关系。
+
+        **为什么会这样演进：**LeNet 证明局部连接和权值共享有效；AlexNet 借助 GPU、ReLU 和数据增强把 CNN 推向 ImageNet；VGG 用规整 3x3 堆叠证明深度很重要；GoogLeNet 用多分支和 1x1 降维控制成本；ResNet 用残差连接解决深层优化；DenseNet 强调特征复用；MobileNet 把目标转向移动端效率。
+
+        > 互动：在左侧“选择网络”中依次选择 VGGNet、ResNet、MobileNet，再回到参数量对比图。观察：参数更多不一定代表结构更先进，参数更少也不一定代表能力弱。
+        >
+        > 工程经验：选骨干网络时不要只看论文年份。服务器端分类可以优先考虑精度和生态，移动端或浏览器端则常先看参数量、FLOPs、延迟和内存峰值。
+        """
+    )
+
+
+def render_forward_guide(arch: Architecture, step: int) -> None:
+    current = arch.forward[step - 1]
+    st.markdown(
+        f"""
+        **图怎么看：**上方结构图从左到右表示数据流，当前高亮块对应“前向传播步骤”滑块选中的阶段；下方表格逐行展示每一步的输出张量、参数量和学到的内容。现在选中的是 **{arch.name}** 的第 **{step}** 步：**{current[0]}**，输出张量为 **{current[1]}**，这一段主要学习 **{current[3]}**。
+
+        **参数怎么调：**“选择网络”决定观察哪一个 CNN 骨干；“前向传播步骤”的范围会随网络阶段数量变化，向左拖可以看浅层如何保留空间细节，向右拖可以看深层如何压缩空间、增加通道或进入分类头。浅层通常看边缘、颜色、纹理，深层更偏部件和语义。
+
+        > 互动：把“前向传播步骤”从 1 拖到最后一步。观察输出张量的空间尺寸和通道数怎样变化。思考：为什么 CNN 通常让空间尺寸逐渐变小，却让通道数逐渐变多？
+        >
+        > 反例实验：选择 AlexNet 或 VGGNet，看 Flatten / FC 阶段的参数量。它们很强，但全连接层参数很重；这也是后来的 GoogLeNet、ResNet、MobileNet 更偏向全局平均池化和轻量结构的原因之一。
+        """
+    )
+
+
+def render_feature_map_guide(input_variant: str, layer_name: str, feature_shape: tuple[int, ...]) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**左图是合成输入，右图是当前层的多个通道。每个通道像一个“问题”：这个位置有没有边缘、纹理、亮斑、局部部件？颜色越亮表示该通道响应越强。当前输入模式是 **{input_variant}**，观察层级是 **{layer_name}**，特征张量形状为 **{feature_shape}**。
+
+        **参数怎么调：**“输入模式”可选几何图形、条纹纹理、亮斑目标；“观察层级”可选输入、浅层、中层、深层。浅层更像边缘检测器，中层组合纹理和局部部件，深层空间尺寸更小但语义更强。本演示使用手工卷积核，所以它展示的是“层级趋势”，不是某个真实预训练模型的内部权重。
+
+        > 互动：先把“输入模式”设为条纹纹理，再把“观察层级”从浅层拖到深层。观察哪些通道仍然亮、哪些通道变弱。思考：为什么越深的特征图越不容易直接解释成原图里的某条边？
+        >
+        > 反例实验：如果把深层特征图当成原图解释，就会误读。深层图的每一个亮点往往对应原图中的一片感受野，而不是一个像素；这也是 Grad-CAM 只能提供线索、不能当完整因果解释的原因。
+        """
+    )
+
+
+def render_residual_guide(scale: float, projection: bool) -> None:
+    projection_text = "开启" if projection else "关闭"
+    st.markdown(
+        f"""
+        **图怎么看：**左图展示残差块的数据路径：主分支学习 F(x)，shortcut 把 x 直接送到 Add；右图比较普通层 F(x) 与残差层 F(x)+x。当前“输入/输出维度不一致时使用 1x1 投影”为 **{projection_text}**，“残差分支 F(x) 强度”为 **{scale:.2f}**。
+
+        **参数怎么调：**勾选 1x1 投影时，shortcut 不再是原样通过，而是先用 1x1 卷积对齐通道或尺寸；调大 F(x) 强度时，主分支改动更大；调小到 0 附近时，残差块接近恒等映射。ResNet 的关键不是“多加一条线好看”，而是让深层网络至少能保留已有表示，不必每一层都重新发明一切。
+
+        > 互动：把“残差分支 F(x) 强度”调到 0，再调到 1.5。观察残差层曲线如何从接近输入变成明显改写输入。思考：为什么深层网络需要这种“先保底，再学习增量”的结构？
+        >
+        > 工程经验：当输入输出通道数或空间尺寸不一致时，shortcut 必须用 1x1 投影或下采样对齐。维度对不上不是小问题，它会直接让张量相加失败。
+        """
+    )
+
+
+def render_inception_guide(variant: str, concat_channels: int) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**上方模块图展示输入特征同时进入 1x1、3x3、5x5、Pool 四条分支，最后在通道维 Concat；下方四张小图展示不同分支对同一输入的响应。当前输入模式是 **{variant}**，拼接后通道数为 **{concat_channels}**。
+
+        **参数怎么调：**“输入模式”会改变四个分支看到的结构：几何图形适合看边缘，条纹纹理适合看频率和方向，亮斑目标适合看局部目标响应。1x1 分支偏通道重混合，3x3 分支偏局部边缘，5x5 分支看更大上下文，Pool 分支保留稳健摘要。
+
+        > 互动：把“输入模式”分别切到几何图形、条纹纹理、亮斑目标。观察 3x3 与 5x5 分支亮的位置是否一致。思考：为什么 Inception 不让你手动选择唯一核大小，而是让多尺度分支同时工作？
+        >
+        > 工程经验：Inception 里的 1x1 卷积常用于先降维再做 3x3/5x5，避免大核分支参数爆炸。它不是“小核没用”，而是通道混合和计算压缩工具。
+        """
+    )
+
+
+def render_detection_segmentation_guide() -> None:
+    st.markdown(
+        """
+        **检测图怎么看：**左半边两阶段路线先产生候选框或 RoI，再分类和框回归；右半边一阶段路线直接在网格或特征金字塔上预测类别和框。两阶段通常更重、更精细；一阶段通常更快，更适合实时。
+
+        **分割图怎么看：**语义分割图给每个像素一个类别，同类目标会合并；实例分割图不仅知道像素类别，还要区分这是第几个目标。表格中的 FCN、U-Net、Mask R-CNN 分别代表全卷积像素分类、编码器-解码器细节恢复、检测加 mask 分支。
+
+        > 互动：先看检测流程图，再看分割示例图。思考：分类、检测、分割都使用 CNN 特征，但输出头为什么完全不同？
+        >
+        > 反例实验：如果只保留很深、很小的特征图，分类可能还行，但分割边界会变粗，小目标检测会漏掉。工程上常用特征金字塔、跳跃连接或 U-Net 结构把高层语义和低层细节重新合起来。
+        """
+    )
+
+
 with st.sidebar:
     st.header("导航")
     selected_arch_name = st.selectbox("选择网络", [arch.name for arch in ARCHITECTURES], index=4)
@@ -813,6 +919,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+render_cnn_arch_learning_map()
 
 if section == "架构演进":
     st.subheader("1. 经典架构演进图")
@@ -834,6 +941,7 @@ if section == "架构演进":
         """,
         unsafe_allow_html=True,
     )
+    render_evolution_guide()
 
 elif section == "网络结构与前向传播":
     st.subheader(f"{selected_arch.name} 架构图")
@@ -856,6 +964,7 @@ elif section == "网络结构与前向传播":
     st.markdown("**结构备注**")
     for note in selected_arch.notes:
         st.write(f"- {note}")
+    render_forward_guide(selected_arch, step)
 
 elif section == "特征图可视化":
     st.subheader("3. 特征图可视化：不同层学到的特征")
@@ -883,6 +992,7 @@ elif section == "特征图可视化":
         """,
         unsafe_allow_html=True,
     )
+    render_feature_map_guide(input_variant, layer_name, tuple(layers[layer_name].shape))
 
 elif section == "残差连接":
     st.subheader("4. 残差连接的原理演示")
@@ -905,6 +1015,7 @@ elif section == "残差连接":
         unsafe_allow_html=True,
     )
     st.latex(r"y = F(x) + x,\quad \frac{\partial y}{\partial x} = \frac{\partial F(x)}{\partial x} + 1")
+    render_residual_guide(scale, projection)
 
 elif section == "Inception 模块":
     st.subheader("5. Inception 模块的多尺度特征融合")
@@ -927,6 +1038,7 @@ elif section == "Inception 模块":
         """,
         unsafe_allow_html=True,
     )
+    render_inception_guide(variant, concat.shape[1])
 
 else:
     st.subheader("6. 目标检测概览：R-CNN 系列与 YOLO 系列")
@@ -958,3 +1070,4 @@ else:
             """,
             unsafe_allow_html=True,
         )
+    render_detection_segmentation_guide()

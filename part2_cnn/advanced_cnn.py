@@ -441,6 +441,113 @@ def plot_dropout_demo(drop_prob: float, training: bool, seed: int) -> tuple[plt.
     return fig, zero_ratio
 
 
+def render_advanced_cnn_learning_map() -> None:
+    st.markdown(
+        """
+        <div class="note">
+        <strong>学习地图：</strong>这个页面不是在罗列高级名词，而是在拆 CNN 的四个工程问题：
+        <strong>卷积实验台</strong>回答“输出尺寸和感受野怎么变”，
+        <strong>卷积类型总览</strong>回答“不同卷积为什么省参数或扩视野”，
+        <strong>池化层</strong>回答“为什么丢掉一部分空间信息反而更稳”，
+        <strong>BatchNorm / Dropout</strong>回答“训练为什么会稳定、为什么不容易死记训练集”。
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        > 互动顺序：先在左侧固定“随机种子”，逐个调“卷积核大小”“步长 stride”“填充 padding”“空洞率 dilation”，观察“输出形状”“有效感受野”“参数量”和输出特征图如何一起变化；再切换到池化、BN、Dropout 页签，把这些局部操作放回完整 CNN 训练流程里。
+        >
+        > 进阶思考：CNN 看起来只是图片变小、通道变多，但每一次尺寸变化都在做取舍。请一边调参一边问：这一层是在保留细节、扩大视野、节省参数，还是在提高训练稳定性？
+        """
+    )
+
+
+def render_conv_experiment_guide(
+    conv_type: str,
+    input_size: int,
+    in_channels: int,
+    out_channels: int,
+    kernel_size: int,
+    stride: int,
+    padding: int,
+    dilation: int,
+    groups: int,
+    output_padding: int,
+    result: ConvResult,
+) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**上排显示输入的均值图和第 0 个输入通道，下排显示若干输出通道。颜色越亮表示该卷积核在这个位置响应越强；响应强不等于“模型理解了语义”，它只说明当前核在该局部窗口上计算出了较大数值。指标卡里的“输出形状”告诉你特征图还有多少空间位置，“有效感受野”告诉你单个输出格子看到多大输入区域，“参数量”告诉你这一层要学习多少权重。
+
+        **参数怎么调：**当前卷积类型是 **{conv_type}**，输入为 **{in_channels} x {input_size} x {input_size}**，输出通道数为 **{out_channels}**，卷积核大小为 **{kernel_size}**，步长为 **{stride}**，填充为 **{padding}**，空洞率为 **{dilation}**，分组数为 **{groups}**，转置卷积 output_padding 为 **{output_padding}**。当前有效感受野是 **{result.effective_kernel} x {result.effective_kernel}**，参数量是 **{result.params:,}**。
+
+        **取值区间：**“输入尺寸 H=W”的范围是 12 到 64；“输入通道数”可选 1、2、4；“输出通道数”可选 1、2、4、8；“卷积核大小”可选 1、3、5；“步长 stride”的范围是 1 到 4；“填充 padding”的范围是 0 到 6；“空洞率 dilation”的范围是 1 到 4。工程上，3x3、stride=1、padding=1 是最常见的稳定基线；stride=2 常用于下采样；stride=4 通常要谨慎，因为空间细节会被快速丢掉。
+
+        > 反例实验 1：把“步长 stride”调到 4，再观察输出形状和特征图。你会发现输出网格明显变小，这是因为卷积窗口跳得太快，很多空间位置没有被细致读取；在检测和分割任务里，这会伤害小目标。
+        >
+        > 反例实验 2：选择“空洞卷积”，把“空洞率 dilation”调到 4。有效感受野会变大，但输出可能出现更稀疏的响应。思考：为什么空洞卷积能看得更远，却可能漏掉细密纹理？
+        >
+        > 工程经验：如果只是做普通图像分类，先用 3x3 卷积、padding=1、stride=1 建基线；需要降采样时再把 stride 设为 2。不要一开始就堆大核、大步幅和大空洞率，否则很难判断性能变化来自哪一个因素。
+        """
+    )
+
+
+def render_conv_overview_guide() -> None:
+    st.markdown(
+        """
+        **图怎么看：**这张总览图把同一个输入送进多种卷积。每个小图的标题都包含输出空间尺寸和参数量：尺寸变化说明信息网格变大或变小，参数量变化说明这一层的学习成本。1x1 卷积几乎不改变空间邻域，但会混合通道；转置卷积会扩大输出网格；空洞卷积不增加参数也能扩大感受野；深度可分离和分组卷积主要是在减少跨通道连接。
+
+        **参数怎么调：**这一页签不额外使用滑块，它使用固定输入来对比卷积类型。请回到“卷积实验台”，用“卷积类型”选择同名操作，再调“卷积核大小”“步长 stride”“填充 padding”“空洞率 dilation”“分组数 groups”，把总览中的现象复现出来。
+
+        > 进阶思考：如果两个卷积输出图看起来相似，但参数量差很多，你会选哪一个？移动端模型通常更在意参数量和 FLOPs，医学影像或分割任务则更在意空间细节是否保住。
+        """
+    )
+
+
+def render_pooling_guide(pool_kernel: int, pool_stride: int) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**输入图保留原始局部数值；最大池化图只保留每个窗口里的最强响应；平均池化图保留窗口平均趋势；全局平均池化把整张图压成 1 个数。池化后的图越小，空间位置越粗，但对小幅平移和噪声越不敏感。
+
+        **参数怎么调：**当前“池化核”为 **{pool_kernel}**，“池化步长”为 **{pool_stride}**。池化核范围是 2 到 4，步长范围是 1 到 4。核越大、步长越大，输出越小，信息压缩越强；步长小于核时窗口会重叠，输出更平滑但计算更多。
+
+        > 反例实验 3：把“池化核”设为 4，把“池化步长”也设为 4。观察输出尺寸和数值变化：这会非常激进地压缩空间信息。分类任务可能还能接受，但分割、定位、小目标检测会很容易丢细节。
+        >
+        > 工程经验：早期 CNN 常频繁池化，现代 CNN 更常用 stride 卷积、残差和特征金字塔控制尺寸。池化不是越强越好，它是在“稳健性”和“定位精度”之间做交换。
+        """
+    )
+
+
+def render_bn_guide(batch_size: int, channels: int) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**左图比较 BN 前后的整体分布，中图比较每个通道的均值，右图比较每个通道的标准差。理想情况下，BN 后每个通道会更接近均值 0、标准差 1，所以中图的青色柱靠近 0，右图的青色柱靠近虚线 1。
+
+        **参数怎么调：**当前 batch size 为 **{batch_size}**，通道数为 **{channels}**。batch size 范围是 2 到 64，通道数范围是 2 到 12。batch 太小时，均值和方差估计会抖；通道越多，你越能看到“每个通道单独标准化”的效果。
+
+        > 互动：把“batch size”从 2 调到 64，观察 BN 后的均值和标准差是否更稳定。思考：为什么小 batch 训练里 BN 可能不如 GroupNorm 或 LayerNorm 稳？
+        >
+        > 工程经验：BN 训练和推理行为不同。训练时用当前 batch 统计量，推理时用滑动平均统计量；如果忘记切换 eval 模式，线上输出可能会抖动。
+        """
+    )
+
+
+def render_dropout_guide(drop_prob: float, training: bool, zero_ratio: float) -> None:
+    mode_text = "训练模式" if training else "推理模式"
+    st.markdown(
+        f"""
+        **图怎么看：**左图是原始激活，中图是 Dropout 后的输出，右图显示数值分布变化。当前处于 **{mode_text}**，丢弃概率 p 为 **{drop_prob:.2f}**，输出零值比例为 **{zero_ratio:.1%}**。训练模式下会随机屏蔽一部分激活；推理模式下不会随机丢弃，因此输出更稳定。
+
+        **参数怎么调：**“丢弃概率 p”的范围是 0.0 到 0.9，默认值是 0.35；“训练模式：开启 Dropout”决定是否真的执行随机丢弃；“Dropout 随机种子”只改变本次随机掩码。p=0 表示不丢弃，p 接近 0.9 会让大部分激活变成 0，模型很难保留足够信息。
+
+        > 极端值实验：把“丢弃概率 p”调到 0.9，再打开训练模式。观察中图是否大片变暗。思考：为什么过强 Dropout 会从“防止死记”变成“让模型看不清输入”？
+        >
+        > 工程经验：CNN 里 Dropout 常放在分类头或较高层，卷积特征早期层过强 Dropout 可能破坏局部纹理。现代架构还会使用数据增强、权重衰减、随机深度等替代或补充它。
+        """
+    )
+
+
 st.markdown(
     """
     <div class="intro">
@@ -450,6 +557,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+render_advanced_cnn_learning_map()
 
 tab_conv, tab_overview, tab_pool, tab_bn, tab_dropout = st.tabs(
     ["卷积实验台", "卷积类型总览", "池化层", "BatchNorm", "Dropout"]
@@ -500,6 +608,19 @@ with tab_conv:
         c4.metric("参数量", f"{result.params:,}")
         st.markdown(f'<div class="formula">{result.formula}</div>', unsafe_allow_html=True)
         st.pyplot(plot_feature_maps(input_tensor, result.output), clear_figure=True)
+        render_conv_experiment_guide(
+            conv_type,
+            input_size,
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride,
+            padding,
+            dilation,
+            groups,
+            output_padding,
+            result,
+        )
     except RuntimeError as exc:
         st.error(f"当前参数无法完成卷积计算：{exc}")
     except ValueError as exc:
@@ -524,6 +645,7 @@ with tab_overview:
             """,
             unsafe_allow_html=True,
         )
+        render_conv_overview_guide()
 
 with tab_pool:
     st.subheader("池化层过程演示")
@@ -537,6 +659,7 @@ with tab_pool:
         '<div class="note">最大池化保留局部最强响应，平均池化保留局部平均趋势，全局平均池化把每个通道压成一个数，常用于分类头前替代大规模全连接层。</div>',
         unsafe_allow_html=True,
     )
+    render_pooling_guide(pool_kernel, pool_stride)
 
 with tab_bn:
     st.subheader("批归一化对数据分布的影响")
@@ -552,6 +675,7 @@ with tab_bn:
         '<div class="note">训练模式下，BN 在每个通道上用当前 batch 的均值和方差做标准化，使各通道更接近均值 0、标准差 1，再由可学习参数缩放和平移。</div>',
         unsafe_allow_html=True,
     )
+    render_bn_guide(bn_batch, bn_channels)
 
 with tab_dropout:
     st.subheader("Dropout 开启 / 关闭对比")
@@ -571,3 +695,4 @@ with tab_dropout:
         '<div class="note">训练时 Dropout 随机屏蔽一部分激活，并按保留概率缩放剩余激活；推理时关闭随机屏蔽，输出保持稳定。</div>',
         unsafe_allow_html=True,
     )
+    render_dropout_guide(drop_prob, training, zero_ratio)
