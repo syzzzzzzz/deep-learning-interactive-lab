@@ -48,6 +48,16 @@ FOCUS_ROUTES = [
     "part2_cnn/cnn_architectures",
     "part2_cnn/advanced_cnn",
     "part3_rnn/sequence_models",
+    "part5_toolbox/01_feature_visualization",
+    "part5_toolbox/02_gradient_monitor",
+    "part5_toolbox/03_training_dynamics",
+    "part5_toolbox/04_hyperparam_search",
+    "part5_toolbox/data_training",
+    "part6_universal_framework/01_unified_interface",
+    "part6_universal_framework/03_full_project",
+    "part6_universal_framework/04_plugin_system",
+    "part6_universal_framework/05_one_click_training",
+    "part6_universal_framework/07_project_template",
 ]
 
 EXPECTED_CONTROL_REFERENCES = {
@@ -137,6 +147,110 @@ EXPECTED_CONTROL_REFERENCES = {
         "窗口长度",
         "学习率",
         "temperature",
+    ],
+    Path("part5_toolbox/data_training.py"): [
+        "样本数",
+        "收入尺度压缩因子",
+        "数值处理方式",
+        "旋转角度",
+        "裁剪保留比例",
+        "缩放比例",
+        "亮度",
+        "对比度",
+        "色彩饱和度",
+        "网络深度",
+        "每层宽度",
+        "激活函数",
+        "L1 强度",
+        "L2 强度",
+        "Dropout",
+        "早停耐心",
+        "最多训练轮数",
+        "初始 / 峰值学习率",
+        "最小学习率",
+        "总 epoch",
+        "StepLR 间隔",
+        "StepLR 衰减系数",
+        "Warmup epoch",
+        "随机种子",
+    ],
+}
+
+EXPECTED_CONTENT_REFERENCES = {
+    Path("main.py"): [
+        "LEGACY_LEARNING_GUIDES",
+        "part6_universal_framework/03_full_project",
+        "part6_universal_framework/05_one_click_training",
+        "part6_universal_framework/07_project_template",
+        "学习导读",
+    ],
+    Path("part5_toolbox/01_feature_visualization.py"): [
+        "print_learning_guide",
+        "学习导读",
+        "工程坑案例",
+        "进阶思考",
+    ],
+    Path("part5_toolbox/02_gradient_monitor.py"): [
+        "print_learning_guide",
+        "梯度爆炸",
+        "梯度消失",
+        "工程坑案例",
+        "进阶思考",
+    ],
+    Path("part5_toolbox/03_training_dynamics.py"): [
+        "print_learning_guide",
+        "更新幅度比",
+        "激活饱和率",
+        "工程坑案例",
+        "进阶思考",
+    ],
+    Path("part5_toolbox/04_hyperparam_search.py"): [
+        "print_learning_guide",
+        "LR Finder",
+        "工程经验",
+        "真实踩坑",
+        "进阶思考",
+    ],
+    Path("part5_toolbox/data_training.py"): [
+        "render_action",
+        "图怎么看",
+        "工程经验",
+        "真实踩坑",
+        "进阶思考",
+    ],
+    Path("part6_universal_framework/01_unified_interface.py"): [
+        "print_learning_guide",
+        "统一接口",
+        "工程坑案例",
+        "进阶思考",
+    ],
+    Path("part6_universal_framework/03_full_project.py"): [
+        "print_learning_guide",
+        "UniversalTrainer",
+        "UniversalVisualizer",
+        "工程坑案例",
+        "复现实验",
+    ],
+    Path("part6_universal_framework/04_plugin_system.py"): [
+        "print_learning_guide",
+        "注册表",
+        "配置模板",
+        "工程坑案例",
+        "进阶思考",
+    ],
+    Path("part6_universal_framework/05_one_click_training.py"): [
+        "print_learning_guide",
+        "best.pt",
+        "training_log.csv",
+        "config.json",
+        "工程坑案例",
+    ],
+    Path("part6_universal_framework/07_project_template.py"): [
+        "print_learning_guide",
+        "训练入口",
+        "评估脚本",
+        "K-Fold",
+        "工程坑案例",
     ],
 }
 
@@ -255,9 +369,9 @@ def check_placeholders() -> None:
 
 def streamlit_control_labels(text: str) -> set[str]:
     label_patterns = [
-        r"st(?:\.sidebar)?\.(?:slider|selectbox|select_slider|radio|text_input|text_area|number_input|toggle|checkbox|multiselect)\(\s*([\"'])(.*?)\1",
-        r"\b\w+\.(?:slider|selectbox|select_slider|radio|text_input|text_area|number_input|toggle|checkbox|multiselect)\(\s*([\"'])(.*?)\1",
-        r"segmented\(\s*([\"'])(.*?)\1",
+        r"st(?:\.sidebar)?\.(?:slider|selectbox|select_slider|segmented_control|radio|text_input|text_area|number_input|toggle|checkbox|multiselect)\(\s*([\"'])(.*?)\1",
+        r"\b\w+\.(?:slider|selectbox|select_slider|segmented_control|radio|text_input|text_area|number_input|toggle|checkbox|multiselect)\(\s*([\"'])(.*?)\1",
+        r"segmented(?:_control)?\(\s*([\"'])(.*?)\1",
     ]
     labels: set[str] = set()
     for pattern in label_patterns:
@@ -276,6 +390,18 @@ def check_expected_controls() -> None:
     if failures:
         raise CheckFailure("重点控件引用检查失败：\n" + "\n".join(failures))
     print(f"[通过] 重点控件引用检查：{len(EXPECTED_CONTROL_REFERENCES)} 个页面")
+
+
+def check_expected_content() -> None:
+    failures: list[str] = []
+    for rel_path, expected_fragments in EXPECTED_CONTENT_REFERENCES.items():
+        text = read_text(rel_path)
+        for fragment in expected_fragments:
+            if fragment not in text:
+                failures.append(f"{rel_path}: 缺少工程教学内容片段：{fragment}")
+    if failures:
+        raise CheckFailure("工程教学内容检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 工程教学内容检查：{len(EXPECTED_CONTENT_REFERENCES)} 个页面")
 
 
 def load_module(rel_path: Path) -> dict[str, object]:
@@ -381,6 +507,7 @@ def run_checks(include_smoke: bool) -> None:
     check_python_compile()
     check_placeholders()
     check_expected_controls()
+    check_expected_content()
     check_main_routes()
     if include_smoke:
         check_focus_smoke()

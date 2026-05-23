@@ -13,6 +13,34 @@ import numpy as np
 from pathlib import Path
 
 
+def print_learning_guide():
+    print("""
+学习导读：项目模板的价值在于复现和交接，不只是把训练代码拆成几个文件。
+
+1. 训练入口怎么看
+   - parse_args 允许从命令行覆盖 config、model、lr、epochs 和 gpu，适合复现实验或临时消融。
+   - train_main 负责读取配置、设置随机种子、构建模型/数据/任务，再交给 ExperimentRunner。
+   - 训练入口不应该写大量模型细节；模型、数据、任务应由 registry 和 config 决定。
+
+2. 评估脚本怎么看
+   - evaluate_main 从 checkpoint 读取 config 和 model_state_dict，只做加载和评估，不再训练。
+   - 评估脚本必须明确 split=train/val/test，避免把验证集或测试集混在一起。
+   - 真实项目要把“加载测试数据并评估”的占位逻辑补成确定实现，否则报告无法复现。
+
+3. K-Fold 和集成怎么看
+   - K-Fold 用多次不同切分估计模型稳定性，适合小数据、比赛和高风险验证。
+   - ensemble_predict 平均多个 checkpoint 的概率，通常能降低方差，但会增加推理成本。
+   - 每个 fold 必须有独立 save_dir，否则 checkpoint 和日志会互相覆盖。
+
+工程坑案例：
+   我见过模板复制后没有补完整评估数据加载逻辑，训练能跑、评估却只打印 checkpoint 信息，最后团队误以为项目已经闭环。
+   模板落地时要逐项检查 config、seed、数据切分、checkpoint、training_log、final_result 是否都能追溯。
+
+进阶思考：
+   为什么训练脚本和评估脚本要分开？如果线上指标和离线验证集冲突，你会先查数据切分、指标定义，还是模型结构？
+""".strip())
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description='深度学习训练脚本')
     parser.add_argument('--config', type=str, default='config.yaml',
@@ -201,4 +229,5 @@ def ensemble_predict(model_paths, dataloader, device='cuda'):
 
 
 if __name__ == '__main__':
+    print_learning_guide()
     print("Project template snippets loaded. Use train_main() or evaluate_main() with real project files.")

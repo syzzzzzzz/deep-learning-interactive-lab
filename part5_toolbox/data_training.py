@@ -76,6 +76,10 @@ def render_note(title: str, body: str) -> None:
     )
 
 
+def render_action(body: str) -> None:
+    st.markdown(f"> {body}")
+
+
 def tight_fig(width: float = 8.0, height: float = 4.5):
     fig = plt.figure(figsize=(width, height), dpi=120)
     fig.patch.set_facecolor("#fbfaf7")
@@ -196,6 +200,17 @@ def render_preprocessing(seed: int) -> None:
     df = make_preprocess_data(n, scale_gap, seed)
     fig, transformed, one_hot = plot_preprocess(df, method or "标准化")
     st.pyplot(fig, clear_figure=True)
+    render_action(
+        "请把“数值处理方式”依次切到“原始数值”“归一化”“标准化”，观察中间散点图的坐标范围如何变化；再把“收入尺度压缩因子”从 1.0 拖到 12.0，看收入这一列是否还会压过年龄这一列。"
+    )
+    render_note(
+        "图怎么看：",
+        "左图显示原始年龄和收入的尺度差异，中图显示处理后的数值空间，右图显示城市被拆成独热编码。神经网络的第一层会把所有输入特征一起乘权重；如果某一列数值尺度过大，它会在梯度里占据过高话语权。"
+    )
+    render_note(
+        "工程经验：",
+        "连续数值特征在 90% 的小型深度学习项目里先用标准化作为默认起点；归一化适合像素、比例这类天然有上下界的输入。真正上线时，标准化的均值和标准差必须只在训练集上拟合，再原样用于验证集、测试集和线上数据。"
+    )
 
     left, right = st.columns([1, 1])
     with left:
@@ -205,6 +220,13 @@ def render_preprocessing(seed: int) -> None:
     with right:
         st.caption("独热编码后的前 8 行")
         st.dataframe(pd.concat([df[["城市"]].head(8), one_hot.head(8)], axis=1), width="stretch")
+    render_note(
+        "常见坑：",
+        "把城市直接编码成 0、1、2、3 会暗示“杭州比北京大”这种不存在的顺序；把全量数据一起标准化会造成数据泄漏。排查时先看上面的统计表：标准化后 mean 应接近 0、std 应接近 1，独热编码每行通常只有一个 1。"
+    )
+    render_action(
+        "进阶思考：当“样本数”从 60 调到 500 时，统计量是否更稳定？如果验证集分布和训练集不同，标准化表里的 mean/std 会怎样暴露这种漂移？"
+    )
 
 
 def synthetic_rgb_image(size: int = 160) -> np.ndarray:
@@ -301,6 +323,20 @@ def render_augmentation() -> None:
         color = st.slider("色彩饱和度", 0.2, 2.0, 1.25, 0.05)
 
     st.pyplot(plot_augmentations(angle, crop_ratio, scale, brightness, contrast, color), clear_figure=True)
+    render_action(
+        "请把“旋转角度”拖到 -45 或 45，把“裁剪保留比例”拖到 0.55，再观察目标主体是否还完整；如果主体被裁掉，这种增强就会把标签变成噪声。"
+    )
+    render_note(
+        "图怎么看：",
+        "六张小图共享同一张原图：翻转检查左右不变性，旋转检查角度鲁棒性，裁剪和缩放检查目标是否仍在画面中，亮度/对比度/色彩饱和度检查模型是否过度依赖颜色。"
+    )
+    render_note(
+        "工程经验：",
+        "增强强度不是越大越好。分类任务里常从轻量增强开始：旋转不超过 15 到 25 度、裁剪保留比例不低于 0.75、亮度和对比度围绕 1.0 上下浮动。医学、遥感、工业缺陷这类方向要先确认变换不会改变标签含义。"
+    )
+    render_action(
+        "极端值测试：把“亮度”调到 0.45、再调到 1.65，观察主体细节是否消失。思考：如果训练集中有这种极端图，模型是在学鲁棒性，还是在学错误样本？"
+    )
 
 
 @st.cache_data(show_spinner=False)
@@ -392,6 +428,20 @@ def render_initialization(seed: int) -> None:
 
     result = simulate_initialization(depth, width, 384, activation or "ReLU", seed)
     st.pyplot(plot_initialization(result), clear_figure=True)
+    render_action(
+        "请把“网络深度”从 4 拖到 50，并在“激活函数”中切换 ReLU/Tanh，观察前向激活标准差和反向梯度标准差是否向 0 塌缩或快速放大。"
+    )
+    render_note(
+        "图怎么看：",
+        "左图看信号前向传播后是否保持合理尺度，中图看梯度反向传播是否还能回到浅层，右图看最后一层激活是否集中在少数区间。ReLU 搭配 He 初始化通常更稳，Tanh 搭配 Xavier 更符合它的对称饱和特性。"
+    )
+    render_note(
+        "工程经验：",
+        "如果深层网络一开始 loss 几乎不动，先不要急着换优化器；先检查初始化、激活函数和输入标准化。常用起点是 ReLU/GELU + He 初始化，Transformer/RNN 中再配合 LayerNorm 或残差连接稳定尺度。"
+    )
+    render_action(
+        "进阶思考：当“每层宽度”增大时，曲线为什么可能更平滑？如果中图的梯度标准差在浅层接近 0，学习率调大能真正解决问题吗？"
+    )
 
 
 @dataclass(frozen=True)
@@ -559,6 +609,24 @@ def render_regularization(seed: int) -> None:
     m2.metric("实际停止轮次", f"{result['stop_epoch']}")
     m3.metric("近零权重比例", f"{result['near_zero']:.1%}")
     st.pyplot(plot_regularization(result), clear_figure=True)
+    render_action(
+        "请先把“Dropout”调到 0.0，再调到 0.75；然后把“L2 强度”从 0.000 调到 0.050，观察左图拟合曲线是否从追噪声变成过度平滑。"
+    )
+    render_note(
+        "图怎么看：",
+        "左图里红点是训练样本、灰虚线是真实函数、青色线是模型预测；右图同时显示训练损失和验证损失。训练损失持续下降但验证损失反弹，是过拟合；两条曲线都高，是欠拟合。"
+    )
+    render_note(
+        "参数经验：",
+        "L1 主要增加稀疏性，可以看“近零权重比例”；L2 是更常用的默认正则，小模型常从 1e-4 到 1e-3 开始；Dropout 在全连接层常用 0.1 到 0.5，超过 0.6 往往会明显欠拟合；早停耐心通常设为总轮数的 5% 到 15%。"
+    )
+    render_note(
+        "真实踩坑：",
+        "我见过一个小样本回归项目把 Dropout 固定成 0.7，训练三天都像没学会；曲线症状就是训练损失和验证损失都高。排查步骤是先关 Dropout 确认模型能过拟合小训练集，再逐步加 L2、Dropout 和早停。"
+    )
+    render_action(
+        "进阶思考：如果“最佳验证损失”变好但“近零权重比例”也大幅升高，这说明 L1 在帮你选特征，还是已经把模型容量压坏了？"
+    )
 
 
 def warmup_cosine_lr(step: int, total_steps: int, base_lr: float, min_lr: float, warmup_steps: int) -> float:
@@ -617,6 +685,17 @@ def render_schedules() -> None:
 
     steps, curves = schedule_curves(base_lr, min_lr, epochs, step_size, gamma, warmup_epochs)
     st.pyplot(plot_schedules(steps, curves), clear_figure=True)
+    render_action(
+        "请把“初始 / 峰值学习率”拖到 0.2，再把“Warmup epoch”从 0 拖到 20，观察紫色曲线如何先慢启动再进入退火。"
+    )
+    render_note(
+        "图怎么看：",
+        "StepLR 是阶梯式下降，适合传统 CNN 训练；CosineAnnealingLR 是平滑退火，适合不想手工指定下降节点的实验；Warmup + Cosine 先小步启动，常用于 Transformer、大 batch 或混合精度训练。"
+    )
+    render_note(
+        "工程经验：",
+        "学习率搜索通常先定数量级，再定调度。Adam/AdamW 常从 1e-4 到 3e-3 搜；SGD 常从 1e-2 到 1e-1 搜。`min_lr` 不宜太高，否则后期无法细致收敛；`gamma` 太小会让 StepLR 过早失去学习能力。"
+    )
 
     summary = pd.DataFrame(
         {
@@ -627,6 +706,13 @@ def render_schedules() -> None:
         }
     )
     st.dataframe(summary, width="stretch", hide_index=True)
+    render_note(
+        "排查手册：",
+        "loss 前几轮直接发散，优先降低“初始 / 峰值学习率”或增加 “Warmup epoch”；loss 后期平台期明显，检查“最小学习率”是否过高；验证指标反复震荡，优先让学习率下降更平滑。"
+    )
+    render_action(
+        "进阶思考：如果 batch size 加大 4 倍，峰值学习率和 warmup 应该一起怎么变？为什么大 batch 更需要 warmup？"
+    )
 
 
 def plot_mixed_precision():
@@ -690,12 +776,27 @@ for x, y in dataloader:
         '<p class="small">注意：上面的收益图是概念示意，真实收益取决于 GPU、模型结构、batch size、算子支持和数据加载瓶颈。</p>',
         unsafe_allow_html=True,
     )
+    render_note(
+        "图怎么看：",
+        "柱状图把 FP32 和 AMP 的显存、吞吐放在同一基准线上。AMP 显存柱更低表示同样模型能放更大 batch，AMP 吞吐柱更高表示单位时间能处理更多样本。"
+    )
+    render_note(
+        "工程经验：",
+        "新项目如果使用 NVIDIA Tensor Core 或较新的 GPU，优先尝试 BF16；老 GPU 上常用 FP16 + GradScaler。若 loss 变成 NaN，先降低学习率、检查损失缩放，再确认 LayerNorm、softmax、loss 这些敏感计算没有被错误强制成低精度。"
+    )
+    render_action(
+        "进阶思考：如果 AMP 后吞吐没有提升，你会先检查 GPU 算子支持、batch size，还是数据加载速度？为什么小模型常常不是被矩阵乘法卡住？"
+    )
 
 
 def main() -> None:
     st.title("数据预处理与训练技巧")
     st.markdown(
         "把工程训练中最常遇到的几类技巧做成可调实验：先看输入怎么变，再看训练过程为什么更稳。"
+    )
+    render_note(
+        "学习路线：",
+        "本页不是单纯罗列技巧，而是按真实训练事故的排查顺序组织：先处理输入尺度和增强，再看初始化与正则化，最后用学习率调度和混合精度提高稳定性与效率。"
     )
 
     with st.sidebar:

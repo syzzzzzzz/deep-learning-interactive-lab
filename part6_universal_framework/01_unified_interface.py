@@ -320,8 +320,37 @@ class SimpleCNN(nn.Module, TrainableMixin):
 # 完整演示
 # ─────────────────────────────────────────────────────────
 
+
+def print_learning_guide():
+    print("""
+学习导读：统一接口的目的不是把代码藏起来，而是给数据、模型、训练和推理划清边界。
+
+1. 这页代码分成三层
+   - TensorDatasetWrapper：负责把 numpy/torch 数据变成 Dataset，并处理 normalize、split、DataLoader。
+   - TrainableMixin：负责 fit/save/load/predict/count_params，也就是训练生命周期。
+   - MLP/SimpleCNN：只表达模型结构，不关心训练循环怎么写。
+
+2. 默认值怎么看
+   - batch_size=32 或 64 是小实验的稳妥起点，验证集 batch 可以更大，因为不需要反向传播。
+   - lr=1e-3 适合 Adam 的第一轮试验，patience=10 能避免验证集轻微抖动就过早停止。
+   - grad_clip=1.0 是防止偶发梯度爆炸的保险，不应掩盖长期学习率过高的问题。
+
+3. 训练曲线怎么看
+   - 左图训练损失和验证损失一起看：训练降、验证升是过拟合；两者都不降是欠拟合或学习率/数据问题。
+   - 右图学习率曲线来自 CosineAnnealing，后期逐步变小，是为了从快速探索进入稳定收敛。
+
+工程坑案例：
+   我见过一个团队把 normalize 写进 Dataset，但训练集、验证集各算各的均值方差，导致线上分布完全对不上。
+   正确做法是在训练集拟合统计量，然后复用到验证、测试和线上；统一接口必须清楚保存这些状态。
+
+进阶思考：
+   哪些逻辑应该放进 Mixin，哪些应该留给具体项目？如果任务从分类变成回归，你应该替换 criterion 和 metric，还是改 Dataset？
+""".strip())
+
+
 def demo_unified_interface():
     """演示统一接口的使用"""
+    print_learning_guide()
     torch.manual_seed(42)
     np.random.seed(42)
 

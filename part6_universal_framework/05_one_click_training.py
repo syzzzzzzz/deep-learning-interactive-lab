@@ -3,6 +3,33 @@
 可独立运行的 Python 源码
 """
 
+def print_learning_guide():
+    print("""
+学习导读：一键训练不是把训练藏进一个按钮，而是把一次实验从配置到产物完整串起来。
+
+1. 训练流程怎么看
+   - config 决定实验名称、模型、学习率、优化器、调度器、梯度裁剪、早停和保存目录。
+   - _train_epoch 只做训练，_validate 只做验证，run 负责把训练、验证、调度、保存、日志串成闭环。
+   - monitor 指标决定 best.pt 保存哪一轮；分类常用 accuracy 或 F1，回归常用 val_loss、MAE 或 RMSE。
+
+2. 产物怎么看
+   - best.pt：验证集指标最好的模型，通常比最后一轮更可靠。
+   - training_log.csv：每个 epoch 的 loss、metric、lr 和耗时，是排查曲线异常的第一证据。
+   - config.json：复现实验的说明书，没有它就很难知道当时到底用了什么参数。
+   - training_curves.png：把训练/验证曲线和学习率放在一起看，判断过拟合、欠拟合和学习率是否合适。
+
+3. 默认值怎么落地
+   - lr=0.001、optimizer=adam、scheduler=cosine、grad_clip=1.0、patience=5 是演示级默认值。
+   - 真实项目要根据验证集噪声扩大 patience，并把 save_dir 命名成包含任务、模型、日期和关键参数的实验目录。
+
+工程坑案例：
+   我见过只保存 last.pt 的项目，训练后期已经过拟合，但上线用的是最后一轮，指标比 best epoch 低很多。
+   一键训练必须默认保存 best checkpoint，并把 monitor 指标、epoch 和 config 一起写进 checkpoint。
+
+进阶思考：
+   如果训练中断，要恢复实验至少需要哪些文件？为什么日志、配置和 checkpoint 必须放在同一个 save_dir 下？
+""".strip())
+
 # SYNTAX_SKIP: import torch
 # SYNTAX_SKIP: import torch.nn as nn
 # SYNTAX_SKIP: import torch.nn.functional as F
@@ -388,6 +415,7 @@
 
 def demo_one_click_training():
     """一键训练演示"""
+    print_learning_guide()
     import torchvision
     import torchvision.transforms as transforms
 
@@ -432,3 +460,6 @@ def demo_one_click_training():
 
 
 # demo_one_click_training()  # 取消注释运行
+
+if __name__ == "__main__":
+    print_learning_guide()

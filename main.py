@@ -381,6 +381,172 @@ def e(value: str) -> str:
     return html.escape(value, quote=True)
 
 
+LEGACY_LEARNING_GUIDES: dict[str, list[tuple[str, str]]] = {
+    "part5_toolbox/01_feature_visualization": [
+        (
+            "图怎么看",
+            "特征图每个小格是一条通道：亮区表示这个通道对某种边缘、纹理或局部形状反应强；卷积核图看权重模式，激活最大化图看“什么输入会让某个通道最兴奋”。",
+        ),
+        (
+            "参数怎么想",
+            "`max_channels` 决定一次看多少通道，`layer_name` 决定观察浅层边缘还是深层语义，`channel_idx` 决定激活最大化优化哪个探测器。",
+        ),
+        (
+            "工程坑",
+            "我见过最常见的误读是把特征图当成原图热力图。正确做法是先确认层名和通道，再问它是否稳定响应同一种模式；如果每个通道都像噪声，通常要查输入归一化、模型是否训练过、hook 是否挂错层。",
+        ),
+        (
+            "进阶思考",
+            "同一张输入经过 `conv1` 和 `conv2` 后，哪些通道更稀疏？如果只看最后分类结果，你会漏掉哪些模型已经学偏的线索？",
+        ),
+    ],
+    "part5_toolbox/02_gradient_monitor": [
+        (
+            "图怎么看",
+            "折线图看梯度随训练步数是否平稳，条形图看最后一刻哪一层异常，热力图看异常是突然出现还是长期存在；红色接近消失，黄色或极高值接近爆炸。",
+        ),
+        (
+            "排查顺序",
+            "先看 `loss` 是否发散，再看梯度 `max` 是否越过爆炸阈值，最后看前几层 `mean` 是否长期小于 `1e-6`。三者同时看，才能区分学习率过高、初始化不当和激活饱和。",
+        ),
+        (
+            "工程坑",
+            "梯度爆炸的症状通常是 loss 突然变成 NaN 或曲线大幅震荡；梯度消失的症状是训练 loss 很慢、早期层梯度接近 0。先尝试把学习率降到原来的 1/3，再加 `clip_grad_norm_(..., 1.0)`，不要一上来重写模型。",
+        ),
+        (
+            "进阶思考",
+            "如果只有最后一层梯度很大，是标签/损失设置更可疑，还是整网学习率更可疑？如果只有前几层梯度消失，残差连接和归一化层各能解决哪一段问题？",
+        ),
+    ],
+    "part5_toolbox/03_training_dynamics": [
+        (
+            "图怎么看",
+            "权重分布图看均值是否持续偏移、标准差是否膨胀；激活饱和图看 ReLU 死亡比例或 Tanh/Sigmoid 饱和比例；更新幅度图看 `lr * grad_norm / weight_norm` 是否在 `1e-4` 到 `1e-2` 的健康带内。",
+        ),
+        (
+            "联合诊断",
+            "loss 降而验证不升，多半是过拟合或数据问题；loss 不降且更新比小，多半学习率太低；loss 震荡且更新比大，多半学习率太高。训练动态要和学习率曲线一起读。",
+        ),
+        (
+            "工程坑",
+            "只盯准确率很容易晚发现问题。我踩过的典型坑是准确率暂时上涨，但激活饱和率已经超过 50%，两天后模型迁移到新数据立刻崩。看到饱和率变红，要先查初始化、激活函数和输入尺度。",
+        ),
+        (
+            "进阶思考",
+            "为什么更新比比单独的梯度范数更可靠？如果某一层权重很小但梯度正常，它的更新比会怎样提醒你？",
+        ),
+    ],
+    "part5_toolbox/04_hyperparam_search": [
+        (
+            "图怎么看",
+            "LR Finder 重点看对数坐标下 loss 下降最快的区间；调度策略图看学习率何时变大、何时退火；敏感性图看哪个参数改变后验证分数波动最大。",
+        ),
+        (
+            "搜索空间",
+            "学习率优先用对数尺度搜索，例如 `1e-4`、`3e-4`、`1e-3`、`3e-3`；dropout 先看 `0.0` 到 `0.5`；hidden size 先做 2 到 3 个量级点，不要一开始铺满网格。",
+        ),
+        (
+            "工程坑",
+            "超参搜索最大的坑不是慢，而是用测试集选参数。正确流程是训练集训练、验证集选择、测试集只最终报告；早停也必须看验证集，否则会把噪声当成能力。",
+        ),
+        (
+            "进阶思考",
+            "如果最优点周围一圈配置都很差，你会信这个最优点吗？随机搜索和网格搜索在高维参数空间里为什么表现不同？",
+        ),
+    ],
+    "part6_universal_framework/01_unified_interface": [
+        (
+            "抽象边界",
+            "`TensorDatasetWrapper` 管数据形状和归一化，`TrainableMixin.fit` 管训练流程，`MLP/SimpleCNN` 管模型结构。统一接口的价值是让数据、模型、训练三件事能替换，但边界仍然清楚。",
+        ),
+        (
+            "默认值经验",
+            "`batch_size=32/64`、`lr=1e-3`、`patience=10`、`grad_clip=1.0` 是多数小实验的稳妥起点；生产项目再根据验证曲线微调，而不是把所有参数都暴露给新手。",
+        ),
+        (
+            "工程坑",
+            "过度抽象会把错误藏起来：如果 `.fit()` 里自动做了太多事，初学者会不知道优化器、调度器和早停在哪里生效。遇到异常时先打印 config、数据 batch shape、loss 和 lr。",
+        ),
+        (
+            "进阶思考",
+            "哪些东西应该统一成接口，哪些东西应该保留在具体模型里？如果任务从分类变成回归，应该改 task、loss，还是改模型 forward？",
+        ),
+    ],
+    "part6_universal_framework/04_plugin_system": [
+        (
+            "图怎么看",
+            "注册表不是神秘容器，本质是名字到类的映射。`register_model`、`register_dataset`、`register_task` 分别把模型、数据、任务挂到同一个可查询目录里。",
+        ),
+        (
+            "扩展流程",
+            "新增组件时先写类，再用装饰器注册，最后通过配置里的 `name` 构建。这样切换模型只改配置，不改训练主循环。",
+        ),
+        (
+            "工程坑",
+            "插件系统最容易踩的是名称冲突和默认参数失控。生产中要检查重复注册、记录最终合并后的 config，并让插件加载失败时给出明确错误，而不是静默跳过。",
+        ),
+        (
+            "进阶思考",
+            "插件让扩展更快，但也让系统更难追踪。你会把数据增强也做成插件吗？哪些组件变化频繁，值得注册化？",
+        ),
+    ],
+    "part6_universal_framework/03_full_project": [
+        (
+            "完整闭环",
+            "`UniversalTrainer` 管训练、验证、调度、早停和最优模型保存；`UniversalVisualizer` 管结构摘要、参数分布、预测样例和错误分析。",
+        ),
+        (
+            "产物边界",
+            "一次可复现实验至少要有 config、checkpoint、history、训练曲线和最终评估。只留下一个模型权重，后面很难解释结果从哪里来。",
+        ),
+        (
+            "工程坑",
+            "完整项目最常见的问题不是少写模型，而是训练、验证、测试边界混乱。评估函数必须只评估，不应偷偷更新参数或改动随机种子。",
+        ),
+        (
+            "进阶思考",
+            "如果验证 loss 改善但业务指标变差，你会先查 metric_fn、数据切分，还是模型结构？为什么 evaluate 不应该调用 optimizer.step()？",
+        ),
+    ],
+    "part6_universal_framework/05_one_click_training": [
+        (
+            "流程闭环",
+            "一键训练不是只有 `runner.run()`，而是配置、设备、模型、数据、loss、optimizer、scheduler、checkpoint、日志和最终评估的完整流水线。",
+        ),
+        (
+            "产物怎么看",
+            "`training_log.csv` 看每轮指标，`best.pt` 保存最优权重，`config.json` 固化复现实验，`training_curves.png` 把 loss、metric、lr 放到同一张诊断图里。",
+        ),
+        (
+            "工程坑",
+            "我见过最贵的坑是只保存最后一轮模型，没有保存最佳验证集模型。训练后期过拟合时，最后一轮可能比第 7 轮差很多；所以默认保存 best checkpoint，并记录 monitor 指标。",
+        ),
+        (
+            "进阶思考",
+            "如果训练中断，恢复实验需要哪些文件？为什么日志、配置和 checkpoint 必须放在同一个实验目录下？",
+        ),
+    ],
+    "part6_universal_framework/07_project_template": [
+        (
+            "项目目录",
+            "训练入口负责读 config、设 seed、构建组件和启动 runner；评估脚本只加载 checkpoint 做验证；K-Fold 和 ensemble 是比赛或高风险评估中的复现工具。",
+        ),
+        (
+            "复现流程",
+            "一个可复现项目至少要保存 config、随机种子、数据切分、代码版本、checkpoint、训练日志和最终指标。少一个，后面就很难解释为什么这次结果变了。",
+        ),
+        (
+            "工程坑",
+            "模板最大的风险是复制后不删占位逻辑。比如 `TODO` 评估数据、`...` dataloader 必须在真实项目里补全，否则会形成“看起来完整、实际不可复现”的假工程。",
+        ),
+        (
+            "进阶思考",
+            "为什么训练脚本和评估脚本要分开？如果线上指标和离线验证集冲突，你会优先检查数据切分、指标定义，还是模型结构？",
+        ),
+    ],
+}
+
+
 def module_kind(module: ModuleInfo) -> str:
     if is_streamlit_app(module.path):
         return "交互页面"
@@ -676,6 +842,37 @@ def render_legacy_results(module: ModuleInfo, run_dir: Path) -> None:
             st.code(stderr[-12000:], language="text")
 
 
+def render_legacy_learning_guide(module: ModuleInfo) -> None:
+    import streamlit as st
+
+    guide = LEGACY_LEARNING_GUIDES.get(module.target)
+    if not guide:
+        return
+
+    st.subheader("学习导读")
+    st.markdown(
+        """
+        <div class="lesson-note">
+          先把下面四张卡读完，再运行脚本。它们会告诉你该看哪张图、调哪些参数、遇到训练异常时先查哪里。
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    for row_start in range(0, len(guide), 2):
+        cols = st.columns(2)
+        for col, (title, body) in zip(cols, guide[row_start:row_start + 2]):
+            with col:
+                st.markdown(
+                    f"""
+                    <div class="artifact-note">
+                      <strong>{e(title)}</strong>
+                      <p>{e(body)}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+
 def render_legacy_module_page(module: ModuleInfo) -> None:
     import streamlit as st
 
@@ -716,6 +913,8 @@ def render_legacy_module_page(module: ModuleInfo) -> None:
         st.write(module.summary)
         render_module_card_html = render_module_card(module)
         st.markdown(render_module_card_html, unsafe_allow_html=True)
+
+    render_legacy_learning_guide(module)
 
     if run_clicked:
         with st.spinner("正在安全运行旧脚本，并把 Matplotlib 图保存为网页图片..."):

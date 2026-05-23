@@ -12,6 +12,40 @@ from typing import Dict, Type, Any, Callable, Optional
 from dataclasses import dataclass
 
 
+_GUIDE_PRINTED = False
+
+
+def print_learning_guide():
+    global _GUIDE_PRINTED
+    if _GUIDE_PRINTED:
+        return
+    _GUIDE_PRINTED = True
+    print("""
+学习导读：插件系统的核心不是炫技，而是让模型、数据集和任务可以被稳定替换。
+
+1. 注册表怎么看
+   - MODEL_REGISTRY 把模型名称映射到模型类和默认参数。
+   - DATASET_REGISTRY 把数据集名称映射到 Dataset 类和默认参数。
+   - TASK_REGISTRY 把任务名称映射到 loss、metrics 和任务对象。
+   - build_model/build_dataset/build_task 是统一入口，配置文件只需要写 name 和 params。
+
+2. 钩子系统怎么看
+   - on_epoch_end 这类钩子点是训练流程的插槽，适合记录学习率、监控梯度、早停和保存额外日志。
+   - 钩子不能悄悄改变核心训练语义，否则排查会变困难；它应该只做可观察、可关闭、可记录的事情。
+
+3. 配置模板怎么看
+   - model/dataset/task/training/hooks/output 分别对应模型、数据、任务、训练参数、扩展逻辑和产物位置。
+   - 推荐默认值：lr=0.001、weight_decay=1e-4、grad_clip=1.0、patience=10，先跑通再根据验证曲线微调。
+
+工程坑案例：
+   插件系统最常见的问题是名称冲突和默认参数覆盖不清。真实项目里要在启动时打印最终合并后的 config，
+   并检查重复注册；插件加载失败必须报出文件名和异常，不能静默跳过。
+
+进阶思考：
+   哪些变化频繁的组件值得插件化？如果一个插件需要修改训练循环内部很多行，说明抽象边界设计得对吗？
+""".strip())
+
+
 # ─────────────────────────────────────────────────────────
 # 模型注册表
 # ─────────────────────────────────────────────────────────
@@ -329,6 +363,7 @@ import yaml
 
 def create_experiment_config():
     """生成实验配置模板"""
+    print_learning_guide()
     config = {
         'experiment': {
             'name': 'mnist_classification',
@@ -473,6 +508,7 @@ class MultiLabelTask:
 
 def demo_switch_models():
     """演示：同一训练代码，切换不同模型"""
+    print_learning_guide()
     print("可用模型:", list(MODEL_REGISTRY.keys()))
     print("可用数据集:", list(DATASET_REGISTRY.keys()))
     print("可用任务:", list(TASK_REGISTRY.keys()))

@@ -15,6 +15,35 @@ import time
 import json
 import os
 
+
+def print_learning_guide():
+    print("""
+学习导读：完整项目骨架要解决的不是“能不能跑一次”，而是“下个月还能不能复现实验”。
+
+1. UniversalTrainer 在管什么
+   - _run_epoch 统一训练和验证流程，确保 train/eval 模式、no_grad、loss、metric 的边界清楚。
+   - fit 负责学习率调度、早停、保存最优模型和记录 history。
+   - evaluate 只做评估，不更新参数；plot 把 loss、metric、lr 放在一起看。
+
+2. UniversalVisualizer 在管什么
+   - model_summary 检查层名、类型、参数量，先确认模型结构没有搭错。
+   - plot_parameter_distributions 检查权重是否异常偏移、过窄或过宽。
+   - visualize_predictions 把预测样本、真实标签和错误案例摆出来，避免只看总准确率。
+
+3. 默认值怎么落地
+   - AdamW + lr=0.001 + weight_decay=1e-4 是小型分类项目常用起点。
+   - grad_clip=1.0 是训练保险丝，能挡住偶发梯度尖峰，但不能替代学习率诊断。
+   - early_stopping_patience=5 适合演示；真实项目通常根据总 epoch 和验证集噪声设为 5% 到 15%。
+
+工程坑案例：
+   我见过项目只保存 best_model.pth，却没有保存 config 和数据切分方式。三周后指标复现不了，没人知道当时用的是哪份数据。
+   完整项目目录必须把 config、checkpoint、training_history.json、训练曲线和最终评估放在同一个实验目录中。
+
+进阶思考：
+   如果验证 loss 改善但业务指标变差，你应该先查 metric_fn、数据切分，还是模型结构？为什么 evaluate 不应该偷偷调用 optimizer.step()？
+""".strip())
+
+
 # ─────────────────────────────────────────────────────────
 # 统一训练器：支持任意 PyTorch 模型
 # ─────────────────────────────────────────────────────────
@@ -529,6 +558,7 @@ def full_pipeline_demo():
     return trainer, visualizer
 
 if __name__ == "__main__":
+    print_learning_guide()
     print("万能框架已准备好！取消注释下面一行来运行完整流水线。")
     print("\n使用方法：")
     print("  trainer = UniversalTrainer(model, optimizer, loss_fn, ...)")
