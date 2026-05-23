@@ -10,11 +10,14 @@ or:
 from __future__ import annotations
 
 import random
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeVar
 
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 
@@ -107,6 +110,9 @@ def ensure_state() -> None:
     st.session_state.setdefault("interview_correct_count", 0)
     st.session_state.setdefault("interview_user_answer_visible", False)
     st.session_state.setdefault("interview_user_answer", "")
+    st.session_state.setdefault("interview_question_start_time", 0.0)
+    st.session_state.setdefault("interview_answer_times", [])
+    st.session_state.setdefault("interview_results", [])
 
 
 def filtered_questions(direction: str, difficulty: str) -> list[QuizItem]:
@@ -125,6 +131,7 @@ def pick_question(candidates: list[QuizItem]) -> None:
     st.session_state["interview_current_qid"] = random.choice(candidates).qid
     st.session_state["interview_user_answer_visible"] = False
     st.session_state["interview_user_answer"] = ""
+    st.session_state["interview_question_start_time"] = time.time()
 
 
 def current_question(candidates: list[QuizItem]) -> QuizItem | None:
@@ -134,6 +141,9 @@ def current_question(candidates: list[QuizItem]) -> QuizItem | None:
         return by_id[qid]
     if candidates:
         st.session_state["interview_current_qid"] = candidates[0].qid
+        # 首次加载时也记录开始时间
+        if st.session_state.get("interview_question_start_time", 0.0) == 0.0:
+            st.session_state["interview_question_start_time"] = time.time()
         return candidates[0]
     return None
 
@@ -153,6 +163,171 @@ def add_unique(state_key: str, item: QuizItem) -> None:
     st.session_state[state_key] = rows
 
 
+def record_interview_result(item: QuizItem, correct: bool) -> None:
+    """记录本轮每次判题结果，用于后续统计分析。"""
+    answer_times = st.session_state.get("interview_answer_times", [])
+    elapsed = 0.0
+    if st.session_state.get("interview_user_answer_visible", False) and answer_times:
+        elapsed = answer_times[-1]
+    if elapsed <= 0:
+        start = st.session_state.get("interview_question_start_time", 0.0)
+        if start > 0:
+            elapsed = time.time() - start
+            st.session_state["interview_answer_times"].append(elapsed)
+
+    results = list(st.session_state.get("interview_results", []))
+    results.append(
+        {
+            "qid": item.qid,
+            "direction": item.direction,
+            "difficulty": item.difficulty,
+            "correct": correct,
+            "elapsed": float(elapsed),
+        }
+    )
+    st.session_state["interview_results"] = results
+
+
+def extract_key_points(answer: str) -> list[str]:
+    """从标准答案中提取关键要点。"""
+    parts = [s.strip() for s in answer.replace("；", "。").replace("；", "。").split("。") if s.strip()]
+    return parts[:5]
+
+
+def format_elapsed(seconds: float) -> str:
+    """格式化用时显示。"""
+    if seconds < 60:
+        return f"{seconds:.0f} 秒"
+    minutes = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{minutes} 分 {secs} 秒"
+
+
+def render_practice_analysis() -> None:
+    st.subheader("本轮练题统计分析")
+    results = st.session_state.get("interview_results", [])
+    if not results:
+        st.info("本轮还没有答题记录。点击“我答对了”或“我答错了”后，这里会展示方向、难度和用时分析。")
+        return
+
+    df = pd.DataFrame(results)
+    chart_config = {"displayModeBar": False, "responsive": True}
+    colors = {
+        "答对": "#0f8b8d",
+        "答错": "#bf3f5b",
+        "总数": "#3268a8",
+        "正确率": "#c4871f",
+        "用时": "#3268a8",
+    }
+
+    direction_order = ["网络", "数据库", "算法", "操作系统", "深度学习"]
+    direction_summary = (
+        df.groupby("direction", as_index=False)
+        .agg(答对=("correct", "sum"), 总数=("qid", "count"))
+        .assign(答错=lambda data: data["总数"] - data["答对"])
+    )
+    direction_summary = (
+        direction_summary.set_index("direction")
+        .reindex(direction_order, fill_value=0)
+        .reset_index()
+        .rename(columns={"index": "direction"})
+    )
+    direction_summary[["答对", "总数", "答错"]] = direction_summary[["答对", "总数", "答错"]].astype(int)
+
+    fig_direction = go.Figure()
+    for name in ["答对", "答错", "总数"]:
+        fig_direction.add_trace(
+            go.Bar(
+                y=direction_summary["direction"],
+                x=direction_summary[name],
+                name=name,
+                orientation="h",
+                marker_color=colors[name],
+                text=direction_summary[name],
+                textposition="auto",
+            )
+        )
+    fig_direction.update_layout(
+        height=320,
+        barmode="group",
+        margin=dict(l=10, r=10, t=24, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        legend_title_text="",
+        xaxis_title="题数",
+        yaxis_title="方向",
+    )
+    st.plotly_chart(fig_direction, use_container_width=True, config=chart_config)
+
+    difficulty_order = ["基础", "高频", "进阶", "大厂追问"]
+    difficulty_summary = (
+        df.groupby("difficulty", as_index=False)
+        .agg(答对=("correct", "sum"), 总数=("qid", "count"))
+    )
+    difficulty_summary = (
+        difficulty_summary.set_index("difficulty")
+        .reindex(difficulty_order, fill_value=0)
+        .reset_index()
+        .rename(columns={"index": "difficulty"})
+    )
+    difficulty_summary[["答对", "总数"]] = difficulty_summary[["答对", "总数"]].astype(int)
+    difficulty_summary["正确率"] = difficulty_summary.apply(
+        lambda row: row["答对"] / row["总数"] * 100 if row["总数"] else 0,
+        axis=1,
+    )
+
+    fig_difficulty = px.bar(
+        difficulty_summary,
+        x="正确率",
+        y="difficulty",
+        orientation="h",
+        text=difficulty_summary["正确率"].map(lambda value: f"{value:.0f}%"),
+        color_discrete_sequence=[colors["正确率"]],
+    )
+    fig_difficulty.update_traces(hovertemplate="%{y}<br>正确率 %{x:.1f}%<extra></extra>")
+    fig_difficulty.update_layout(
+        height=280,
+        margin=dict(l=10, r=10, t=24, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis_title="正确率",
+        yaxis_title="难度",
+        xaxis=dict(range=[0, 100], ticksuffix="%"),
+        showlegend=False,
+    )
+    st.plotly_chart(fig_difficulty, use_container_width=True, config=chart_config)
+
+    time_df = df.reset_index().rename(columns={"index": "题序"})
+    time_df["题序"] = time_df["题序"] + 1
+    fig_time = px.line(
+        time_df,
+        x="题序",
+        y="elapsed",
+        markers=True,
+        color_discrete_sequence=[colors["用时"]],
+        hover_data={"qid": True, "direction": True, "difficulty": True, "elapsed": ":.1f"},
+    )
+    fig_time.update_layout(
+        height=280,
+        margin=dict(l=10, r=10, t=24, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis_title="答题顺序",
+        yaxis_title="用时（秒）",
+        showlegend=False,
+    )
+    st.plotly_chart(fig_time, use_container_width=True, config=chart_config)
+
+    answered_directions = direction_summary[direction_summary["总数"] > 0].copy()
+    answered_directions["正确率"] = answered_directions["答对"] / answered_directions["总数"] * 100
+    weakest = answered_directions.sort_values(["正确率", "总数"], ascending=[True, False]).iloc[0]
+    st.info(
+        f"薄弱方向提示：当前正确率最低的是 {weakest['direction']}，正确率 {weakest['正确率']:.0f}% "
+        f"（答对 {int(weakest['答对'])} / 共 {int(weakest['总数'])} 题）。建议下一轮优先筛选该方向，"
+        "先复盘错题本里的遗漏点，再连续练 3-5 道同方向题巩固表达。"
+    )
+
+
 def main() -> None:
     ensure_state()
     st.markdown(css(), unsafe_allow_html=True)
@@ -160,7 +335,7 @@ def main() -> None:
         """
         <div class="hero">
           <h1>CS 面试刷题模式</h1>
-          <p>随机出题、按方向和难度筛选，并把错题与稍后复习题留在本轮会话中，适合高频八股的快速口述训练。</p>
+          <p>随机出题、按方向和难度筛选，支持先自己作答再对照标准答案，附带要点自查清单和答题计时，适合高频八股的快速口述训练。</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -181,6 +356,13 @@ def main() -> None:
             st.metric("本轮正确率", f"{accuracy:.0f}%")
             st.caption(f"已答 {answered} 题，答对 {correct} 题")
 
+        # 平均用时统计
+        answer_times = st.session_state.get("interview_answer_times", [])
+        if answer_times:
+            avg_time = sum(answer_times) / len(answer_times)
+            st.metric("平均用时", format_elapsed(avg_time))
+            st.caption(f"共作答 {len(answer_times)} 次")
+
         if st.button("随机出题", key="quiz-random", use_container_width=True):
             pick_question(candidates)
         if st.button("清空错题本", key="quiz-clear", use_container_width=True):
@@ -188,6 +370,8 @@ def main() -> None:
             st.session_state["interview_later_book"] = []
             st.session_state["interview_answered_count"] = 0
             st.session_state["interview_correct_count"] = 0
+            st.session_state["interview_answer_times"] = []
+            st.session_state["interview_results"] = []
 
     with right:
         candidates = filtered_questions(direction, difficulty)
@@ -218,6 +402,11 @@ def main() -> None:
                 st.session_state["interview_user_answer"] = user_answer
                 if st.button("提交并查看标准答案", key="quiz-show-answer", use_container_width=True):
                     st.session_state["interview_user_answer_visible"] = True
+                    # 记录用时
+                    start = st.session_state.get("interview_question_start_time", 0.0)
+                    if start > 0:
+                        elapsed = time.time() - start
+                        st.session_state["interview_answer_times"].append(elapsed)
                     st.rerun()
             else:
                 # 显示用户答案
@@ -228,8 +417,22 @@ def main() -> None:
 
             # 标准答案和追问（仅在提交后显示）
             if st.session_state.get("interview_user_answer_visible", False):
+                # 显示用时
+                answer_times = st.session_state.get("interview_answer_times", [])
+                if answer_times:
+                    last_time = answer_times[-1]
+                    st.caption(f"⏱️ 用时 {format_elapsed(last_time)}")
+
                 with st.expander("标准答案", expanded=True):
                     st.write(item.answer)
+
+                # 要点自查清单
+                key_points = extract_key_points(item.answer)
+                if key_points:
+                    st.markdown("**📋 要点自查清单**")
+                    for i, point in enumerate(key_points, 1):
+                        st.markdown(f"- [ ] {point}")
+
                 with st.expander("面试官追问"):
                     st.write(item.follow_up)
                 with st.expander("初学者易错点"):
@@ -242,10 +445,12 @@ def main() -> None:
                 if st.button("我答对了", key="quiz-right", use_container_width=True):
                     st.session_state["interview_answered_count"] = st.session_state.get("interview_answered_count", 0) + 1
                     st.session_state["interview_correct_count"] = st.session_state.get("interview_correct_count", 0) + 1
+                    record_interview_result(item, True)
                     pick_question(candidates)
             with c2:
                 if st.button("我答错了", key="quiz-wrong", use_container_width=True):
                     st.session_state["interview_answered_count"] = st.session_state.get("interview_answered_count", 0) + 1
+                    record_interview_result(item, False)
                     add_unique("interview_wrong_book", item)
                     pick_question(candidates)
             with c3:
@@ -277,9 +482,9 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
+    render_practice_analysis()
     render_back_home()
 
 
 if __name__ == "__main__":
     safe_run(main)
-
