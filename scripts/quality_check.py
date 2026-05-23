@@ -34,6 +34,7 @@ FOCUS_FILES = [
     Path("part1_foundations/math_primer.py"),
     Path("part2_cnn/cnn_architectures.py"),
     Path("part2_cnn/advanced_cnn.py"),
+    Path("part3_rnn/sequence_models.py"),
 ]
 
 TEXT_SCAN_EXCLUDES = {
@@ -46,6 +47,7 @@ FOCUS_ROUTES = [
     "part1_foundations/math_primer",
     "part2_cnn/cnn_architectures",
     "part2_cnn/advanced_cnn",
+    "part3_rnn/sequence_models",
 ]
 
 EXPECTED_CONTROL_REFERENCES = {
@@ -114,6 +116,28 @@ EXPECTED_CONTROL_REFERENCES = {
         "丢弃概率 p",
         "训练模式：开启 Dropout",
     ],
+    Path("part3_rnn/sequence_models.py"): [
+        "查看内容",
+        "展开时间步",
+        "当前时间步",
+        "循环权重尺度",
+        "隐藏单元数",
+        "输入强度",
+        "反向传播时间距离",
+        "循环 Jacobian 尺度",
+        "tanh 饱和程度",
+        "遗忘门偏置",
+        "输入门偏置",
+        "输出门偏置",
+        "更新门偏置",
+        "重置门偏置",
+        "序列长度",
+        "双向合并方式",
+        "模型类型",
+        "窗口长度",
+        "学习率",
+        "temperature",
+    ],
 }
 
 SMOKE_FUNCTIONS = {
@@ -152,6 +176,16 @@ SMOKE_FUNCTIONS = {
         "render_pooling_guide",
         "render_bn_guide",
         "render_dropout_guide",
+    ],
+    Path("part3_rnn/sequence_models.py"): [
+        "render_sequence_learning_map",
+        "render_rnn_unroll_guide",
+        "render_gradient_issue_guide",
+        "render_lstm_guide",
+        "render_gru_guide",
+        "render_bidirectional_guide",
+        "render_forecast_guide",
+        "render_text_generation_guide",
     ],
 }
 
@@ -222,6 +256,7 @@ def check_placeholders() -> None:
 def streamlit_control_labels(text: str) -> set[str]:
     label_patterns = [
         r"st(?:\.sidebar)?\.(?:slider|selectbox|select_slider|radio|text_input|text_area|number_input|toggle|checkbox|multiselect)\(\s*([\"'])(.*?)\1",
+        r"\b\w+\.(?:slider|selectbox|select_slider|radio|text_input|text_area|number_input|toggle|checkbox|multiselect)\(\s*([\"'])(.*?)\1",
         r"segmented\(\s*([\"'])(.*?)\1",
     ]
     labels: set[str] = set()
@@ -292,6 +327,20 @@ def call_smoke_function(namespace: dict[str, object], name: str) -> None:
         func(16, 6)
     elif name == "render_dropout_guide":
         func(0.35, True, 0.35)
+    elif name == "render_rnn_unroll_guide":
+        func(7, 4, 0.85, 8, 1.0)
+    elif name == "render_gradient_issue_guide":
+        func(60, 0.98, 0.12, {"effective_gain": 0.862, "final_norm": 1e-4})
+    elif name == "render_lstm_guide":
+        func(1.0, 0.0, 0.3, 1.1)
+    elif name == "render_gru_guide":
+        func(0.4, 0.0, 1.1)
+    elif name == "render_bidirectional_guide":
+        func(8, "concat")
+    elif name == "render_forecast_guide":
+        func("LSTM", 32, 32, 1, 0.003, 90, 0.08, 0.0, 0.0123)
+    elif name == "render_text_generation_guide":
+        func("唐诗风格小样本", 64, 260, 0.01, 50, 0.8)
     else:
         func()
 

@@ -666,6 +666,163 @@ def plot_char_training(losses: list[float], generated: str, chars: list[str]) ->
     return fig
 
 
+def render_sequence_learning_map() -> None:
+    st.markdown(
+        """
+        <div class="note">
+        <strong>学习地图：</strong>序列模型和普通前馈网络最大的区别，是它必须回答“前面发生过什么”。
+        RNN 用隐藏状态 h_t 压缩历史，LSTM 额外维护细胞状态 c_t 来保留长期记忆，GRU 用更少的门把记忆直接放在 h_t 里。
+        左侧“查看内容”可以按机制顺序阅读：先看 RNN 展开和隐藏状态，再看梯度问题，接着比较 LSTM/GRU 门控，最后进入预测和文本生成任务。
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        """
+        > 互动顺序：先在“RNN 展开”拖动“展开时间步”和“隐藏单元数”，观察状态如何沿时间传递；再到“梯度问题”把“反向传播时间距离”调长，观察远处梯度为什么会消失或爆炸；最后在“时间序列预测”和“文本生成”里调模型类型、窗口长度、学习率、temperature，把结构问题和训练现象连起来。
+        >
+        > 进阶思考：如果一个模型只看到当前输入 x_t，却没有隐藏状态 h_{t-1}，它还能判断“前面已经出现过什么”吗？这就是序列模型为什么需要状态。
+        """
+    )
+    st.code(
+        """hidden = None
+for x, y in loader:
+    pred, hidden = model(x, hidden)      # 前向：状态跨时间传递
+    loss = criterion(pred, y)
+    optimizer.zero_grad()
+    loss.backward()                      # BPTT：沿时间反向传播
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    optimizer.step()
+    hidden = hidden.detach()             # 截断 BPTT：保留数值，截断梯度图""",
+        language="python",
+    )
+
+
+def render_rnn_unroll_guide(
+    seq_len: int,
+    active_step: int,
+    recurrent_scale: float,
+    hidden_size: int,
+    input_scale: float,
+) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**上方展开图把同一个 RNN cell 沿时间复制成 **{seq_len}** 个时间步。每个 h 都不是新模型，而是同一组参数反复使用；箭头 `h_(t-1) -> h_t` 表示历史摘要向后传。当前高亮的是第 **{active_step}** 步，它同时接收当前输入 `x_t` 和前一步隐藏状态。
+
+        **隐藏状态为什么必要：**如果没有 h，模型每一步只能看当前输入，无法记住前面出现过的节奏、词语或事件。下方隐藏状态热力图中，横轴是时间，纵轴是隐藏单元；颜色持续变化说明模型正在把历史压缩进一组状态值。当前隐藏单元数为 **{hidden_size}**，输入强度为 **{input_scale:.1f}**，循环权重尺度为 **{recurrent_scale:.2f}**。
+
+        **参数怎么调：**“展开时间步”的范围是 3 到 12，控制结构图长度；“当前时间步”只改变高亮位置；“循环权重尺度”的范围是 0.10 到 1.50，决定历史状态影响下一步的强弱；“隐藏单元数”的范围是 4 到 16，决定状态容量；“输入强度”的范围是 0.2 到 2.0，决定新输入对状态的冲击。
+
+        > 极端值实验 1：把“隐藏单元数”调到 4，再把“输入强度”调高。观察热力图是否更容易挤成少数强响应。隐藏维度过小的症状是：模型只能记住粗略趋势，长序列预测会变钝。
+        >
+        > 极端值实验 2：把“循环权重尺度”调到 0.10，再调到 1.50。前者会让历史很快淡掉，后者会让状态更容易饱和或震荡。真实训练中，这会表现为长期依赖学不住或 loss 曲线不稳定。
+        """
+    )
+
+
+def render_gradient_issue_guide(seq_len: int, jacobian_scale: float, saturation: float, metrics: dict[str, float]) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**左图用 log 坐标展示梯度穿过时间步时的范数变化；右图把同一件事画成柱状图。当前反向传播时间距离是 **{seq_len}**，循环 Jacobian 尺度是 **{jacobian_scale:.2f}**，tanh 饱和程度是 **{saturation:.2f}**，单步有效增益为 **{metrics['effective_gain']:.3f}**。单步有效增益略小于 1，几十步后也会指数衰减；略大于 1，几十步后也可能爆炸。
+
+        **症状与排查：**梯度消失时，早期时间步几乎学不到，表现为长依赖任务准确率低、预测只依赖最近输入；梯度爆炸时，loss 会突然变成很大、NaN，或者参数更新后模型输出乱跳。排查顺序是：先看序列长度是否过长，再看激活是否饱和，再看学习率，最后打开梯度裁剪。
+
+        **梯度裁剪和截断 BPTT：**图中的 clip 曲线说明梯度裁剪能限制爆炸，但不能把已经消失的梯度恢复回来。截断 BPTT 的做法是把长序列分段训练，段间传递隐藏状态数值，但用 `detach()` 截断梯度图；它节省显存，也减少极长链路上的梯度问题。
+
+        > 极端值实验 3：把“反向传播时间距离”调到 120，再把“循环 Jacobian 尺度”调到 1.20。观察梯度如何爆炸。然后把尺度调到 0.85，观察梯度如何消失。思考：为什么 RNN 训练比普通前馈网络更怕时间链太长？
+        >
+        > 工程经验：真实项目里通常同时使用较小学习率、梯度裁剪、LSTM/GRU、LayerNorm/权重初始化，以及 Truncated BPTT。只加梯度裁剪，通常只能救爆炸，救不了长期记忆。
+        """
+    )
+
+
+def render_lstm_guide(forget_bias: float, input_bias: float, output_bias: float, candidate_strength: float) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**LSTM 有两条状态线：细胞状态 c_t 更像长期记忆，隐藏状态 h_t 更像当前要暴露给外部的短期摘要。热力图中“遗忘门”决定旧记忆保留多少，“输入门”决定新候选写入多少，“输出门”决定暴露多少记忆到 h_t。当前遗忘门偏置 **{forget_bias:.1f}**，输入门偏置 **{input_bias:.1f}**，输出门偏置 **{output_bias:.1f}**，候选记忆强度 **{candidate_strength:.1f}**。
+
+        **RNN 与 LSTM 的差异：**普通 RNN 只有 h_t 一条状态，所有历史都被挤在同一条通道里；LSTM 用 c_t 建立更直接的记忆通道，再用门控决定保留、写入和输出。这就是 LSTM 更擅长长依赖的原因。
+
+        **参数怎么调：**四个滑块范围分别是 -3.0 到 3.0、-3.0 到 3.0、-3.0 到 3.0、0.1 到 2.5。偏置越高，对应门平均越开；候选记忆强度越高，新写入内容越强。工程上常把遗忘门偏置初始化为正值，让模型一开始更愿意保留旧记忆。
+
+        > 互动：把“遗忘门偏置”调到 -3.0，再调到 3.0。观察“新记忆”一行如何变化。思考：为什么遗忘门太关会让长期信息断掉，太开又可能把旧噪声一直带下去？
+        """
+    )
+
+
+def render_gru_guide(update_bias: float, reset_bias: float, candidate_strength: float) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**GRU 没有独立的 c_t，它把记忆直接放在 h_t 中。更新门 z_t 决定旧隐藏态和候选状态的混合比例，重置门 r_t 决定计算候选状态时看多少旧信息。当前更新门偏置 **{update_bias:.1f}**，重置门偏置 **{reset_bias:.1f}**，候选状态强度 **{candidate_strength:.1f}**。
+
+        **LSTM 与 GRU 的差异：**LSTM 有输入门、遗忘门、输出门和候选记忆，控制更细；GRU 把输入/遗忘合并成更新门，参数更少、训练更快。页面指标卡用“4 组门”和“3 组门”说明了这个结构差异。
+
+        **参数怎么调：**“更新门偏置”和“重置门偏置”的范围都是 -3.0 到 3.0；“候选状态强度”的范围是 0.1 到 2.5。更新门越开，GRU 越愿意采用新候选；重置门越关，候选状态越少依赖旧历史。
+
+        > 互动：把“更新门偏置”调到 -3.0，再调到 3.0。观察新隐藏态更像旧隐藏态还是候选状态。思考：为什么 GRU 常作为 LSTM 的轻量替代，但不是所有长记忆任务都一定优于 LSTM？
+        """
+    )
+
+
+def render_bidirectional_guide(seq_len: int, merge_mode: str) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**每个位置同时有正向隐藏态和反向隐藏态。正向读左侧历史，反向读右侧未来，最后按 **{merge_mode}** 合并成当前位置输出。当前序列长度为 **{seq_len}**。
+
+        **为什么需要双向：**文本分类、序列标注、实体抽取等任务通常已经看到了完整句子，因此一个词的左侧和右侧都可能提供线索。单向 RNN 只能利用过去，双向 RNN 能同时利用两边上下文。
+
+        **边界条件：**双向 RNN 不适合严格在线预测和自回归生成，因为这些场景不能偷看未来 token。做实时语音、实时传感器预测时，通常只能用单向或有限延迟的双向结构。
+
+        > 互动：把“序列长度”调长，观察每个位置都多了一条反向信息路径。思考：为什么双向结构适合文本分类，却不适合一步一步生成下一个字符？
+        """
+    )
+
+
+def render_forecast_guide(
+    cell_type: str,
+    seq_len: int,
+    hidden_size: int,
+    num_layers: int,
+    lr: float,
+    epochs: int,
+    noise: float,
+    dropout: float,
+    test_loss: float,
+) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**左图是训练损失，越平滑下降说明优化越稳定；右图把输入窗口、真实下一步、模型预测和滚动预测放在一起。滚动预测会把模型自己的输出继续喂回去，所以错误会逐步累积。当前模型类型是 **{cell_type}**，窗口长度 **{seq_len}**，隐藏单元 **{hidden_size}**，层数 **{num_layers}**，学习率 **{lr}**，训练 **{epochs}** epoch，噪声强度 **{noise:.2f}**，dropout **{dropout:.2f}**，测试 MSE **{test_loss:.5f}**。
+
+        **RNN / LSTM / GRU 怎么选：**RNN 参数少但长依赖弱；LSTM 稳定但更重；GRU 介于两者之间，常作为速度和效果的折中。隐藏单元太少会欠拟合，窗口过长会增加 BPTT 难度，学习率太大容易让损失曲线抖动。
+
+        **Teacher Forcing 的影子：**训练时模型看到的是干净的输入窗口，滚动预测时看到的是自己上一步预测，这和 Seq2Seq 中 Teacher Forcing 的训练/推理差异很像。症状是单步预测还可以，但长距离滚动预测逐渐漂移。
+
+        > 极端值实验：把“隐藏单元”设为 8、把“窗口长度”设为 60，再把“学习率”设为 0.01。观察损失曲线和滚动预测是否更不稳定。排查时先降低学习率，再缩短窗口或换 LSTM/GRU，最后再增加隐藏维度。
+        """
+    )
+
+
+def render_text_generation_guide(
+    corpus_name: str,
+    hidden_size: int,
+    epochs: int,
+    lr: float,
+    length: int,
+    temperature: float,
+) -> None:
+    st.markdown(
+        f"""
+        **图怎么看：**生成结果展示模型按字符一步步预测下一个字符；左图是训练交叉熵，右图是生成文本中的字符分布。当前语料是 **{corpus_name}**，隐藏单元 **{hidden_size}**，训练 **{epochs}** epoch，学习率 **{lr}**，生成长度 **{length}**，temperature **{temperature:.2f}**。
+
+        **Teacher Forcing 与推理差异：**训练字符模型时，每一步通常用真实前缀预测下一个真实字符，这就是 Teacher Forcing 的简化形式；生成时，模型只能使用自己刚生成的字符。如果训练时太依赖真实前缀，生成时一个错误会带偏后续很多步。
+
+        **参数怎么调：**temperature 低时概率分布更尖锐，输出更保守、更容易重复；temperature 高时更随机，但也更容易乱码。小语料和大 epoch 会让模型快速记忆训练文本，学习率太大则可能让 loss 震荡。
+
+        > 极端值实验：把 temperature 调到 0.2，再调到 2.0。观察生成文本从重复保守到随机发散的变化。思考：生成质量差时，是模型没学会，还是采样温度把分布推得太极端？
+        """
+    )
+
+
 with st.sidebar:
     st.header("导航")
     section = st.radio(
@@ -694,6 +851,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+render_sequence_learning_map()
 
 
 if section == "RNN 展开":
@@ -718,6 +876,7 @@ if section == "RNN 展开":
     hidden_size = d1.slider("隐藏单元数", 4, 16, 8, 1)
     input_scale = d2.slider("输入强度", 0.2, 2.0, 1.0, 0.1)
     st.pyplot(plot_hidden_dynamics(seq_len * 6, hidden_size, recurrent_scale, input_scale), clear_figure=True)
+    render_rnn_unroll_guide(seq_len, active_step, recurrent_scale, hidden_size, input_scale)
 
 elif section == "梯度问题":
     st.subheader("2. 梯度消失和梯度爆炸")
@@ -739,6 +898,7 @@ elif section == "梯度问题":
         """,
         unsafe_allow_html=True,
     )
+    render_gradient_issue_guide(seq_len, jacobian_scale, saturation, metrics)
 
 elif section == "LSTM 门控":
     st.subheader("3. LSTM 门控机制")
@@ -759,6 +919,7 @@ elif section == "LSTM 门控":
         """,
         unsafe_allow_html=True,
     )
+    render_lstm_guide(forget_bias, input_bias, output_bias, candidate_strength)
 
 elif section == "GRU 门控":
     st.subheader("4. GRU 的简化门控机制")
@@ -782,6 +943,7 @@ elif section == "GRU 门控":
         """,
         unsafe_allow_html=True,
     )
+    render_gru_guide(update_bias, reset_bias, candidate_strength)
 
 elif section == "双向 RNN":
     st.subheader("5. 双向 RNN 结构")
@@ -797,6 +959,7 @@ elif section == "双向 RNN":
         """,
         unsafe_allow_html=True,
     )
+    render_bidirectional_guide(seq_len, merge_mode)
 
 elif section == "时间序列预测":
     st.subheader("6. 简单时间序列预测 demo")
@@ -814,6 +977,7 @@ elif section == "时间序列预测":
         result = train_forecast_model(cell_type, seq_len, hidden_size, num_layers, lr, epochs, noise, dropout)
     st.pyplot(plot_forecast_result(result), clear_figure=True)
     st.metric("测试 MSE", f"{result.test_loss:.5f}")
+    render_forecast_guide(cell_type, seq_len, hidden_size, num_layers, lr, epochs, noise, dropout, result.test_loss)
 
 elif section == "文本生成":
     st.subheader("7. 简单文本生成 demo")
@@ -847,3 +1011,4 @@ elif section == "文本生成":
         """,
         unsafe_allow_html=True,
     )
+    render_text_generation_guide(corpus_name, hidden_size, epochs, lr, length, temperature)
