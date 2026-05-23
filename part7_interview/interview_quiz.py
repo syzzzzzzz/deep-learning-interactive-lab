@@ -103,6 +103,10 @@ def ensure_state() -> None:
     st.session_state.setdefault("interview_current_qid", "")
     st.session_state.setdefault("interview_wrong_book", [])
     st.session_state.setdefault("interview_later_book", [])
+    st.session_state.setdefault("interview_answered_count", 0)
+    st.session_state.setdefault("interview_correct_count", 0)
+    st.session_state.setdefault("interview_user_answer_visible", False)
+    st.session_state.setdefault("interview_user_answer", "")
 
 
 def filtered_questions(direction: str, difficulty: str) -> list[QuizItem]:
@@ -119,6 +123,8 @@ def pick_question(candidates: list[QuizItem]) -> None:
         st.session_state["interview_current_qid"] = ""
         return
     st.session_state["interview_current_qid"] = random.choice(candidates).qid
+    st.session_state["interview_user_answer_visible"] = False
+    st.session_state["interview_user_answer"] = ""
 
 
 def current_question(candidates: list[QuizItem]) -> QuizItem | None:
@@ -166,11 +172,22 @@ def main() -> None:
         difficulty = st.selectbox("按难度筛选", ["全部", "基础", "高频", "进阶", "大厂追问"], key="quiz-difficulty")
         candidates = filtered_questions(direction, difficulty)
         st.metric("当前题库数量", len(candidates))
+
+        # 本轮会话统计
+        answered = st.session_state.get("interview_answered_count", 0)
+        correct = st.session_state.get("interview_correct_count", 0)
+        if answered > 0:
+            accuracy = correct / answered * 100
+            st.metric("本轮正确率", f"{accuracy:.0f}%")
+            st.caption(f"已答 {answered} 题，答对 {correct} 题")
+
         if st.button("随机出题", key="quiz-random", use_container_width=True):
             pick_question(candidates)
         if st.button("清空错题本", key="quiz-clear", use_container_width=True):
             st.session_state["interview_wrong_book"] = []
             st.session_state["interview_later_book"] = []
+            st.session_state["interview_answered_count"] = 0
+            st.session_state["interview_correct_count"] = 0
 
     with right:
         candidates = filtered_questions(direction, difficulty)
@@ -188,21 +205,47 @@ def main() -> None:
                 """,
                 unsafe_allow_html=True,
             )
-            with st.expander("查看标准答案", expanded=True):
-                st.write(item.answer)
-            with st.expander("面试官追问"):
-                st.write(item.follow_up)
-            with st.expander("初学者易错点"):
-                st.write(item.trap)
-            with st.expander("项目中的真实应用"):
-                st.write(item.application)
+
+            # 先自己作答模式
+            if not st.session_state.get("interview_user_answer_visible", False):
+                user_answer = st.text_area(
+                    "先自己想一想，口述或写下你的答案：",
+                    value=st.session_state.get("interview_user_answer", ""),
+                    height=120,
+                    key="quiz-user-input",
+                    placeholder="写出你的理解，尽量覆盖关键点、边界条件和工程取舍...",
+                )
+                st.session_state["interview_user_answer"] = user_answer
+                if st.button("提交并查看标准答案", key="quiz-show-answer", use_container_width=True):
+                    st.session_state["interview_user_answer_visible"] = True
+                    st.rerun()
+            else:
+                # 显示用户答案
+                user_answer = st.session_state.get("interview_user_answer", "")
+                if user_answer.strip():
+                    st.markdown("**你的答案：**")
+                    st.info(user_answer)
+
+            # 标准答案和追问（仅在提交后显示）
+            if st.session_state.get("interview_user_answer_visible", False):
+                with st.expander("标准答案", expanded=True):
+                    st.write(item.answer)
+                with st.expander("面试官追问"):
+                    st.write(item.follow_up)
+                with st.expander("初学者易错点"):
+                    st.write(item.trap)
+                with st.expander("项目中的真实应用"):
+                    st.write(item.application)
 
             c1, c2, c3 = st.columns(3)
             with c1:
                 if st.button("我答对了", key="quiz-right", use_container_width=True):
+                    st.session_state["interview_answered_count"] = st.session_state.get("interview_answered_count", 0) + 1
+                    st.session_state["interview_correct_count"] = st.session_state.get("interview_correct_count", 0) + 1
                     pick_question(candidates)
             with c2:
                 if st.button("我答错了", key="quiz-wrong", use_container_width=True):
+                    st.session_state["interview_answered_count"] = st.session_state.get("interview_answered_count", 0) + 1
                     add_unique("interview_wrong_book", item)
                     pick_question(candidates)
             with c3:
@@ -228,8 +271,8 @@ def main() -> None:
     st.markdown(
         """
         <div class="note">
-        训练建议：先口述答案，再展开标准答案对照。真正面试时要主动给出边界条件、工程取舍和排查路径，
-        不要只背一句定义。
+        训练建议：先在输入框里写下你的答案，再提交对照标准答案。真正面试时要主动给出边界条件、工程取舍和排查路径，
+        不要只背一句定义。对比自己的答案和标准答案，找出遗漏的关键点。
         </div>
         """,
         unsafe_allow_html=True,
