@@ -1,3 +1,77 @@
+MODULE_TITLE = "注意力机制"
+MODULE_SUMMARY = "从查询、键、值和权重矩阵理解注意力的信息检索过程。"
+MODULE_TAGS = ["Transformer", "注意力", "NLP", "可视化"]
+
+import streamlit as st
+
+
+PLAYGROUND_TARGET = "part6_universal_framework/neural_network_playground"
+
+
+def _running_under_streamlit() -> bool:
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+        return get_script_run_ctx() is not None
+    except Exception:
+        return False
+
+
+def _go_to_playground(example: str) -> None:
+    st.query_params["module"] = PLAYGROUND_TARGET
+    st.query_params["example"] = example
+    st.rerun()
+
+
+def _render_streamlit_entry() -> None:
+    st.set_page_config(page_title="注意力机制", layout="wide", initial_sidebar_state="expanded")
+    st.markdown(
+        """
+        <style>
+        .stApp { background: linear-gradient(180deg, #fbfcfb 0%, #eef5f2 100%); color: #172026; }
+        .block-container { padding-top: 1.2rem; padding-bottom: 2.4rem; }
+        .hero { border-bottom: 1px solid #d7dde1; padding-bottom: 0.9rem; margin-bottom: 1rem; }
+        .hero h1 { margin: 0; font-size: clamp(2rem, 3vw, 3rem); letter-spacing: 0; }
+        .hero p { color: #58646d; max-width: 980px; line-height: 1.7; margin: 0.45rem 0 0; }
+        .note { border-left: 4px solid #0f8b8d; background: rgba(255,255,255,0.78); border-radius: 0 8px 8px 0; padding: 0.75rem 0.95rem; line-height: 1.7; }
+        </style>
+        <div class="hero">
+          <h1>注意力机制</h1>
+          <p>从 Query、Key、Value 的投影出发，理解注意力如何把“当前位置的问题”映射到“上下文中的信息检索”。</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    left, right = st.columns([0.7, 0.3])
+    with left:
+        st.markdown(
+            """
+            <div class="note">
+            注意力里的 Q/K/V 本质上是线性投影后的表示。先在中央控制台里观察 Linear 层如何保持序列长度、替换最后一维，
+            再回到完整多头注意力，会更容易看懂 reshape、分头和加权求和的形状流动。
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with right:
+        if st.button("去实战：Transformer 示例", width="stretch"):
+            _go_to_playground("transformer")
+    st.subheader("核心张量形状")
+    st.code(
+        """X: [batch, seq_len, d_model]
+Q = X @ W_Q: [batch, seq_len, d_k]
+K = X @ W_K: [batch, seq_len, d_k]
+V = X @ W_V: [batch, seq_len, d_v]
+scores = Q @ K.transpose(-2, -1): [batch, seq_len, seq_len]
+output = softmax(scores / sqrt(d_k)) @ V: [batch, seq_len, d_v]""",
+        language="text",
+    )
+
+
+if _running_under_streamlit():
+    _render_streamlit_entry()
+    st.stop()
+
 try:
     """
     自动生成自: part4_transformer\01_attention_mechanism.md

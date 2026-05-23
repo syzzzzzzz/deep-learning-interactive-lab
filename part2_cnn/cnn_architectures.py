@@ -25,6 +25,7 @@ from plotly.subplots import make_subplots
 torch.set_num_threads(1)
 
 PLOT_CONFIG = {"displayModeBar": False, "responsive": True}
+PLAYGROUND_TARGET = "part6_universal_framework/neural_network_playground"
 
 st.set_page_config(
     page_title="经典 CNN 架构与高级应用",
@@ -139,6 +140,12 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+
+def go_to_playground(example: str) -> None:
+    st.query_params["module"] = PLAYGROUND_TARGET
+    st.query_params["example"] = example
+    st.rerun()
 
 
 @dataclass(frozen=True)
@@ -919,6 +926,11 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+practice_col, _ = st.columns([0.24, 0.76])
+with practice_col:
+    if st.button("去实战：CNN 构建器", width="stretch"):
+        go_to_playground("cnn")
+
 render_cnn_arch_learning_map()
 
 if section == "架构演进":

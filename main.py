@@ -176,6 +176,7 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("part6", "part6_universal_framework", "插件系统", "04_plugin_system", "用注册表和插件扩展任务、模型与工具。", "工程", ("框架", "插件"), 63),
     ModuleInfo("part6", "part6_universal_framework", "一键训练", "05_one_click_training", "从配置到训练、评估和产物保存的一键流程。", "工程", ("训练", "自动化"), 64),
     ModuleInfo("part6", "part6_universal_framework", "可视化实验台", "06_streamlit_demo", "用 Streamlit 交互观察边界、卷积和注意力。", "核心", ("实验", "可视化", "Streamlit"), 65),
+    ModuleInfo("part6", "part6_universal_framework", "神经网络乐高工厂", "neural_network_playground", "用表单构建神经网络、形状推导、代码生成、示例模型加载。", "核心", ("构建器", "Playground", "实战"), 66),
     ModuleInfo("part6", "part6_universal_framework", "项目模板", "07_project_template", "训练脚本、评估脚本、K-Fold 和集成预测模板。", "工程", ("项目", "模板"), 66),
     ModuleInfo("part6", "part6_universal_framework", "强化学习入门", "reinforcement_learning", "强化学习概念、多臂老虎机、Q-Learning 和纯 Python 环境 demo。", "核心", ("RL", "强化学习", "实验"), 67),
     ModuleInfo("part6", "part6_universal_framework", "学习路径推荐", "learning_path", "入门测评、个性化路径、知识图谱、进度追踪和下一步推荐。", "核心", ("路径", "知识图谱", "测评"), 68),
