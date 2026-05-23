@@ -93,3 +93,24 @@ python main.py part2_cnn/01_convolution_visual
 - 根目录下的 `.png`、`.log`、`.pt` 通常是教学脚本运行产物，不建议提交到仓库。
 - 如果新增章节，请优先保持“图文绑定、可调参数、误区解释、工程意义”的教学风格。
 
+## 内容质量检查
+
+提交前建议运行：
+
+```powershell
+python scripts/quality_check.py
+```
+
+这条命令会检查：
+
+- Python 文件能否编译，并把 `SyntaxWarning` 当作失败处理。
+- 教材内容是否残留模板占位符。
+- 首批重点页面中，互动文案引用的控件是否真实存在。
+- 主站重点路由是否已注册。
+- 注意力机制、经典机器学习、数学基础速查的关键渲染分支是否能跑通。
+
+如果只想快速做静态检查，可以执行：
+
+```powershell
+python scripts/quality_check.py --skip-smoke
+```

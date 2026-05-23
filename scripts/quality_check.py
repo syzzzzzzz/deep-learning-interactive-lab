@@ -1,0 +1,291 @@
+"""
+内容质量检查入口。
+
+运行：
+    python scripts/quality_check.py
+"""
+
+from __future__ import annotations
+
+import argparse
+import io
+import os
+import re
+import runpy
+import sys
+import warnings
+from contextlib import redirect_stderr, redirect_stdout
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+PLACEHOLDER_PATTERNS = [
+    "【知识点名称】",
+    "【参数名】",
+    "【可视化图名称】",
+    "【对应可视化",
+    "【调参控件",
+]
+
+FOCUS_FILES = [
+    Path("part4_transformer/transformer_models.py"),
+    Path("part1_foundations/classical_ml.py"),
+    Path("part1_foundations/math_primer.py"),
+]
+
+TEXT_SCAN_EXCLUDES = {
+    Path("scripts/quality_check.py"),
+}
+
+FOCUS_ROUTES = [
+    "part4_transformer/transformer_models",
+    "part1_foundations/classical_ml",
+    "part1_foundations/math_primer",
+]
+
+EXPECTED_CONTROL_REFERENCES = {
+    Path("part4_transformer/transformer_models.py"): [
+        "输入文本",
+        "计算步骤",
+        "注意力演示维度",
+        "多头注意力锐度",
+        "选择一个 query token",
+    ],
+    Path("part1_foundations/classical_ml.py"): [
+        "学习率",
+        "L2 正则化系数",
+        "训练轮数",
+        "类别可分程度",
+        "正则化强度 C",
+        "最大树深度",
+        "最大叶子节点数",
+        "K 值",
+        "迭代步数",
+        "核函数",
+        "gamma",
+        "查询点 x1",
+        "查询点 x2",
+    ],
+    Path("part1_foundations/math_primer.py"): [
+        "u_x",
+        "u_y",
+        "v_x",
+        "v_y",
+        "缩放系数 alpha",
+        "观察点 x0",
+        "割线步长 h",
+        "当前 x",
+        "当前 y",
+        "先验 P(H)：样本真实为正的比例",
+        "选择分布",
+        "采样数量",
+        "学习率",
+        "动量",
+    ],
+}
+
+SMOKE_FUNCTIONS = {
+    Path("part4_transformer/transformer_models.py"): [
+        "render_overview",
+        "render_self_attention",
+        "render_multihead",
+        "render_text_heatmap",
+    ],
+    Path("part1_foundations/classical_ml.py"): [
+        "render_linear_regression",
+        "render_logistic_regression",
+        "render_decision_tree",
+        "render_kmeans",
+        "render_svm",
+        "render_knn",
+    ],
+    Path("part1_foundations/math_primer.py"): [
+        "render_linear_algebra",
+        "render_calculus",
+        "render_probability",
+        "render_gradient_descent",
+        "render_cheatsheet",
+    ],
+}
+
+
+class CheckFailure(Exception):
+    pass
+
+
+def project_files(suffixes: tuple[str, ...]) -> list[Path]:
+    ignored_parts = {
+        ".git",
+        ".venv",
+        "venv",
+        "env",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".streamlit_module_outputs",
+    }
+    files: list[Path] = []
+    for path in ROOT.rglob("*"):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(ROOT)
+        if any(part in ignored_parts for part in rel.parts):
+            continue
+        if path.suffix.lower() in suffixes:
+            files.append(rel)
+    return sorted(files)
+
+
+def read_text(rel_path: Path) -> str:
+    return (ROOT / rel_path).read_text(encoding="utf-8", errors="replace")
+
+
+def check_python_compile() -> None:
+    failures: list[str] = []
+    py_files = project_files((".py",))
+    for rel_path in py_files:
+        try:
+            source = read_text(rel_path)
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", SyntaxWarning)
+                compile(source, str(ROOT / rel_path), "exec")
+        except Exception as exc:  # noqa: BLE001 - report all compile-time failures.
+            failures.append(f"{rel_path}: {exc}")
+    if failures:
+        raise CheckFailure("Python 编译或 SyntaxWarning 检查失败：\n" + "\n".join(failures))
+    print(f"[通过] Python 编译检查：{len(py_files)} 个文件")
+
+
+def check_placeholders() -> None:
+    failures: list[str] = []
+    text_files = [path for path in project_files((".py", ".md", ".txt", ".bat")) if path not in TEXT_SCAN_EXCLUDES]
+    generic_placeholder = re.compile(r"【[^】]{1,40}】")
+    for rel_path in text_files:
+        text = read_text(rel_path)
+        for pattern in PLACEHOLDER_PATTERNS:
+            if pattern in text:
+                failures.append(f"{rel_path}: 发现模板占位符 {pattern}")
+        for match in generic_placeholder.finditer(text):
+            failures.append(f"{rel_path}: 发现疑似模板占位符 {match.group(0)}")
+    if failures:
+        raise CheckFailure("模板占位符检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 模板占位符检查：{len(text_files)} 个文本文件")
+
+
+def streamlit_control_labels(text: str) -> set[str]:
+    label_patterns = [
+        r"st(?:\.sidebar)?\.(?:slider|selectbox|select_slider|radio|text_input|text_area|number_input|toggle|checkbox|multiselect)\(\s*([\"'])(.*?)\1",
+        r"segmented\(\s*([\"'])(.*?)\1",
+    ]
+    labels: set[str] = set()
+    for pattern in label_patterns:
+        labels.update(match.group(2) for match in re.finditer(pattern, text, flags=re.S))
+    return labels
+
+
+def check_expected_controls() -> None:
+    failures: list[str] = []
+    for rel_path, expected_labels in EXPECTED_CONTROL_REFERENCES.items():
+        text = read_text(rel_path)
+        labels = streamlit_control_labels(text)
+        for label in expected_labels:
+            if label not in labels:
+                failures.append(f"{rel_path}: 文案引用的控件不存在或未被识别：{label}")
+    if failures:
+        raise CheckFailure("重点控件引用检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 重点控件引用检查：{len(EXPECTED_CONTROL_REFERENCES)} 个页面")
+
+
+def load_module(rel_path: Path) -> dict[str, object]:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        return runpy.run_path(str(ROOT / rel_path), run_name="__main__")
+
+
+def call_smoke_function(namespace: dict[str, object], name: str) -> None:
+    func = namespace[name]
+    if name == "render_overview":
+        func(2)
+    elif name == "render_self_attention":
+        func("The cat sat on the mat because it was tired", 16, 7)
+    elif name == "render_multihead":
+        pack = namespace["compute_attention"](namespace["tokenize"]("The cat sat on the mat because it was tired"), 16, 7)
+        func(pack, 1.4)
+    elif name == "render_text_heatmap":
+        pack = namespace["compute_attention"](namespace["tokenize"]("The cat sat on the mat because it was tired"), 16, 7)
+        func(pack)
+    elif name.startswith("render_") and name in {
+        "render_linear_regression",
+        "render_logistic_regression",
+        "render_decision_tree",
+        "render_kmeans",
+        "render_svm",
+        "render_knn",
+    }:
+        func(42)
+    else:
+        func()
+
+
+def check_focus_smoke() -> None:
+    failures: list[str] = []
+    old_env = os.environ.copy()
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    try:
+        for rel_path, function_names in SMOKE_FUNCTIONS.items():
+            try:
+                namespace = load_module(rel_path)
+                for name in function_names:
+                    stdout = io.StringIO()
+                    stderr = io.StringIO()
+                    with redirect_stdout(stdout), redirect_stderr(stderr):
+                        call_smoke_function(namespace, name)
+            except Exception as exc:  # noqa: BLE001 - smoke test should report every runtime failure.
+                failures.append(f"{rel_path}: {exc}")
+    finally:
+        os.environ.clear()
+        os.environ.update(old_env)
+    if failures:
+        raise CheckFailure("重点页面渲染 smoke 失败：\n" + "\n".join(failures))
+    print(f"[通过] 重点页面渲染 smoke：{len(SMOKE_FUNCTIONS)} 个页面")
+
+
+def check_main_routes() -> None:
+    namespace = runpy.run_path(str(ROOT / "main.py"))
+    routes = namespace["route_map"]()
+    missing = [route for route in FOCUS_ROUTES if route not in routes]
+    if missing:
+        raise CheckFailure("主站路由检查失败，缺少：\n" + "\n".join(missing))
+    print(f"[通过] 主站重点路由检查：{len(FOCUS_ROUTES)} 条路由")
+
+
+def run_checks(include_smoke: bool) -> None:
+    check_python_compile()
+    check_placeholders()
+    check_expected_controls()
+    check_main_routes()
+    if include_smoke:
+        check_focus_smoke()
+    print("[完成] 内容质量检查全部通过")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="深度学习交互式网站内容质量检查")
+    parser.add_argument(
+        "--skip-smoke",
+        action="store_true",
+        help="跳过重点页面渲染 smoke，只做静态检查。",
+    )
+    args = parser.parse_args()
+    try:
+        run_checks(include_smoke=not args.skip_smoke)
+    except CheckFailure as exc:
+        print(f"[失败] {exc}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
