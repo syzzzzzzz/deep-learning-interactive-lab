@@ -1454,6 +1454,44 @@ def render_streamlit_home() -> None:
     st.subheader("功能亮点")
     st.markdown(render_feature_cards(), unsafe_allow_html=True)
 
+    st.subheader("学习进度总览")
+    try:
+        from components.progress_tracker import render进度总览
+
+        render进度总览()
+    except Exception as exc:
+        st.warning("学习进度总览暂时无法显示，请继续浏览课程目录。")
+        with st.expander("查看进度组件错误", expanded=False):
+            st.code(str(exc), language="text")
+
+    st.subheader("知识图谱导航")
+    try:
+        from components.knowledge_graph import KNOWLEDGE_GRAPH
+
+        path_keys = [
+            "math_primer",
+            "tensors_gradients",
+            "activation_functions",
+            "neural_network_basics",
+            "convolution_visual",
+            "cnn_architectures",
+            "rnn_intuition",
+            "sequence_models",
+            "attention_mechanism",
+            "transformer_models",
+            "training_dynamics",
+            "gradient_monitor",
+        ]
+        path_nodes = [KNOWLEDGE_GRAPH[key] for key in path_keys if key in KNOWLEDGE_GRAPH]
+        st.caption("推荐路径：先补数学和梯度，再进入神经网络、视觉、序列、注意力，最后用训练诊断收束。")
+        for index, node in enumerate(path_nodes, 1):
+            st.markdown(f"**{index}. {node.title}**")
+            st.caption(f"{node.description}｜难度：{node.difficulty}｜实战目标：{node.practice_target}")
+    except Exception as exc:
+        st.warning("知识图谱导航暂时无法显示，请继续浏览课程目录。")
+        with st.expander("查看知识图谱错误", expanded=False):
+            st.code(str(exc), language="text")
+
     st.subheader("学习路径推荐")
     left, right = st.columns([0.38, 0.62])
     with left:
