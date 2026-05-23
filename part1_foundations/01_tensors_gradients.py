@@ -1,3 +1,7 @@
+MODULE_TITLE = "张量与梯度"
+MODULE_SUMMARY = "用可视化理解张量形状、自动求导和反向传播。"
+MODULE_TAGS = ["基础", "张量", "梯度", "PyTorch"]
+
 try:
     """
     自动生成自: part1_foundations\01_tensors_gradients.md

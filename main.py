@@ -120,6 +120,14 @@ PARTS: dict[str, PartInfo] = {
         "框架与前沿",
         "统一接口、模块化工程、项目模板、学习路径、术语表和前沿方向。",
     ),
+    "part7": PartInfo(
+        "part7",
+        "part7_interview",
+        "🎯",
+        "第七部分 CS面试八股",
+        "面试八股",
+        "计算机网络、数据库、数据结构、操作系统面试训练。",
+    ),
 }
 
 
@@ -183,6 +191,11 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("part6", "part6_universal_framework", "深度学习术语表", "glossary", "集中检索常见概念、缩写和相关模块。", "复习", ("术语", "搜索", "复习"), 69),
     ModuleInfo("part6", "part6_universal_framework", "前沿方向", "frontier", "LLM、AGI、多模态、自监督、XAI、安全与对齐。", "前沿", ("LLM", "AGI", "安全"), 70),
     ModuleInfo("part6", "part6_universal_framework", "经典论文解读实验室", "paper_reading_lab", "用时间线、机制图和最小复现清单读懂经典深度学习论文。", "进阶", ("论文", "可视化", "复现"), 71),
+    ModuleInfo("part7", "part7_interview", "计算机网络", "networking", "TCP握手挥手、HTTP/HTTPS、DNS解析、高频面试题与交互练习。", "核心", ("网络", "TCP", "HTTP", "面试"), 70),
+    ModuleInfo("part7", "part7_interview", "数据库SQL", "database_sql", "SELECT执行流程、B+树索引、慢查询排查、高频面试题与交互练习。", "核心", ("数据库", "SQL", "索引", "面试"), 71),
+    ModuleInfo("part7", "part7_interview", "数据结构与算法", "data_structures", "数组链表可视化、排序算法动画、BFS/DFS、高频面试题。", "核心", ("数据结构", "算法", "排序", "面试"), 72),
+    ModuleInfo("part7", "part7_interview", "操作系统", "operating_system", "进程线程、调度算法、虚拟内存、死锁、高频面试题。", "核心", ("操作系统", "进程", "内存", "面试"), 73),
+    ModuleInfo("part7", "part7_interview", "面试刷题模式", "interview_quiz", "随机出题、按方向难度筛选、错题本、面试官追问。", "核心", ("刷题", "面试", "错题本"), 74),
 ]
 
 
@@ -1361,6 +1374,26 @@ def render_sidebar(catalog: list[ModuleInfo]) -> None:
     st.divider()
     st.caption("命令行示例")
     st.code("python main.py part6/frontier", language="bash")
+
+
+    st.divider()
+    if st.button("运行质量检查", width="stretch"):
+        with st.spinner("正在运行 scripts/quality_check.py..."):
+            completed = subprocess.run(
+                [sys.executable, str(BASE_DIR / "scripts" / "quality_check.py")],
+                cwd=BASE_DIR,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=300,
+            )
+        if completed.returncode == 0:
+            st.success("质量检查通过")
+        else:
+            st.error(f"质量检查失败，退出码 {completed.returncode}")
+        output = "\n".join(part for part in [completed.stdout.strip(), completed.stderr.strip()] if part)
+        st.code(output or "没有输出", language="text")
 
 
 def render_streamlit_home() -> None:

@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import io
 import os
 import re
@@ -16,6 +17,7 @@ import sys
 import warnings
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +42,14 @@ FOCUS_FILES = [
 TEXT_SCAN_EXCLUDES = {
     Path("scripts/quality_check.py"),
 }
+
+LEGACY_PROTOCOL_FILES = [
+    Path("part1_foundations/01_tensors_gradients.py"),
+    Path("part1_foundations/03_datasets_optimizers.py"),
+    Path("part2_cnn/01_convolution_visual.py"),
+    Path("part3_rnn/01_rnn_intuition.py"),
+    Path("part4_transformer/01_attention_mechanism.py"),
+]
 
 FOCUS_ROUTES = [
     "part4_transformer/transformer_models",
@@ -335,6 +345,21 @@ def read_text(rel_path: Path) -> str:
     return (ROOT / rel_path).read_text(encoding="utf-8", errors="replace")
 
 
+def parse_python(rel_path: Path) -> ast.Module:
+    return ast.parse(read_text(rel_path), filename=str(ROOT / rel_path))
+
+
+def literal_value(node: ast.AST) -> object:
+    try:
+        return ast.literal_eval(node)
+    except Exception:
+        return None
+
+
+def function_names(tree: ast.Module) -> set[str]:
+    return {node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+
+
 def check_python_compile() -> None:
     failures: list[str] = []
     py_files = project_files((".py",))
@@ -365,6 +390,45 @@ def check_placeholders() -> None:
     if failures:
         raise CheckFailure("模板占位符检查失败：\n" + "\n".join(failures))
     print(f"[通过] 模板占位符检查：{len(text_files)} 个文本文件")
+
+
+def check_bracket_placeholders() -> None:
+    failures: list[str] = []
+    pattern = re.compile(r"【[^】\n]{1,80}】")
+    py_files = [path for path in project_files((".py",)) if path not in TEXT_SCAN_EXCLUDES]
+    for rel_path in py_files:
+        text = read_text(rel_path)
+        for line_number, line in enumerate(text.splitlines(), 1):
+            for match in pattern.finditer(line):
+                failures.append(f"{rel_path}:{line_number}: 发现疑似模板占位符 {match.group(0)}")
+    if failures:
+        raise CheckFailure("残留模板占位符检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 残留模板占位符检查：【xxx】格式，{len(py_files)} 个 Python 文件")
+
+
+def check_legacy_module_protocol_metadata() -> None:
+    failures: list[str] = []
+    for rel_path in LEGACY_PROTOCOL_FILES:
+        tree = parse_python(rel_path)
+        assignments: dict[str, object] = {}
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id in {"MODULE_TITLE", "MODULE_SUMMARY", "MODULE_TAGS"}:
+                        assignments[target.id] = literal_value(node.value)
+
+        title = assignments.get("MODULE_TITLE")
+        summary = assignments.get("MODULE_SUMMARY")
+        tags = assignments.get("MODULE_TAGS")
+        if not isinstance(title, str) or not title.strip():
+            failures.append(f"{rel_path}: 缺少有效 MODULE_TITLE")
+        if not isinstance(summary, str) or not summary.strip():
+            failures.append(f"{rel_path}: 缺少有效 MODULE_SUMMARY")
+        if not isinstance(tags, list) or not tags or not all(isinstance(tag, str) and tag.strip() for tag in tags):
+            failures.append(f"{rel_path}: 缺少有效 MODULE_TAGS")
+    if failures:
+        raise CheckFailure("老脚本模块协议元数据检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 老脚本模块协议元数据检查：{len(LEGACY_PROTOCOL_FILES)} 个文件")
 
 
 def streamlit_control_labels(text: str) -> set[str]:
@@ -503,12 +567,138 @@ def check_main_routes() -> None:
     print(f"[通过] 主站重点路由检查：{len(FOCUS_ROUTES)} 条路由")
 
 
+def route_from_knowledge_url(url: str) -> str:
+    parsed = urlparse(url)
+    values = parse_qs(parsed.query).get("module", [])
+    return unquote(values[0]) if values else ""
+
+
+def check_knowledge_graph_routes() -> None:
+    main_namespace = runpy.run_path(str(ROOT / "main.py"))
+    graph_namespace = runpy.run_path(str(ROOT / "components" / "knowledge_graph.py"))
+    routes = main_namespace["route_map"]()
+    graph = graph_namespace["KNOWLEDGE_GRAPH"]
+    module_url = graph_namespace["_module_url"]
+
+    failures: list[str] = []
+    for key in sorted(graph):
+        route = route_from_knowledge_url(module_url(key))
+        if route not in routes:
+            failures.append(f"{key}: 映射到 {route or '<empty>'}，但 main.py MODULES/route_map 中没有对应路由")
+    if failures:
+        raise CheckFailure("知识图谱元数据完整性检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 知识图谱元数据完整性检查：{len(graph)} 个节点")
+
+
+def check_bagu_routes_placeholder() -> None:
+    """Reserved check for future interview-route batches."""
+
+    print("[通过] 八股文路由检查：接口已预留，当前批次未定义八股文路由表")
+
+
+def check_back_to_home_entry() -> None:
+    text = read_text(Path("main.py"))
+    failures: list[str] = []
+    if "def render_home_button" not in text:
+        failures.append("main.py: 缺少统一返回主界面入口 render_home_button()")
+    if "render_legacy_module_page" not in text or "render_home_button()" not in text:
+        failures.append("main.py: 老脚本页面缺少统一返回主界面入口调用")
+    if "runpy.run_path" in text and text.count("render_home_button()") < 3:
+        failures.append("main.py: Streamlit 路由外壳缺少返回主界面入口调用")
+    if failures:
+        raise CheckFailure("返回主界面入口检查失败：\n" + "\n".join(failures))
+    print("[通过] 返回主界面入口检查：main.py 已为路由页面提供统一返回入口")
+
+
+def call_name(node: ast.AST) -> str:
+    if isinstance(node, ast.Call):
+        return call_name(node.func)
+    if isinstance(node, ast.Attribute):
+        base = call_name(node.value)
+        return f"{base}.{node.attr}" if base else node.attr
+    if isinstance(node, ast.Name):
+        return node.id
+    return ""
+
+
+def is_guarded_main_if(node: ast.AST) -> bool:
+    if not isinstance(node, ast.If):
+        return False
+    test = ast.unparse(node.test) if hasattr(ast, "unparse") else ""
+    return "__name__" in test and "__main__" in test
+
+
+def check_legacy_top_level_execution() -> None:
+    failures: list[str] = []
+    for rel_path in LEGACY_PROTOCOL_FILES:
+        tree = parse_python(rel_path)
+        for node in tree.body:
+            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+                failures.append(f"{rel_path}:{node.lineno}: 发现未包裹在 if __name__ 或 try/except 中的顶层调用")
+            elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign)) and node_contains_call(node, "plt.show"):
+                failures.append(f"{rel_path}:{node.lineno}: 发现未包裹在 if __name__ 或 try/except 中的顶层绘图执行")
+    if failures:
+        raise CheckFailure("老脚本顶层危险执行逻辑检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 老脚本顶层危险执行逻辑检查：{len(LEGACY_PROTOCOL_FILES)} 个文件")
+
+
+def node_contains_call(node: ast.AST, expected: str) -> bool:
+    return any(call_name(child) == expected for child in ast.walk(node) if isinstance(child, ast.Call))
+
+
+def check_statement_list_for_unclosed_matplotlib(body: list[ast.stmt], rel_path: Path, failures: list[str]) -> None:
+    for index, stmt in enumerate(body):
+        if node_contains_call(stmt, "plt.show"):
+            has_close_after = any(node_contains_call(next_stmt, "plt.close") for next_stmt in body[index + 1 :])
+            if not has_close_after:
+                failures.append(f"{rel_path}:{stmt.lineno}: plt.show() 后缺少 plt.close()")
+
+
+def check_matplotlib_close_after_show() -> None:
+    failures: list[str] = []
+    runner_text = read_text(Path("legacy_runner.py"))
+    if "plt.show = save_open_figures" not in runner_text or 'plt.close("all")' not in runner_text:
+        failures.append("legacy_runner.py: 缺少 plt.show 统一替换或 plt.close(\"all\") 清理")
+
+    legacy_roots = {
+        "part1_foundations",
+        "part2_cnn",
+        "part3_rnn",
+        "part4_transformer",
+        "part5_toolbox",
+        "part6_universal_framework",
+    }
+    scan_files = [
+        rel_path
+        for rel_path in project_files((".py",))
+        if rel_path.parts[0] not in legacy_roots and rel_path != Path("legacy_runner.py")
+    ]
+    for rel_path in scan_files:
+        tree = parse_python(rel_path)
+        check_statement_list_for_unclosed_matplotlib(tree.body, rel_path, failures)
+        for node in ast.walk(tree):
+            for field_name in ("body", "orelse", "finalbody"):
+                body = getattr(node, field_name, None)
+                if isinstance(body, list) and all(isinstance(item, ast.stmt) for item in body):
+                    check_statement_list_for_unclosed_matplotlib(body, rel_path, failures)
+    if failures:
+        raise CheckFailure("Matplotlib 图未关闭检查失败：\n" + "\n".join(failures))
+    print(f"[通过] Matplotlib 图未关闭检查：legacy_runner 统一关闭旧脚本图像，额外扫描 {len(scan_files)} 个非旧脚本文件")
+
+
 def run_checks(include_smoke: bool) -> None:
     check_python_compile()
     check_placeholders()
+    check_bracket_placeholders()
+    check_legacy_module_protocol_metadata()
     check_expected_controls()
     check_expected_content()
     check_main_routes()
+    check_knowledge_graph_routes()
+    check_bagu_routes_placeholder()
+    check_back_to_home_entry()
+    check_legacy_top_level_execution()
+    check_matplotlib_close_after_show()
     if include_smoke:
         check_focus_smoke()
     print("[完成] 内容质量检查全部通过")

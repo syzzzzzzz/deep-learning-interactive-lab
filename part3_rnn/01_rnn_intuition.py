@@ -1,3 +1,7 @@
+MODULE_TITLE = "RNN 直觉"
+MODULE_SUMMARY = "从循环隐藏状态理解序列信息如何随时间流动。"
+MODULE_TAGS = ["RNN", "序列", "隐藏状态", "可视化"]
+
 try:
     """
     自动生成自: part3_rnn\01_rnn_intuition.md

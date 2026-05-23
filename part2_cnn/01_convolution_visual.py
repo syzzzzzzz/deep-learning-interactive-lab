@@ -1,3 +1,7 @@
+MODULE_TITLE = "卷积直觉"
+MODULE_SUMMARY = "用滑窗、卷积核和边缘检测建立 CNN 的局部特征直觉。"
+MODULE_TAGS = ["CNN", "卷积", "可视化", "视觉"]
+
 try:
     """
     自动生成自: part2_cnn\01_convolution_visual.md

@@ -1,3 +1,7 @@
+MODULE_TITLE = "数据集与优化器"
+MODULE_SUMMARY = "理解数据划分、批训练、SGD、Adam 和优化轨迹。"
+MODULE_TAGS = ["基础", "数据集", "优化器", "训练"]
+
 try:
     """
     自动生成自: part1_foundations\03_datasets_optimizers.md
