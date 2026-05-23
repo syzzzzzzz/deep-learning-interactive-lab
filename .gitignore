@@ -1,0 +1,32 @@
+# Python 缓存与本地环境
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Streamlit 与本地运行输出
+.streamlit_module_outputs/
+.streamlit/
+*.log
+*.stdout.log
+*.stderr.log
+
+# 教学脚本运行时生成的图片、模型与临时产物
+/*.png
+/*.jpg
+/*.jpeg
+/*.gif
+/*.pt
+/*.pth
+/*.ckpt
+
+# 系统与编辑器文件
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+

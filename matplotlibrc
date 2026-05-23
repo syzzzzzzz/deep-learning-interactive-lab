@@ -1,0 +1,17 @@
+font.family: sans-serif
+font.sans-serif: Microsoft YaHei, SimHei, Noto Sans CJK SC, Source Han Sans SC, Arial Unicode MS, DejaVu Sans
+axes.unicode_minus: False
+figure.facecolor: ivory
+axes.facecolor: floralwhite
+axes.edgecolor: lightsteelblue
+axes.labelcolor: black
+xtick.color: darkslategray
+ytick.color: darkslategray
+grid.color: lightsteelblue
+grid.alpha: 0.32
+lines.linewidth: 2.2
+figure.dpi: 120
+savefig.dpi: 150
+legend.frameon: True
+legend.framealpha: 0.92
+toolbar: None
