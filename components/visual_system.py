@@ -840,6 +840,355 @@ def render_training_dynamics_panel() -> None:
 
 
 # ──────────────────────────────────────────────
+# 高级卷积对比动效
+# ──────────────────────────────────────────────
+
+
+def render_advanced_conv_comparison() -> None:
+    """高级卷积对比动效：展示普通卷积、扩张卷积、分组卷积、深度可分离卷积的区别。
+
+    用 CSS 动画展示卷积核滑动效果，不同颜色区分各类型。
+    """
+    st = _st()
+    conv_types = [
+        ("标准卷积", "3×3, stride=1, padding=1", NEON_BLUE,
+         "所有输入通道参与所有输出通道，参数量 = C_in × C_out × K × K",
+         "standard"),
+        ("扩张卷积", "3×3, dilation=2, 感受野=5×5", NEON_PURPLE,
+         "在卷积核元素间插入空洞，在不增加参数的前提下扩大感受野",
+         "dilated"),
+        ("分组卷积", "3×3, groups=2, 参数减半", NEON_GREEN,
+         "将输入通道分成若干组，每组独立卷积，大幅减少计算量",
+         "grouped"),
+        ("深度可分离", "DW 3×3 + PW 1×1, 参数≈1/9", "#ffd166",
+         "先逐通道空间卷积，再逐点通道混合，MobileNet 的核心技巧",
+         "depthwise"),
+    ]
+
+    stages_html = []
+    for idx, (name, spec, color, desc, css_class) in enumerate(conv_types):
+        delay = round(idx * 0.15, 2)
+        # 生成 3×3 卷积核小格子
+        kernel_cells = ""
+        for r in range(3):
+            for c in range(3):
+                cell_opacity = 1.0
+                if css_class == "dilated" and r == 1 and c == 1:
+                    cell_opacity = 0.0  # 中心空洞
+                elif css_class == "grouped":
+                    group_id = (r + c) % 2
+                    cell_opacity = 0.9 if group_id == 0 else 0.35
+                elif css_class == "depthwise":
+                    cell_opacity = 0.85
+                kernel_cells += (
+                    f'<span class="vs-ck-cell" style="--cr:{r};--cc:{c};'
+                    f'opacity:{cell_opacity};--ck-color:{color}"></span>'
+                )
+
+        # 滑动光标
+        slider = f'<span class="vs-ck-slider vs-ck-{css_class}" style="--ck-color:{color}"></span>'
+
+        stages_html.append(
+            f"""
+            <div class="vs-conv-kind" style="--ck-color:{color};--ck-delay:{delay}s">
+              <div class="vs-ck-header">
+                <span class="vs-ck-name">{escape(name)}</span>
+                <code>{escape(spec)}</code>
+              </div>
+              <div class="vs-ck-kernel vs-ck-grid-{css_class}">
+                {kernel_cells}
+                {slider}
+              </div>
+              <p class="vs-ck-desc">{escape(desc)}</p>
+            </div>
+            """
+        )
+
+    st.markdown(
+        f"""
+        <div class="vs-card vs-conv-compare" title="四种卷积类型对比：感受野、参数量、计算方式各不相同。">
+          <div class="vs-panel-title"><i class="fa-solid fa-layer-group"></i> 高级卷积对比</div>
+          <div class="vs-cc-grid">{''.join(stages_html)}</div>
+          <p>标准卷积是基线；扩张卷积用空洞换感受野；分组卷积用分治换速度；深度可分离卷积用两步分解换极致轻量。</p>
+        </div>
+        <style>
+        .vs-conv-compare{{padding:1rem;overflow:hidden}}
+        .vs-cc-grid{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem}}
+        .vs-conv-kind{{border:1px solid rgba(0,240,255,.22);border-radius:8px;padding:.65rem;
+            background:rgba(0,0,0,.18);animation:vs-ck-in .5s ease both;animation-delay:var(--ck-delay)}}
+        @keyframes vs-ck-in{{from{{opacity:0;transform:translateY(10px) scale(.92)}}to{{opacity:1;transform:translateY(0) scale(1)}}}}
+        .vs-ck-header{{display:flex;align-items:center;gap:.35rem;margin-bottom:.5rem;flex-wrap:wrap}}
+        .vs-ck-name{{font-weight:800;font-size:.82rem;color:var(--ck-color)}}
+        .vs-ck-header code{{font-size:.65rem;color:var(--vs-muted);background:rgba(255,255,255,.05);
+            padding:.1rem .35rem;border-radius:4px}}
+        .vs-ck-kernel{{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;width:72px;height:72px;
+            position:relative;margin:0 auto .5rem}}
+        .vs-ck-cell{{border-radius:4px;background:var(--ck-color);box-shadow:0 0 8px var(--ck-color);
+            animation:vs-ck-cell-pulse 2.2s ease-in-out infinite;animation-delay:calc(var(--cr)*.12s + var(--cc)*.08s)}}
+        @keyframes vs-ck-cell-pulse{{0%,100%{{opacity:.35;transform:scale(.88)}}50%{{opacity:1;transform:scale(1.05)}}}}
+        .vs-ck-dilated .vs-ck-cell:nth-child(5){{opacity:0!important;background:transparent!important;box-shadow:none!important}}
+        .vs-ck-slider{{position:absolute;width:100%;height:3px;background:var(--ck-color);border-radius:3px;
+            top:50%;left:0;box-shadow:0 0 14px var(--ck-color);animation:vs-ck-slide 2.2s ease-in-out infinite}}
+        @keyframes vs-ck-slide{{0%{{top:0;opacity:.4}}50%{{top:90%;opacity:1}}100%{{top:0;opacity:.4}}}}
+        .vs-ck-desc{{color:var(--vs-muted);font-size:.72rem;line-height:1.45;margin:0}}
+        .vs-conv-compare>p{{color:var(--vs-muted);line-height:1.62;margin:.7rem 0 0}}
+        @media(max-width:900px){{.vs-cc-grid{{grid-template-columns:repeat(2,minmax(0,1fr))}}}}
+        @media(max-width:520px){{.vs-cc-grid{{grid-template-columns:1fr}}}}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ──────────────────────────────────────────────
+# RNN 隐藏状态传递动效
+# ──────────────────────────────────────────────
+
+
+def render_rnn_hidden_state_flow() -> None:
+    """RNN 隐藏状态传递动效：展示时间步 t=0,1,2,3 的隐藏状态传递。
+
+    用粒子流动效果表示信息传递，展示 h0→h1→h2→h3 的状态变化。
+    """
+    st = _st()
+    time_steps = ["t=0", "t=1", "t=2", "t=3"]
+    tokens = ["我", "喜欢", "深度", "学习"]
+    hidden_states = ["h₀", "h₁", "h₂", "h₃"]
+
+    # 每个时间步的隐藏状态强度（模拟信息积累）
+    intensities = [0.35, 0.55, 0.75, 0.95]
+
+    nodes = []
+    for idx, (ts, tok, hid, intensity) in enumerate(zip(time_steps, tokens, hidden_states, intensities)):
+        delay = round(idx * 0.22, 2)
+        nodes.append(
+            f"""
+            <div class="vs-rnn-node" style="--rn-delay:{delay}s;--rn-int:{intensity}">
+              <div class="vs-rnn-cell">
+                <span class="vs-rnn-hidden">{escape(hid)}</span>
+              </div>
+              <span class="vs-rnn-token">{escape(tok)}</span>
+              <span class="vs-rnn-ts">{escape(ts)}</span>
+            </div>
+            """
+        )
+
+    # 连接箭头和粒子流
+    arrows = []
+    particles = []
+    for idx in range(len(time_steps) - 1):
+        delay = round(idx * 0.22 + 0.11, 2)
+        arrows.append(
+            f'<div class="vs-rnn-arrow" style="--ra-delay:{delay}s"><i class="fa-solid fa-arrow-right"></i></div>'
+        )
+        # 粒子：从左节点飞向右节点
+        for p in range(5):
+            pd = round(idx * 0.22 + p * 0.06, 2)
+            particles.append(
+                f'<span class="vs-rnn-particle" style="--rp-delay:{pd}s;--rp-idx:{idx}"></span>'
+            )
+
+    st.markdown(
+        f"""
+        <div class="vs-card vs-rnn-flow" title="RNN 隐藏状态沿时间步传递：每个 h_t 既接收输入 x_t，也接收上一步的 h_(t-1)。">
+          <div class="vs-panel-title"><i class="fa-solid fa-arrow-trend-up"></i> RNN 隐藏状态传递</div>
+          <div class="vs-rnn-timeline">
+            <div class="vs-rnn-nodes">{''.join(nodes)}</div>
+            <div class="vs-rnn-arrows">{''.join(arrows)}</div>
+            <div class="vs-rnn-particles">{''.join(particles)}</div>
+          </div>
+          <p>每个时间步的隐藏状态 h_t = σ(W_hh · h_(t-1) + W_xh · x_t + b)。信息沿时间轴累积，越靠后的状态承载越多上下文。</p>
+        </div>
+        <style>
+        .vs-rnn-flow{{padding:1rem;overflow:hidden}}
+        .vs-rnn-timeline{{position:relative;min-height:180px}}
+        .vs-rnn-nodes{{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:2}}
+        .vs-rnn-node{{display:flex;flex-direction:column;align-items:center;gap:.3rem;
+            animation:vs-rnn-in .5s ease both;animation-delay:var(--rn-delay)}}
+        @keyframes vs-rnn-in{{from{{opacity:0;transform:translateY(14px) scale(.88)}}to{{opacity:1;transform:translateY(0) scale(1)}}}}
+        .vs-rnn-cell{{width:72px;height:72px;border-radius:14px;display:grid;place-items:center;
+            border:2px solid rgba(176,0,255,.55);background:rgba(176,0,255,calc(var(--rn-int)*.22));
+            box-shadow:0 0 24px rgba(176,0,255,calc(var(--rn-int)*.45));
+            animation:vs-rnn-glow 2.4s ease-in-out infinite alternate;animation-delay:var(--rn-delay)}}
+        @keyframes vs-rnn-glow{{from{{box-shadow:0 0 12px rgba(176,0,255,.15)}}to{{box-shadow:0 0 32px rgba(176,0,255,.55)}}}}
+        .vs-rnn-hidden{{font-family:"JetBrains Mono";font-weight:700;font-size:1rem;color:var(--vs-ink);
+            text-shadow:0 0 12px rgba(176,0,255,.6)}}
+        .vs-rnn-token{{font-size:.85rem;color:var(--vs-blue);font-weight:700;
+            background:rgba(0,240,255,.08);border:1px solid rgba(0,240,255,.3);border-radius:6px;
+            padding:.15rem .5rem}}
+        .vs-rnn-ts{{font-family:"JetBrains Mono";font-size:.7rem;color:var(--vs-muted)}}
+        .vs-rnn-arrows{{position:absolute;top:50%;left:0;right:0;display:flex;justify-content:space-around;
+            transform:translateY(-50%);z-index:1;pointer-events:none}}
+        .vs-rnn-arrow{{color:var(--vs-purple);font-size:.9rem;opacity:.5;
+            animation:vs-rnn-arrow-pulse 1.5s ease-in-out infinite;animation-delay:var(--ra-delay)}}
+        @keyframes vs-rnn-arrow-pulse{{0%,100%{{opacity:.25;transform:scale(.8)}}50%{{opacity:1;transform:scale(1.2)}}}}
+        .vs-rnn-particles{{position:absolute;inset:0;z-index:3;pointer-events:none}}
+        .vs-rnn-particle{{position:absolute;width:5px;height:5px;border-radius:50%;top:45%;
+            background:var(--vs-green);box-shadow:0 0 12px var(--vs-green);
+            animation:vs-rnn-particle-fly 2.4s linear infinite;animation-delay:var(--rp-delay);
+            left:calc(var(--rp-idx)*25% + 12%)}}
+        @keyframes vs-rnn-particle-fly{{0%{{transform:translateX(0);opacity:0}}15%{{opacity:1}}85%{{opacity:1}}100%{{transform:translateX(calc(25vw * 0.8));opacity:0}}}}
+        .vs-rnn-flow>p{{color:var(--vs-muted);line-height:1.62;margin:.7rem 0 0}}
+        @media(max-width:600px){{.vs-rnn-cell{{width:56px;height:56px}}.vs-rnn-hidden{{font-size:.82rem}}}}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ──────────────────────────────────────────────
+# Transformer 注意力热力图动效
+# ──────────────────────────────────────────────
+
+
+def render_transformer_attention_heatmap(
+    tokens: list[str] | None = None,
+    num_heads: int = 4,
+) -> None:
+    """Transformer 多头注意力热力图动效。
+
+    展示多头注意力的权重分布，用热力图展示 Q·K^T 的注意力分数，
+    支持动态切换注意力头。
+
+    Parameters
+    ----------
+    tokens : list[str] | None
+        输入 token 列表，默认 ["The", "cat", "sat", "on", "mat"]。
+    num_heads : int
+        注意力头数量，默认 4。
+    """
+    st = _st()
+    tokens = tokens or ["The", "cat", "sat", "on", "mat"]
+    tokens = tokens[:6]  # 最多 6 个 token
+    n = len(tokens)
+
+    # 为每个头生成模拟注意力权重矩阵
+    import math
+
+    head_configs = [
+        ("头 1 — 局部关注", NEON_BLUE, lambda i, j, n: max(0.05, 1.0 - abs(i - j) * 0.35)),
+        ("头 2 — 全局均等", NEON_PURPLE, lambda i, j, n: 0.4 + 0.2 * math.sin(i + j)),
+        ("头 3 — 对角强", NEON_GREEN, lambda i, j, n: 0.9 if i == j else 0.1 + 0.08 * (i + j)),
+        ("头 4 — 起始聚焦", "#ffd166", lambda i, j, n: max(0.05, 1.2 - j * 0.25)),
+    ]
+
+    # 生成热力图单元格
+    def make_heatmap_cells(weight_fn, color, head_idx):
+        cells = ""
+        for i in range(n):
+            for j in range(n):
+                w = weight_fn(i, j, n)
+                w = max(0.0, min(1.0, w))
+                opacity = round(w * 0.85 + 0.1, 2)
+                delay = round((i * n + j) * 0.03, 2)
+                cells += (
+                    f'<span class="vs-attn-cell" '
+                    f'style="--ac-color:{color};--ac-opacity:{opacity};--ac-delay:{delay}s" '
+                    f'title="{escape(tokens[i])}→{escape(tokens[j])}: {w:.2f}">'
+                    f'{w:.1f}</span>'
+                )
+        return cells
+
+    # 构建所有头的热力图
+    heads_html = []
+    for h_idx in range(num_heads):
+        label, color, fn = head_configs[h_idx % len(head_configs)]
+        cells = make_heatmap_cells(fn, color, h_idx)
+        # 行标签
+        row_labels = "".join(
+            f'<span class="vs-attn-rlbl">{escape(t)}</span>' for t in tokens
+        )
+        # 列标签
+        col_labels = "".join(
+            f'<span class="vs-attn-clbl">{escape(t)}</span>' for t in tokens
+        )
+        active_class = "vs-head-active" if h_idx == 0 else ""
+        heads_html.append(
+            f"""
+            <div class="vs-attn-head {active_class}" data-head="{h_idx}"
+                 style="--head-color:{color};--head-idx:{h_idx}">
+              <div class="vs-attn-head-label" style="color:{color}">
+                <i class="fa-solid fa-brain"></i> {escape(label)}
+              </div>
+              <div class="vs-attn-grid-wrap">
+                <div class="vs-attn-row-labels">{row_labels}</div>
+                <div class="vs-attn-grid" style="grid-template-columns:repeat({n},1fr)">
+                  {col_labels}
+                  {cells}
+                </div>
+              </div>
+            </div>
+            """
+        )
+
+    # 切换按钮的 HTML（用模板避免多层转义）
+    btns = ""
+    for h in range(num_heads):
+        color = head_configs[h % len(head_configs)][1]
+        # onclick 用 data 属性 + 简化 JS，避免嵌套引号地狱
+        btns += (
+            f'<button class="vs-head-btn" data-bh="{h}" '
+            f'style="--btn-color:{color}" '
+            f'onclick="vsSwitchHead({h})">'
+            f'Head {h + 1}</button>'
+        )
+
+    st.markdown(
+        f"""
+        <div class="vs-card vs-attn-heatmap" title="多头注意力热力图：颜色越深表示注意力权重越高。">
+          <div class="vs-panel-title"><i class="fa-solid fa-fire-flame-curved"></i> Transformer 多头注意力热力图</div>
+          <div class="vs-head-btns">
+            <span class="vs-head-btn-label">切换注意力头:</span>
+            {btns}
+          </div>
+          <div class="vs-attn-heads">
+            {''.join(heads_html)}
+          </div>
+          <p>Q·K<sup>T</sup> / √d_k 的注意力分数经 softmax 后得到权重矩阵。不同头学到不同的注意力模式：有的看局部上下文，有的捕捉长距离依赖。</p>
+        </div>
+        <style>
+        .vs-attn-heatmap{{padding:1rem;overflow:hidden}}
+        .vs-head-btns{{display:flex;align-items:center;gap:.4rem;margin-bottom:.7rem;flex-wrap:wrap}}
+        .vs-head-btn-label{{font-size:.82rem;color:var(--vs-muted);margin-right:.3rem}}
+        .vs-head-btn{{border:1px solid var(--btn-color);border-radius:6px;padding:.3rem .7rem;
+            background:rgba(0,0,0,.18);color:var(--vs-ink);font-size:.78rem;font-weight:700;
+            cursor:pointer;transition:all .2s ease;font-family:Inter,sans-serif}}
+        .vs-head-btn:hover{{background:rgba(255,255,255,.08);box-shadow:0 0 12px var(--btn-color)}}
+        .vs-head-btn.vs-btn-active{{background:var(--btn-color);color:#061018;
+            box-shadow:0 0 18px var(--btn-color)}}
+        .vs-attn-heads{{min-height:240px}}
+        .vs-attn-head{{display:none;animation:vs-attn-fade-in .35s ease both}}
+        .vs-attn-head.vs-head-active{{display:block}}
+        @keyframes vs-attn-fade-in{{from{{opacity:0;transform:scale(.96)}}to{{opacity:1;transform:scale(1)}}}}
+        .vs-attn-head-label{{font-weight:800;font-size:.92rem;margin-bottom:.45rem;
+            display:flex;align-items:center;gap:.35rem}}
+        .vs-attn-head-label i{{filter:drop-shadow(0 0 6px var(--head-color))}}
+        .vs-attn-grid-wrap{{display:flex;gap:.35rem;align-items:flex-start}}
+        .vs-attn-row-labels{{display:flex;flex-direction:column;gap:2px;padding-top:22px}}
+        .vs-attn-rlbl{{height:30px;display:grid;place-items:center;font-size:.68rem;
+            color:var(--vs-muted);font-family:"JetBrains Mono"}}
+        .vs-attn-grid{{display:grid;gap:2px;position:relative}}
+        .vs-attn-clbl{{height:18px;display:grid;place-items:center;font-size:.62rem;
+            color:var(--vs-muted);font-family:"JetBrains Mono"}}
+        .vs-attn-cell{{width:52px;height:30px;border-radius:4px;display:grid;place-items:center;
+            font-family:"JetBrains Mono";font-size:.62rem;color:rgba(255,255,255,.85);
+            background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.04);
+            animation:vs-attn-cell-in .4s ease both;animation-delay:var(--ac-delay);
+            transition:background .3s ease,box-shadow .3s ease}}
+        .vs-attn-cell:hover{{box-shadow:0 0 16px var(--ac-color);z-index:2;transform:scale(1.08)}}
+        @keyframes vs-attn-cell-in{{from{{opacity:0;transform:scale(.8)}}to{{opacity:var(--ac-opacity);transform:scale(1)}}}}
+        /* 用伪元素实现背景热力效果 */
+        .vs-attn-cell::before{{content:"";position:absolute;inset:0;border-radius:4px;
+            background:var(--ac-color);opacity:calc(var(--ac-opacity)*.45)}}
+        .vs-attn-cell{{position:relative}}
+        .vs-attn-heatmap>p{{color:var(--vs-muted);line-height:1.62;margin:.7rem 0 0}}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ──────────────────────────────────────────────
 # 运动画廊（展示所有动效）
 # ──────────────────────────────────────────────
 
