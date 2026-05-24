@@ -1183,6 +1183,20 @@ def render_transformer_attention_heatmap(
         .vs-attn-cell{{position:relative}}
         .vs-attn-heatmap>p{{color:var(--vs-muted);line-height:1.62;margin:.7rem 0 0}}
         </style>
+        <script>
+        function vsSwitchHead(idx) {{
+            document.querySelectorAll('.vs-attn-head').forEach(function(e) {{
+                e.classList.remove('vs-head-active');
+            }});
+            var target = document.querySelector('.vs-attn-head[data-head="' + idx + '"]');
+            if (target) target.classList.add('vs-head-active');
+            document.querySelectorAll('.vs-head-btn').forEach(function(e) {{
+                e.classList.remove('vs-btn-active');
+            }});
+            var btn = document.querySelector('.vs-head-btn[data-bh="' + idx + '"]');
+            if (btn) btn.classList.add('vs-btn-active');
+        }}
+        </script>
         """,
         unsafe_allow_html=True,
     )
@@ -1227,6 +1241,18 @@ def render_motion_gallery() -> None:
     # ── 训练动态面板 ──
     st.markdown("### 训练动态监控面板")
     render_training_dynamics_panel()
+
+    # ── 高级卷积对比 ──
+    st.markdown("### 高级卷积对比")
+    render_advanced_conv_comparison()
+
+    # ── RNN 隐藏状态传递 ──
+    st.markdown("### RNN 隐藏状态传递")
+    render_rnn_hidden_state_flow()
+
+    # ── Transformer 注意力热力图 ──
+    st.markdown("### Transformer 注意力热力图")
+    render_transformer_attention_heatmap()
 
     # ── 原有动效 ──
     st.markdown("### 交互式教学动效")
