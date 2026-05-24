@@ -412,12 +412,25 @@ def render_张量基础() -> None:
 
     import streamlit as st
     from components.error_boundary import render_module_error
+    from components.visual_system import (
+        render_backprop_current_flow,
+        render_gradient_descent_landscape,
+        render_loading_bar,
+        render_visual_system,
+    )
 
     try:
         clean_old_artifacts()
         st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
+        render_visual_system("dark")
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
+        render_loading_bar("梯度动画加载：损失地形和反向传播电流会把抽象公式变成可观察路径")
+        c1, c2 = st.columns(2)
+        with c1:
+            render_gradient_descent_landscape()
+        with c2:
+            render_backprop_current_flow()
         data = compute_张量基础(save_artifacts=True)
         st.subheader("张量形状")
         st.dataframe([{"对象": name, "shape": str(shape), "ndim": ndim} for name, shape, ndim in data["tensor_info"]["shapes"]], width="stretch")

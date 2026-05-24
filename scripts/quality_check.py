@@ -215,6 +215,9 @@ EXPECTED_CONTENT_REFERENCES = {
         "学习导读",
         "render_module_knowledge_nav",
         "render学习操作面板",
+        "render_visual_system",
+        "render_motion_gallery",
+        "暗色模式",
     ],
     Path("components/progress_tracker.py"): [
         "稍后复习",
@@ -228,6 +231,23 @@ EXPECTED_CONTENT_REFERENCES = {
         "build_learning_report",
         "analyze_weaknesses",
         "recommend_today",
+    ],
+    Path("components/visual_system.py"): [
+        "NEON_BLUE",
+        "#00f0ff",
+        "#b000ff",
+        "#00ff88",
+        "JetBrains Mono",
+        "Inter",
+        "font-awesome",
+        "render_particle_field",
+        "render_convolution_particle_flow",
+        "render_gradient_descent_landscape",
+        "render_attention_light_beams",
+        "render_backprop_current_flow",
+        "render_training_dashboard_gauges",
+        "render_motion_gallery",
+        "scroll-behavior: smooth",
     ],
     Path("components/knowledge_graph.py"): [
         "canonical_node_keys",
@@ -330,6 +350,19 @@ EXPECTED_CONTENT_REFERENCES = {
         "make_update_ratio_chart",
         "make_cnn_feature_map",
         "make_attention_heatmap",
+    ],
+    Path("part1_foundations/01_tensors_gradients.py"): [
+        "render_gradient_descent_landscape",
+        "render_backprop_current_flow",
+    ],
+    Path("part2_cnn/01_convolution_visual.py"): [
+        "render_convolution_particle_flow",
+    ],
+    Path("part4_transformer/transformer_models.py"): [
+        "render_attention_light_beams",
+    ],
+    Path("part6_universal_framework/training_demo.py"): [
+        "render_training_dashboard_gauges",
     ],
     Path("part7_interview/interview_quiz.py"): [
         "QUESTION_MODULE_MAP",

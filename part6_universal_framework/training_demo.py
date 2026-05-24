@@ -24,6 +24,8 @@ import torch.nn as nn
 from sklearn.datasets import make_classification
 from sklearn.preprocessing import StandardScaler
 
+from components.visual_system import render_loading_bar, render_training_dashboard_gauges, render_visual_system
+
 
 MODULE_TITLE = "训练过程可视化演示"
 MODULE_SUMMARY = "用轻量数据集演示完整训练循环，实时展示损失、准确率、学习率和梯度范数。"
@@ -488,7 +490,10 @@ def render_training_panel(config: TrainingConfig) -> None:
 def render_app() -> None:
     st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
     render_style()
+    render_visual_system("dark")
     render_header()
+    render_loading_bar("训练仪表盘加载：指标指针会随着训练状态给出直观信号")
+    render_training_dashboard_gauges()
 
     top_left, top_right = st.columns([0.78, 0.22])
     with top_left:

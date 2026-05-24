@@ -22,6 +22,8 @@ import streamlit as st
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 from plotly.subplots import make_subplots
 
+from components.visual_system import render_attention_light_beams, render_loading_bar, render_visual_system
+
 
 PLOT_CONFIG = {"displayModeBar": False, "responsive": True}
 PLOT_FONT = {"family": "Microsoft YaHei, SimHei, Segoe UI, sans-serif", "color": "#172026"}
@@ -175,6 +177,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+render_visual_system("dark")
 
 
 def softmax(x: np.ndarray, axis: int = -1) -> np.ndarray:
@@ -943,6 +946,8 @@ def render_self_attention(text: str, d_model: int, seed: int) -> AttentionPack:
     tokens = tokenize(text)
     pack = compute_attention(tokens, d_model=d_model, seed=seed)
     step = st.slider("计算步骤", 1, 5, 4, format="第 %d 步")
+    render_loading_bar("注意力动效加载：Query 光束会照亮最相关的 Key")
+    render_attention_light_beams(tokens, min(2, len(tokens) - 1))
     render_attention_textbook_intro(tokens)
     render_attention_math_section(d_model)
     st.plotly_chart(plot_attention_step(pack, step), use_container_width=True, config=PLOT_CONFIG)

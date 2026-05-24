@@ -921,7 +921,10 @@ def render_legacy_module_page(module: ModuleInfo) -> None:
         layout="wide",
         initial_sidebar_state="collapsed",
     )
-    st.markdown(css("light"), unsafe_allow_html=True)
+    st.markdown(css("dark"), unsafe_allow_html=True)
+    from components.visual_system import render_visual_system
+
+    render_visual_system("dark")
     render_home_button()
     render_module_header(module)
 
@@ -1569,7 +1572,10 @@ def render_streamlit_home() -> None:
                     layout="wide",
                     initial_sidebar_state="collapsed",
                 )
-                st.markdown(css("light"), unsafe_allow_html=True)
+                st.markdown(css("dark"), unsafe_allow_html=True)
+                from components.visual_system import render_visual_system
+
+                render_visual_system("dark")
                 render_home_button()
                 render_module_header(module)
                 render_route_error(module, exc)
@@ -1580,7 +1586,10 @@ def render_streamlit_home() -> None:
             layout="wide",
             initial_sidebar_state="expanded",
         )
-        st.markdown(css("light"), unsafe_allow_html=True)
+        st.markdown(css("dark"), unsafe_allow_html=True)
+        from components.visual_system import render_visual_system
+
+        render_visual_system("dark")
         render_home_button()
         st.error(f"没有找到模块：{query_module}")
         st.link_button("返回首页", "/")
@@ -1594,10 +1603,13 @@ def render_streamlit_home() -> None:
     )
 
     with st.sidebar:
-        dark_mode = st.toggle("🌗 暗色模式", value=False)
+        dark_mode = st.toggle("🌗 暗色模式", value=True)
         render_sidebar(catalog)
 
     st.markdown(css("dark" if dark_mode else "light"), unsafe_allow_html=True)
+    from components.visual_system import render_visual_system
+
+    render_visual_system("dark" if dark_mode else "light")
 
     available = [module for module in catalog if module.path.exists()]
     tags = sorted({tag for module in available for tag in module.tags})
@@ -1637,6 +1649,9 @@ def render_streamlit_home() -> None:
 
     st.subheader("功能亮点")
     st.markdown(render_feature_cards(), unsafe_allow_html=True)
+    from components.visual_system import render_motion_gallery
+
+    render_motion_gallery()
 
     st.subheader("学习进度总览")
     try:
