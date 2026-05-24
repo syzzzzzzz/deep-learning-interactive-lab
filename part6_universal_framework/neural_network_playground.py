@@ -10,12 +10,14 @@ or:
 from __future__ import annotations
 
 import copy
+import json
 import math
 import textwrap
 import traceback
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 import pandas as pd
 import streamlit as st
@@ -105,6 +107,16 @@ COMPONENT_REGISTRY: dict[str, dict[str, Any]] = {
         "pytorch_code": "nn.BatchNorm1d(num_features) / nn.BatchNorm2d(num_features)",
         "related_topic": "归一化",
     },
+    "LayerNorm": {
+        "name": "LayerNorm",
+        "type": "normalization",
+        "params": {"normalized_shape": 64, "eps": 1e-5},
+        "input_rule": "输入可以是一维特征或序列表示；最后一维等于 normalized_shape。",
+        "output_rule": "形状不变，只对最后一维做归一化。",
+        "description": "层归一化，不依赖 batch 统计，是 Transformer 中的默认归一化方式。",
+        "pytorch_code": "nn.LayerNorm(normalized_shape, eps=1e-5)",
+        "related_topic": "Transformer / LayerNorm",
+    },
     "Flatten": {
         "name": "Flatten",
         "type": "reshape",
@@ -114,6 +126,46 @@ COMPONENT_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "把卷积特征图展平成向量，通常接 Linear 层。",
         "pytorch_code": "nn.Flatten(start_dim=1, end_dim=-1)",
         "related_topic": "CNN / MLP 衔接",
+    },
+    "GELU": {
+        "name": "GELU",
+        "type": "activation",
+        "params": {},
+        "input_rule": "任意张量形状。",
+        "output_rule": "形状不变。",
+        "description": "Transformer 和现代 MLP 常用激活函数，比 ReLU 更平滑。",
+        "pytorch_code": "nn.GELU()",
+        "related_topic": "Transformer / 激活函数",
+    },
+    "ResidualBlock": {
+        "name": "ResidualBlock",
+        "type": "block",
+        "params": {"dim": 128, "hidden_dim": 256, "dropout": 0.1},
+        "input_rule": "输入最后一维必须等于 dim，可用于向量或序列 token 表示。",
+        "output_rule": "输出形状与输入完全相同。",
+        "description": "残差 MLP 块，学习 F(x) 后再和输入 x 相加，缓解深层网络退化和梯度传播困难。",
+        "pytorch_code": "ResidualMLPBlock(dim, hidden_dim, dropout)",
+        "related_topic": "ResNet / 残差连接",
+    },
+    "MultiheadAttention": {
+        "name": "MultiheadAttention",
+        "type": "attention",
+        "params": {"embed_dim": 64, "num_heads": 4, "dropout": 0.1},
+        "input_rule": "输入必须是 (seq_len, embed_dim)，即 batch 后的 token 序列表示。",
+        "output_rule": "输出形状与输入相同。",
+        "description": "自注意力块，让每个 token 根据上下文重新汇聚信息。",
+        "pytorch_code": "SelfAttentionBlock(embed_dim, num_heads, dropout)",
+        "related_topic": "多头注意力 / Transformer",
+    },
+    "TransformerEncoder": {
+        "name": "TransformerEncoder",
+        "type": "block",
+        "params": {"d_model": 64, "nhead": 4, "dim_feedforward": 128, "num_layers": 1, "dropout": 0.1},
+        "input_rule": "输入必须是 (seq_len, d_model)，且 d_model 能被 nhead 整除。",
+        "output_rule": "输出形状与输入相同。",
+        "description": "标准 Transformer Encoder 堆叠，内部包含多头注意力、前馈网络、残差和 LayerNorm。",
+        "pytorch_code": "nn.TransformerEncoder(nn.TransformerEncoderLayer(...), num_layers)",
+        "related_topic": "Transformer Encoder",
     },
 }
 
@@ -182,10 +234,27 @@ PRESETS: dict[str, dict[str, Any]] = {
         "optimizer": "Adam",
         "layers": [
             {"component": "Linear", "params": {"in_features": 64, "out_features": 64, "bias": True}},
-            {"component": "Tanh", "params": {}},
+            {"component": "LayerNorm", "params": {"normalized_shape": 64, "eps": 1e-5}},
+            {"component": "MultiheadAttention", "params": {"embed_dim": 64, "num_heads": 4, "dropout": 0.1}},
+            {"component": "ResidualBlock", "params": {"dim": 64, "hidden_dim": 128, "dropout": 0.1}},
+            {"component": "TransformerEncoder", "params": {"d_model": 64, "nhead": 4, "dim_feedforward": 128, "num_layers": 1, "dropout": 0.1}},
             {"component": "Linear", "params": {"in_features": 64, "out_features": 64, "bias": True}},
         ],
-        "note": "这个预设用两个 Linear 投影展示注意力里的 Q/K/V 投影概念；完整多头注意力可回到理论页拆解。",
+        "note": "这个预设展示序列输入里的 LayerNorm、多头注意力、残差 MLP 和 Transformer Encoder 如何保持 token 形状稳定。",
+    },
+    "residual_mlp": {
+        "title": "残差 MLP 分类器",
+        "input_shape": (784,),
+        "loss": "CrossEntropy",
+        "optimizer": "Adam",
+        "layers": [
+            {"component": "Linear", "params": {"in_features": 784, "out_features": 128, "bias": True}},
+            {"component": "LayerNorm", "params": {"normalized_shape": 128, "eps": 1e-5}},
+            {"component": "GELU", "params": {}},
+            {"component": "ResidualBlock", "params": {"dim": 128, "hidden_dim": 256, "dropout": 0.1}},
+            {"component": "Linear", "params": {"in_features": 128, "out_features": 10, "bias": True}},
+        ],
+        "note": "残差块要求输入输出维度一致。它不负责改变维度，而是让网络在原表示上学习一个修正量 F(x)。",
     },
 }
 
@@ -257,6 +326,10 @@ def default_state() -> None:
         }
     if "playground_loaded_example" not in st.session_state:
         st.session_state.playground_loaded_example = ""
+    if "playground_project_name" not in st.session_state:
+        st.session_state.playground_project_name = "我的神经网络结构"
+    if "playground_last_import_error" not in st.session_state:
+        st.session_state.playground_last_import_error = ""
 
 
 def load_preset(key: str) -> None:
@@ -266,6 +339,7 @@ def load_preset(key: str) -> None:
     st.session_state.playground_loss = preset["loss"]
     st.session_state.playground_optimizer = preset["optimizer"]
     st.session_state.playground_loaded_example = key
+    st.session_state.playground_project_name = preset["title"]
 
 
 def query_example() -> str:
@@ -341,6 +415,15 @@ def infer_layer_shape(component: str, params: dict[str, Any], current: tuple[int
         code = layer_code(component, params, current)
         return current, "归一化不改变形状。", code
 
+    if component == "LayerNorm":
+        expected = int(params["normalized_shape"])
+        actual = current[-1]
+        if actual != expected:
+            raise ValueError(
+                f"LayerNorm 的 normalized_shape={expected} 必须等于输入最后一维 {actual}。"
+            )
+        return current, "LayerNorm 只归一化最后一维，形状不变。", layer_code(component, params, current)
+
     if component == "Flatten":
         start_dim = int(params["start_dim"])
         end_dim = int(params["end_dim"])
@@ -356,7 +439,51 @@ def infer_layer_shape(component: str, params: dict[str, Any], current: tuple[int
         output = (*current[:relative_start], flattened, *current[relative_end + 1 :])
         return output, "指定范围内的维度被合并。", layer_code(component, params, current)
 
-    if component in {"ReLU", "Sigmoid", "Tanh", "Dropout"}:
+    if component == "ResidualBlock":
+        dim = int(params["dim"])
+        hidden_dim = int(params["hidden_dim"])
+        dropout = float(params["dropout"])
+        if current[-1] != dim:
+            raise ValueError(
+                f"ResidualBlock 要求输入最后一维等于 dim={dim}，但上一层输出最后一维是 {current[-1]}。"
+                "请先用 Linear 对齐维度。"
+            )
+        if hidden_dim < dim:
+            raise ValueError("ResidualBlock 的 hidden_dim 建议大于等于 dim，否则表达能力会被压窄。")
+        if not 0.0 <= dropout <= 0.9:
+            raise ValueError("ResidualBlock 的 dropout 建议在 0.0 到 0.9 之间。")
+        return current, "残差块输出与输入相加，因此形状必须保持不变。", layer_code(component, params, current)
+
+    if component == "MultiheadAttention":
+        if len(current) != 2:
+            raise ValueError(
+                f"MultiheadAttention 需要 (seq_len, embed_dim) 输入，当前是 {format_shape(current)}。"
+                "图像特征请先展平成序列，向量输入请增加序列维。"
+            )
+        embed_dim = int(params["embed_dim"])
+        num_heads = int(params["num_heads"])
+        if current[-1] != embed_dim:
+            raise ValueError(f"embed_dim={embed_dim} 必须等于输入最后一维 {current[-1]}。")
+        if embed_dim % num_heads != 0:
+            raise ValueError(f"embed_dim={embed_dim} 必须能被 num_heads={num_heads} 整除。")
+        return current, "自注意力重新混合 token 信息，但保持序列长度和维度不变。", layer_code(component, params, current)
+
+    if component == "TransformerEncoder":
+        if len(current) != 2:
+            raise ValueError(
+                f"TransformerEncoder 需要 (seq_len, d_model) 输入，当前是 {format_shape(current)}。"
+            )
+        d_model = int(params["d_model"])
+        nhead = int(params["nhead"])
+        if current[-1] != d_model:
+            raise ValueError(f"d_model={d_model} 必须等于输入最后一维 {current[-1]}。")
+        if d_model % nhead != 0:
+            raise ValueError(f"d_model={d_model} 必须能被 nhead={nhead} 整除。")
+        if int(params["num_layers"]) < 1:
+            raise ValueError("TransformerEncoder 的 num_layers 至少为 1。")
+        return current, "Encoder 层内部包含注意力、前馈、残差和归一化，整体形状不变。", layer_code(component, params, current)
+
+    if component in {"ReLU", "Sigmoid", "Tanh", "Dropout", "GELU"}:
         return current, "该层不改变张量形状。", layer_code(component, params, current)
 
     raise ValueError(f"未知组件：{component}")
@@ -383,6 +510,8 @@ def param_repr(value: Any) -> str:
         return "True" if value else "False"
     if isinstance(value, tuple):
         return "(" + ", ".join(param_repr(item) for item in value) + ")"
+    if isinstance(value, list):
+        return "(" + ", ".join(param_repr(item) for item in value) + ")"
     return repr(value)
 
 
@@ -401,8 +530,23 @@ def layer_code(component: str, params: dict[str, Any], current_shape: tuple[int,
     if component == "BatchNorm":
         cls = "nn.BatchNorm2d" if current_shape and len(current_shape) == 3 else "nn.BatchNorm1d"
         return f"{cls}({params['num_features']})"
+    if component == "LayerNorm":
+        return f"nn.LayerNorm({params['normalized_shape']}, eps={params['eps']})"
     if component == "Flatten":
         return f"nn.Flatten(start_dim={params['start_dim']}, end_dim={params['end_dim']})"
+    if component == "GELU":
+        return "nn.GELU()"
+    if component == "ResidualBlock":
+        return f"ResidualMLPBlock({params['dim']}, {params['hidden_dim']}, dropout={params['dropout']})"
+    if component == "MultiheadAttention":
+        return f"SelfAttentionBlock({params['embed_dim']}, {params['num_heads']}, dropout={params['dropout']})"
+    if component == "TransformerEncoder":
+        return (
+            "nn.TransformerEncoder("
+            f"nn.TransformerEncoderLayer(d_model={params['d_model']}, nhead={params['nhead']}, "
+            f"dim_feedforward={params['dim_feedforward']}, dropout={params['dropout']}, batch_first=True), "
+            f"num_layers={params['num_layers']})"
+        )
     return f"nn.{component}()"
 
 
@@ -429,35 +573,77 @@ def generate_code(
         f"{OPTIMIZER_REGISTRY[optimizer_name]['pytorch_code']}"
         f"(model.parameters(), {optimizer_param_code(optimizer_name, optimizer_params)})"
     )
-    return textwrap.dedent(
-        f"""
-        import torch
-        import torch.nn as nn
+    used_components = {layer["component"] for layer in layers}
+    helper_blocks: list[str] = []
+    if "ResidualBlock" in used_components:
+        helper_blocks.append(
+            """
+class ResidualMLPBlock(nn.Module):
+    def __init__(self, dim, hidden_dim, dropout=0.0):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+        )
+
+    def forward(self, x):
+        return x + self.net(x)
+"""
+        )
+    if "MultiheadAttention" in used_components:
+        helper_blocks.append(
+            """
+class SelfAttentionBlock(nn.Module):
+    def __init__(self, embed_dim, num_heads, dropout=0.0):
+        super().__init__()
+        self.norm = nn.LayerNorm(embed_dim)
+        self.attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout, batch_first=True)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        normalized = self.norm(x)
+        attended, _ = self.attn(normalized, normalized, normalized, need_weights=False)
+        return x + self.dropout(attended)
+"""
+        )
+    helper_code = "\n\n".join(textwrap.dedent(block).strip() for block in helper_blocks)
+    sections = [
+        "import torch",
+        "import torch.nn as nn",
+    ]
+    if helper_code:
+        sections.append(helper_code)
+    sections.append(
+        textwrap.dedent(
+            f"""
+            class BuiltModel(nn.Module):
+                def __init__(self):
+                    super().__init__()
+                    self.model = nn.Sequential(
+            {layer_block}
+                    )
+
+                def forward(self, x):
+                    return self.model(x)
 
 
-        class BuiltModel(nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.model = nn.Sequential(
-        {layer_block}
-                )
+            input_shape = {format_shape(input_shape)}
+            batch_size = 4
 
-            def forward(self, x):
-                return self.model(x)
+            model = BuiltModel()
+            criterion = {criterion_code}
+            optimizer = {optimizer_code}
 
-
-        input_shape = {format_shape(input_shape)}
-        batch_size = 4
-
-        model = BuiltModel()
-        criterion = {criterion_code}
-        optimizer = {optimizer_code}
-
-        x = torch.randn(batch_size, *input_shape)
-        output = model(x)
-        print("output shape:", tuple(output.shape))
-        """
-    ).strip()
+            x = torch.randn(batch_size, *input_shape)
+            output = model(x)
+            print("output shape:", tuple(output.shape))
+            """
+        ).strip()
+    )
+    return "\n\n".join(sections)
 
 
 def render_style() -> None:
@@ -497,6 +683,151 @@ def render_style() -> None:
         """,
         unsafe_allow_html=True,
     )
+
+
+def project_config() -> dict[str, Any]:
+    return {
+        "version": 2,
+        "name": st.session_state.playground_project_name,
+        "input_shape": st.session_state.playground_input_shape,
+        "loss": st.session_state.playground_loss,
+        "optimizer": st.session_state.playground_optimizer,
+        "optimizer_params": copy.deepcopy(st.session_state.playground_optimizer_params),
+        "layers": clone_layers(st.session_state.playground_layers),
+    }
+
+
+def export_project_config() -> str:
+    """Serialize the current playground model to a stable JSON document."""
+
+    return json.dumps(project_config(), ensure_ascii=False, indent=2)
+
+
+def import_project_config(raw_json: str) -> None:
+    """Load a saved playground model config after validating public fields."""
+
+    try:
+        payload = json.loads(raw_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"JSON 无法解析：{exc}") from exc
+
+    if not isinstance(payload, dict):
+        raise ValueError("配置文件必须是 JSON object。")
+    layers = payload.get("layers")
+    if not isinstance(layers, list):
+        raise ValueError("配置缺少 layers 数组。")
+    normalized_layers: list[dict[str, Any]] = []
+    for index, layer in enumerate(layers, 1):
+        if not isinstance(layer, dict):
+            raise ValueError(f"第 {index} 层不是 object。")
+        component = layer.get("component")
+        if component not in COMPONENT_REGISTRY:
+            raise ValueError(f"第 {index} 层组件 {component!r} 不在注册表中。")
+        params = layer.get("params", {})
+        if not isinstance(params, dict):
+            raise ValueError(f"第 {index} 层 params 必须是 object。")
+        defaults = COMPONENT_REGISTRY[component]["params"]
+        merged = copy.deepcopy(defaults)
+        for key, value in params.items():
+            if key in defaults:
+                merged[key] = value
+        normalized_layers.append({"component": component, "params": merged})
+
+    shape_text = str(payload.get("input_shape", "(1, 28, 28)"))
+    parse_shape(shape_text)
+    loss = str(payload.get("loss", "CrossEntropy"))
+    optimizer = str(payload.get("optimizer", "Adam"))
+    if loss not in LOSS_REGISTRY:
+        raise ValueError(f"未知损失函数：{loss}")
+    if optimizer not in OPTIMIZER_REGISTRY:
+        raise ValueError(f"未知优化器：{optimizer}")
+
+    st.session_state.playground_project_name = str(payload.get("name", "导入的神经网络结构"))[:80]
+    st.session_state.playground_input_shape = shape_text
+    st.session_state.playground_layers = normalized_layers
+    st.session_state.playground_loss = loss
+    st.session_state.playground_optimizer = optimizer
+    optimizer_params = payload.get("optimizer_params")
+    if isinstance(optimizer_params, dict):
+        current = copy.deepcopy(st.session_state.playground_optimizer_params)
+        for name, params in optimizer_params.items():
+            if name in current and isinstance(params, dict):
+                current[name].update(params)
+        st.session_state.playground_optimizer_params = current
+    st.session_state.playground_loaded_example = ""
+
+
+def render_project_io() -> None:
+    st.subheader("保存 / 加载结构")
+    st.session_state.playground_project_name = st.text_input(
+        "结构名称",
+        value=st.session_state.playground_project_name,
+        max_chars=80,
+    )
+    json_text = export_project_config()
+    st.download_button(
+        "下载模型结构 JSON",
+        data=json_text.encode("utf-8"),
+        file_name="neural_network_playground_config.json",
+        mime="application/json",
+        width="stretch",
+    )
+    with st.expander("查看 / 粘贴 JSON", expanded=False):
+        edited = st.text_area("模型结构 JSON", value=json_text, height=260, key="playground_config_json")
+        if st.button("从上方 JSON 加载", width="stretch"):
+            try:
+                import_project_config(edited)
+                st.session_state.playground_last_import_error = ""
+                st.success("模型结构已加载。")
+                _rerun()
+            except Exception as exc:
+                st.session_state.playground_last_import_error = str(exc)
+                st.error(f"加载失败：{exc}")
+    uploaded = st.file_uploader("上传结构 JSON", type=["json"], accept_multiple_files=False)
+    if uploaded is not None and st.button("加载上传文件", width="stretch"):
+        try:
+            import_project_config(uploaded.getvalue().decode("utf-8"))
+            st.session_state.playground_last_import_error = ""
+            st.success("上传结构已加载。")
+            _rerun()
+        except Exception as exc:
+            st.session_state.playground_last_import_error = str(exc)
+            st.error(f"上传文件加载失败：{exc}")
+
+
+def module_url(target: str, **params: str) -> str:
+    query = {"module": target}
+    query.update(params)
+    parts = [f"{quote(str(key), safe='')}={quote(str(value), safe='')}" for key, value in query.items()]
+    return "/?" + "&".join(parts)
+
+
+def render_integration_panel(input_shape: tuple[int, ...] | None, steps: list[ShapeStep]) -> None:
+    final_shape = steps[-1].output_shape if steps and steps[-1].ok else None
+    st.subheader("训练与章节联动")
+    st.markdown(
+        """
+        <div class="mini-note">
+        当前控制台已经能输出结构、shape 和代码。下一步要理解训练行为时，请顺着下面几个入口看：
+        损失曲线回答“有没有学会”，梯度监控回答“为什么学不动”，特征图/注意力回答“中间表示在看什么”。
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    cols = st.columns(4)
+    cols[0].link_button("训练过程可视化", module_url("part6_universal_framework/training_demo"), width="stretch")
+    cols[1].link_button("梯度监控", module_url("part5_toolbox/02_gradient_monitor"), width="stretch")
+    if final_shape and len(final_shape) == 3:
+        cols[2].link_button("CNN 特征图", module_url("part2_cnn/02_feature_maps"), width="stretch")
+    else:
+        cols[2].link_button("训练动态", module_url("part5_toolbox/03_training_dynamics"), width="stretch")
+    if final_shape and len(final_shape) == 2:
+        cols[3].link_button("注意力机制", module_url("part4_transformer/transformer_models"), width="stretch")
+    else:
+        cols[3].link_button("超参搜索", module_url("part5_toolbox/04_hyperparam_search"), width="stretch")
+
+    if input_shape and final_shape:
+        st.caption(f"当前结构：输入 {format_shape(input_shape)} → 输出 {format_shape(final_shape)}。")
 
 
 def render_component_docs() -> None:
@@ -540,14 +871,15 @@ def render_layer_form() -> None:
                         min_value = 1
                     params[name] = int(st.number_input(name, min_value=min_value, value=default, step=1, key=key))
                 elif isinstance(default, float):
-                    max_value = 1.0 if name == "p" else None
+                    max_value = 0.9 if name in {"p", "dropout"} else None
+                    step = 0.01 if name not in {"eps"} else 1e-6
                     params[name] = float(
                         st.number_input(
                             name,
                             min_value=0.0,
                             max_value=max_value,
                             value=default,
-                            step=0.01,
+                            step=step,
                             format="%.8f",
                             key=key,
                         )
@@ -638,8 +970,9 @@ def render_shape_table(steps: list[ShapeStep]) -> None:
 
 def render_preset_controls() -> None:
     st.subheader("示例模型")
-    cols = st.columns(3)
-    for col, key in zip(cols, ("mlp", "cnn", "transformer"), strict=True):
+    preset_keys = ("mlp", "cnn", "transformer", "residual_mlp")
+    cols = st.columns(len(preset_keys))
+    for col, key in zip(cols, preset_keys, strict=True):
         preset = PRESETS[key]
         if col.button(preset["title"], key=f"load-{key}", width="stretch"):
             load_preset(key)
@@ -694,6 +1027,8 @@ def render_app() -> None:
             st.session_state.playground_layers = []
             st.session_state.playground_loaded_example = ""
             _rerun()
+        st.divider()
+        render_project_io()
 
     with result_col:
         st.subheader("训练配置")
@@ -725,19 +1060,36 @@ def render_app() -> None:
         else:
             st.warning("修复形状错误后会生成完整 PyTorch 代码。")
 
+        st.divider()
+        render_integration_panel(input_shape if steps else None, steps)
+
     with st.expander("组件注册表", expanded=False):
         render_component_docs()
 
 
-try:
-    render_app()
-except Exception as error:
+def _running_under_streamlit() -> bool:
     try:
-        st.error("中央控制台暂时无法运行。")
-        st.warning("请返回主界面重新进入，或检查最近一次组件参数修改。")
-        if st.button("返回主界面"):
-            go_home()
-        with st.expander("错误详情", expanded=False):
-            st.code("".join(traceback.format_exception(type(error), error, error.__traceback__)), language="text")
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+
+        return get_script_run_ctx(suppress_warning=True) is not None
     except Exception:
-        raise
+        return False
+
+
+def _should_render_app() -> bool:
+    return __name__ == "__main__" or _running_under_streamlit()
+
+
+if _should_render_app():
+    try:
+        render_app()
+    except Exception as error:
+        try:
+            st.error("中央控制台暂时无法运行。")
+            st.warning("请返回主界面重新进入，或检查最近一次组件参数修改。")
+            if st.button("返回主界面"):
+                go_home()
+            with st.expander("错误详情", expanded=False):
+                st.code("".join(traceback.format_exception(type(error), error, error.__traceback__)), language="text")
+        except Exception:
+            raise

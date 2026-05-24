@@ -279,6 +279,15 @@ EXPECTED_CONTENT_REFERENCES = {
         "K-Fold",
         "工程坑案例",
     ],
+    Path("part6_universal_framework/neural_network_playground.py"): [
+        "LayerNorm",
+        "ResidualBlock",
+        "MultiheadAttention",
+        "TransformerEncoder",
+        "export_project_config",
+        "import_project_config",
+        "训练与章节联动",
+    ],
 }
 
 SMOKE_FUNCTIONS = {
@@ -529,6 +538,61 @@ def check_expected_content() -> None:
     if failures:
         raise CheckFailure("工程教学内容检查失败：\n" + "\n".join(failures))
     print(f"[通过] 工程教学内容检查：{len(EXPECTED_CONTENT_REFERENCES)} 个页面")
+
+
+def check_playground_codegen() -> None:
+    namespace = load_module_without_main(Path("part6_universal_framework/neural_network_playground.py"))
+    registry = namespace["COMPONENT_REGISTRY"]
+    presets = namespace["PRESETS"]
+    infer_shapes = namespace["infer_shapes"]
+    generate_code = namespace["generate_code"]
+
+    required_components = {
+        "Linear",
+        "Conv2d",
+        "MaxPool2d",
+        "LayerNorm",
+        "ResidualBlock",
+        "MultiheadAttention",
+        "TransformerEncoder",
+        "Flatten",
+    }
+    missing_components = sorted(required_components - set(registry))
+    failures: list[str] = []
+    if missing_components:
+        failures.append("组件注册表缺少：" + ", ".join(missing_components))
+
+    required_presets = {"mlp", "cnn", "transformer", "residual_mlp"}
+    missing_presets = sorted(required_presets - set(presets))
+    if missing_presets:
+        failures.append("预设模型缺少：" + ", ".join(missing_presets))
+
+    for preset_name in sorted(required_presets & set(presets)):
+        preset = presets[preset_name]
+        steps = infer_shapes(tuple(preset["input_shape"]), preset["layers"])
+        bad_steps = [step for step in steps if not step.ok]
+        if bad_steps:
+            failures.append(f"{preset_name}: shape 推导失败：{bad_steps[0].message}")
+            continue
+        code = generate_code(
+            tuple(preset["input_shape"]),
+            preset["layers"],
+            steps,
+            preset["loss"],
+            preset["optimizer"],
+            namespace["OPTIMIZER_REGISTRY"][preset["optimizer"]]["params"],
+        )
+        try:
+            compile(code, f"<generated:{preset_name}>", "exec")
+            exec_namespace: dict[str, object] = {}
+            with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                exec(code, exec_namespace)
+        except Exception as exc:  # noqa: BLE001 - generated code must be executable.
+            failures.append(f"{preset_name}: 生成代码不可执行：{exc}")
+
+    if failures:
+        raise CheckFailure("中央控制台代码生成检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 中央控制台组件与代码生成检查：{len(required_presets)} 个预设")
 
 
 def load_module(rel_path: Path) -> dict[str, object]:
@@ -789,6 +853,7 @@ def run_checks(include_smoke: bool) -> None:
     check_strict_legacy_module_protocol()
     check_expected_controls()
     check_expected_content()
+    check_playground_codegen()
     check_main_routes()
     check_knowledge_graph_routes()
     check_bagu_routes_placeholder()
