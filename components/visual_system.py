@@ -402,10 +402,485 @@ def render_training_dashboard_gauges(loss: float = 0.42, accuracy: float = 0.86,
     )
 
 
+# ──────────────────────────────────────────────
+# 通用 UI 组件
+# ──────────────────────────────────────────────
+
+
+def render_card(
+    title: str,
+    body: str,
+    *,
+    icon: str = "fa-solid fa-cube",
+    accent: str = NEON_BLUE,
+    footer: str = "",
+) -> None:
+    """渲染一个带发光边框的通用信息卡片。
+
+    Parameters
+    ----------
+    title : str
+        卡片标题。
+    body : str
+        卡片正文（支持 HTML）。
+    icon : str
+        Font Awesome 图标 class。
+    accent : str
+        主题强调色 hex。
+    footer : str
+        可选底部注释文本。
+    """
+    st = _st()
+    footer_html = f'<div class="vs-card-footer">{escape(footer)}</div>' if footer else ""
+    st.markdown(
+        f"""
+        <div class="vs-card vs-generic-card" style="--card-accent:{accent}">
+          <div class="vs-card-header"><i class="{icon}"></i> {escape(title)}</div>
+          <div class="vs-card-body">{body}</div>
+          {footer_html}
+        </div>
+        <style>
+        .vs-generic-card {{ padding:1rem; border-left:3px solid var(--card-accent) !important; }}
+        .vs-generic-card .vs-card-header {{ font-weight:850; font-size:1.05rem; margin-bottom:.55rem;
+            color:var(--vs-ink); display:flex; align-items:center; gap:.45rem; }}
+        .vs-generic-card .vs-card-header i {{ color:var(--card-accent);
+            filter:drop-shadow(0 0 8px var(--card-accent)); }}
+        .vs-generic-card .vs-card-body {{ color:var(--vs-muted); line-height:1.65; }}
+        .vs-generic-card .vs-card-footer {{ margin-top:.6rem; padding-top:.45rem;
+            border-top:1px solid rgba(255,255,255,.08); font-size:.82rem; color:var(--vs-muted);
+            font-style:italic; }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_metric_card(
+    label: str,
+    value: str,
+    *,
+    delta: str = "",
+    icon: str = "fa-solid fa-chart-simple",
+    accent: str = NEON_GREEN,
+) -> None:
+    """渲染单个数值指标卡片。
+
+    Parameters
+    ----------
+    label : str
+        指标名称。
+    value : str
+        当前值（字符串，方便格式化如 "98.2%"）。
+    delta : str
+        可选变化量（如 "+0.5%"），绿色为正，红色为负。
+    icon : str
+        Font Awesome 图标 class。
+    accent : str
+        主题强调色 hex。
+    """
+    st = _st()
+    delta_html = ""
+    if delta:
+        positive = delta.startswith("+") or not delta.startswith("-")
+        delta_color = NEON_GREEN if positive else "#ff4d6a"
+        delta_html = (
+            f'<span class="vs-metric-delta" style="color:{delta_color}">{escape(delta)}</span>'
+        )
+    st.markdown(
+        f"""
+        <div class="vs-card vs-metric-card" style="--mc-accent:{accent}">
+          <div class="vs-metric-icon"><i class="{icon}"></i></div>
+          <div class="vs-metric-content">
+            <span class="vs-metric-label">{escape(label)}</span>
+            <span class="vs-metric-value">{escape(value)}</span>
+            {delta_html}
+          </div>
+        </div>
+        <style>
+        .vs-metric-card {{ display:flex; align-items:center; gap:.85rem; padding:.85rem 1rem; }}
+        .vs-metric-icon {{ width:44px; height:44px; border-radius:10px; display:grid; place-items:center;
+            background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.06); flex-shrink:0; }}
+        .vs-metric-icon i {{ font-size:1.2rem; color:var(--mc-accent);
+            filter:drop-shadow(0 0 8px var(--mc-accent)); }}
+        .vs-metric-content {{ display:flex; flex-direction:column; gap:.12rem; }}
+        .vs-metric-label {{ font-size:.82rem; color:var(--vs-muted); letter-spacing:.03em; }}
+        .vs-metric-value {{ font-family:"JetBrains Mono"; font-size:1.45rem; font-weight:700; color:var(--vs-ink); }}
+        .vs-metric-delta {{ font-size:.82rem; font-family:"JetBrains Mono"; }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_neon_button(label: str, key: str, *, icon: str = "", accent: str = NEON_BLUE) -> bool:
+    """渲染一个霓虹风格按钮并返回是否被点击。
+
+    Parameters
+    ----------
+    label : str
+        按钮文字。
+    key : str
+        Streamlit widget key。
+    icon : str
+        可选 Font Awesome 图标 class（前置）。
+    accent : str
+        主题强调色 hex。
+
+    Returns
+    -------
+    bool
+        按钮是否被点击。
+    """
+    st = _st()
+    prefix = f'<i class="{icon}" style="margin-right:.35rem"></i>' if icon else ""
+    st.markdown(
+        f"""
+        <style>
+        div[data-testid=\"stButton\"] > button[key=\"{key}\"] {{
+            border-color:{accent} !important;
+            box-shadow:0 0 18px {accent}44, inset 0 0 12px {accent}18 !important;
+        }}
+        div[data-testid=\"stButton\"] > button[key=\"{key}\"]:hover {{
+            box-shadow:0 0 28px {accent}66 !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    return st.button(f"{prefix}{label}", key=key, use_container_width=True)
+
+
+def render_chart_container(
+    title: str,
+    fig,
+    *,
+    icon: str = "fa-solid fa-chart-area",
+    description: str = "",
+) -> None:
+    """将 Plotly 图表包裹在带标题的容器面板中。
+
+    Parameters
+    ----------
+    title : str
+        面板标题。
+    fig : plotly.graph_objects.Figure
+        Plotly 图表对象。
+    icon : str
+        Font Awesome 图标 class。
+    description : str
+        可选描述文字，显示在图表下方。
+    """
+    st = _st()
+    desc_html = f'<p class="vs-chart-desc">{escape(description)}</p>' if description else ""
+    st.markdown(
+        f"""
+        <div class="vs-card vs-chart-panel">
+          <div class="vs-chart-title"><i class="{icon}"></i> {escape(title)}</div>
+        </div>
+        <style>
+        .vs-chart-panel {{ padding:1rem; }}
+        .vs-chart-title {{ font-weight:850; font-size:1.02rem; margin-bottom:.6rem; color:var(--vs-ink);
+            display:flex; align-items:center; gap:.4rem; }}
+        .vs-chart-title i {{ color:var(--vs-blue); filter:drop-shadow(0 0 6px rgba(0,240,255,.45)); }}
+        .vs-chart-desc {{ color:var(--vs-muted); font-size:.86rem; line-height:1.55; margin:.5rem 0 0; }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    if description:
+        st.markdown(
+            f'<p style="color:var(--vs-muted);font-size:.86rem;line-height:1.55;margin:-.3rem 0 .8rem;">{escape(description)}</p>',
+            unsafe_allow_html=True,
+        )
+
+
+# ──────────────────────────────────────────────
+# CNN 层级管线动效
+# ──────────────────────────────────────────────
+
+
+def render_cnn_layer_pipeline() -> None:
+    """CNN 层级管线动效：展示数据从 Input 经 Conv→ReLU→Pool→FC 的完整前向流动。
+
+    每个阶段用独立容器表示，中间有粒子流动的连接箭头，
+    各阶段的特征图尺寸逐步缩小、通道数递增。
+    """
+    st = _st()
+    stages = [
+        ("Input", "224×224×3", NEON_BLUE, "fa-solid fa-image"),
+        ("Conv", "112×112×64", NEON_PURPLE, "fa-solid fa-expand"),
+        ("ReLU", "112×112×64", "#ff4d6a", "fa-solid fa-bolt"),
+        ("Pool", "56×56×64", NEON_GREEN, "fa-solid fa-compress"),
+        ("Conv", "56×56×128", NEON_PURPLE, "fa-solid fa-expand"),
+        ("ReLU", "56×56×128", "#ff4d6a", "fa-solid fa-bolt"),
+        ("Pool", "28×28×128", NEON_GREEN, "fa-solid fa-compress"),
+        ("FC", "1×1×1000", "#ffd166", "fa-solid fa-brain"),
+    ]
+    stage_items = []
+    for idx, (name, shape, color, icon) in enumerate(stages):
+        anim_delay = round(idx * 0.18, 2)
+        stage_items.append(
+            f"""
+            <div class="vs-pipe-stage" style="--stage-color:{color};--stage-delay:{anim_delay}s">
+              <i class="{icon}"></i>
+              <strong>{escape(name)}</strong>
+              <code>{escape(shape)}</code>
+            </div>
+            """
+        )
+    # 箭头连接
+    arrows = "".join(
+        f'<div class="vs-pipe-arrow" style="--arr-delay:{round(idx * 0.18 + 0.09, 2)}s"><i class="fa-solid fa-chevron-right"></i></div>'
+        for idx in range(len(stages) - 1)
+    )
+    # 数据粒子行
+    data_dots = "".join(
+        f'<span class="vs-pipe-dot" style="--dot-delay:{round(idx * 0.12, 2)}s;--dot-color:{stages[idx % len(stages)][2]}"></span>'
+        for idx in range(24)
+    )
+    st.markdown(
+        f"""
+        <div class="vs-card vs-cnn-pipeline" title="CNN 前向管线：数据逐层经过卷积、激活、池化，最终到达全连接分类层。">
+          <div class="vs-panel-title"><i class="fa-solid fa-layer-group"></i> CNN 层级管线</div>
+          <div class="vs-pipe-row">
+            {''.join(stage_items)}
+          </div>
+          <div class="vs-pipe-arrow-row">{arrows}</div>
+          <div class="vs-pipe-data-track">{data_dots}</div>
+          <p>数据从左到右流动：卷积提取局部特征 → ReLU 引入非线性 → 池化压缩空间维度 → 全连接层输出分类。特征图越来越小，但语义越来越丰富。</p>
+        </div>
+        <style>
+        .vs-cnn-pipeline {{ padding:1rem; overflow:hidden; }}
+        .vs-pipe-row {{ display:flex; gap:.35rem; flex-wrap:wrap; justify-content:center; margin-bottom:.45rem; }}
+        .vs-pipe-stage {{ display:flex; flex-direction:column; align-items:center; gap:.2rem;
+            padding:.55rem .5rem; border-radius:8px; min-width:78px;
+            border:1px solid var(--stage-color); background:rgba(0,0,0,.22);
+            animation:vs-pipe-stage-in .5s ease both; animation-delay:var(--stage-delay); }}
+        .vs-pipe-stage i {{ color:var(--stage-color); font-size:1.1rem;
+            filter:drop-shadow(0 0 8px var(--stage-color)); }}
+        .vs-pipe-stage strong {{ font-size:.78rem; color:var(--vs-ink); }}
+        .vs-pipe-stage code {{ font-size:.68rem; color:var(--vs-muted); background:rgba(255,255,255,.05);
+            padding:.1rem .35rem; border-radius:4px; }}
+        @keyframes vs-pipe-stage-in {{ from {{ opacity:0; transform:translateY(10px) scale(.92); }}
+            to {{ opacity:1; transform:translateY(0) scale(1); }} }}
+        .vs-pipe-arrow-row {{ display:flex; justify-content:center; gap:0; margin:.2rem 0; position:relative; }}
+        .vs-pipe-arrow {{ color:var(--vs-blue); font-size:.72rem; opacity:.55;
+            animation:vs-pipe-arrow-pulse 1.4s ease-in-out infinite; animation-delay:var(--arr-delay); }}
+        @keyframes vs-pipe-arrow-pulse {{ 0%,100%{{ opacity:.3; transform:scale(.85); }}
+            50%{{ opacity:1; transform:scale(1.15); }} }}
+        .vs-pipe-data-track {{ height:8px; border-radius:4px; background:rgba(255,255,255,.05);
+            position:relative; overflow:hidden; margin:.45rem 0; }}
+        .vs-pipe-dot {{ position:absolute; width:6px; height:6px; border-radius:50%;
+            top:1px; background:var(--dot-color); box-shadow:0 0 10px var(--dot-color);
+            animation:vs-pipe-data-flow 3.2s linear infinite; animation-delay:var(--dot-delay); }}
+        @keyframes vs-pipe-data-flow {{ from {{ left:-3%; opacity:0; }}
+            10%{{ opacity:1; }} 90%{{ opacity:1; }} to {{ left:103%; opacity:0; }} }}
+        .vs-cnn-pipeline p {{ color:var(--vs-muted); line-height:1.62; margin:.7rem 0 0; }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ──────────────────────────────────────────────
+# 梯度监控仪表盘
+# ──────────────────────────────────────────────
+
+
+def render_gradient_monitor(mode: str = "normal") -> None:
+    """梯度监控仪表盘：展示正常/消失/爆炸三种梯度状态的可视化对比。
+
+    Parameters
+    ----------
+    mode : str
+        梯度状态，可选 'normal' | 'vanishing' | 'exploding'。
+        若传入 'all' 则同时展示三种状态对比。
+    """
+    st = _st()
+    configs = {
+        "normal": {
+            "label": "正常梯度",
+            "color": NEON_GREEN,
+            "icon": "fa-solid fa-circle-check",
+            "desc": "各层梯度量级相近，训练稳定收敛。",
+            "bars": [0.85, 0.80, 0.78, 0.75, 0.72, 0.70, 0.68],
+        },
+        "vanishing": {
+            "label": "梯度消失",
+            "color": NEON_PURPLE,
+            "icon": "fa-solid fa-ghost",
+            "desc": "深层梯度趋近零，前面的层几乎无法学习。",
+            "bars": [0.82, 0.50, 0.22, 0.08, 0.02, 0.005, 0.001],
+        },
+        "exploding": {
+            "label": "梯度爆炸",
+            "color": "#ff4d6a",
+            "icon": "fa-solid fa-explosion",
+            "desc": "梯度指数增长，参数更新剧烈震荡甚至 NaN。",
+            "bars": [0.10, 0.35, 0.80, 1.50, 3.20, 7.50, 15.0],
+        },
+    }
+    if mode == "all":
+        modes_to_show = ["normal", "vanishing", "exploding"]
+    else:
+        modes_to_show = [mode]
+    for m in modes_to_show:
+        cfg = configs[m]
+        layer_names = ["Layer 1", "Layer 2", "Layer 3", "Layer 4", "Layer 5", "Layer 6", "Layer 7"]
+        max_val = max(cfg["bars"]) if max(cfg["bars"]) > 0 else 1.0
+        bars_html = ""
+        for idx, (lname, val) in enumerate(zip(layer_names, cfg["bars"])):
+            pct = min(100, val / max_val * 100)
+            delay = round(idx * 0.1, 2)
+            bars_html += (
+                f'<div class="vs-grad-bar-row">'
+                f'<span class="vs-grad-bar-label">{escape(lname)}</span>'
+                f'<div class="vs-grad-bar-track">'
+                f'<div class="vs-grad-bar-fill" style="--bar-w:{pct:.1f}%;--bar-color:{cfg["color"]};--bar-delay:{delay}s"></div>'
+                f'</div>'
+                f'<span class="vs-grad-bar-val">{val:.3g}</span>'
+                f'</div>'
+            )
+        st.markdown(
+            f"""
+            <div class="vs-card vs-grad-monitor" style="--gm-color:{cfg['color']}">
+              <div class="vs-panel-title"><i class="{cfg['icon']}"></i> 梯度监控 — {escape(cfg['label'])}</div>
+              <div class="vs-grad-bars">{bars_html}</div>
+              <p>{escape(cfg['desc'])}</p>
+            </div>
+            <style>
+            .vs-grad-monitor {{ padding:1rem; }}
+            .vs-grad-bars {{ display:flex; flex-direction:column; gap:.4rem; }}
+            .vs-grad-bar-row {{ display:flex; align-items:center; gap:.55rem; }}
+            .vs-grad-bar-label {{ width:58px; font-size:.76rem; color:var(--vs-muted); text-align:right; flex-shrink:0; }}
+            .vs-grad-bar-track {{ flex:1; height:14px; border-radius:7px; background:rgba(255,255,255,.06); overflow:hidden; }}
+            .vs-grad-bar-fill {{ height:100%; border-radius:7px; width:0; background:var(--bar-color);
+                box-shadow:0 0 12px var(--bar-color); animation:vs-grad-fill .7s ease forwards; animation-delay:var(--bar-delay); }}
+            @keyframes vs-grad-fill {{ to {{ width:var(--bar-w); }} }}
+            .vs-grad-bar-val {{ width:52px; font-size:.76rem; font-family:"JetBrains Mono"; color:var(--gm-color); flex-shrink:0; }}
+            .vs-grad-monitor p {{ color:var(--vs-muted); line-height:1.62; margin:.7rem 0 0; }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+# ──────────────────────────────────────────────
+# 训练动态监控面板
+# ──────────────────────────────────────────────
+
+
+def render_training_dynamics_panel() -> None:
+    """训练动态监控面板：用 Plotly 绘制 loss、accuracy、learning rate、gradient norm 四条实时曲线。
+
+    使用模拟数据演示，实际调用时可传入真实训练数据。
+    """
+    st = _st()
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+    import math
+
+    epochs = list(range(1, 51))
+    # 模拟训练曲线
+    loss_vals = [2.3 * math.exp(-0.06 * e) + 0.15 + 0.05 * math.sin(e * 0.8) for e in epochs]
+    acc_vals = [1 - 0.85 * math.exp(-0.07 * e) + 0.02 * math.sin(e * 0.6) for e in epochs]
+    lr_vals = [0.01 * (0.95 ** e) for e in epochs]
+    grad_vals = [0.5 * math.exp(-0.02 * e) + 0.08 * abs(math.sin(e * 0.4)) for e in epochs]
+
+    fig = make_subplots(
+        rows=2,
+        cols=2,
+        subplot_titles=("Loss", "Accuracy", "Learning Rate", "Gradient Norm"),
+        vertical_spacing=0.12,
+        horizontal_spacing=0.08,
+    )
+    fig.add_trace(
+        go.Scatter(x=epochs, y=loss_vals, line=dict(color=NEON_PURPLE, width=2), name="Loss"),
+        row=1, col=1,
+    )
+    fig.add_trace(
+        go.Scatter(x=epochs, y=acc_vals, line=dict(color=NEON_GREEN, width=2), name="Accuracy"),
+        row=1, col=2,
+    )
+    fig.add_trace(
+        go.Scatter(x=epochs, y=lr_vals, line=dict(color=NEON_BLUE, width=2), name="LR"),
+        row=2, col=1,
+    )
+    fig.add_trace(
+        go.Scatter(x=epochs, y=grad_vals, line=dict(color="#ffd166", width=2), name="Grad Norm"),
+        row=2, col=2,
+    )
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0.15)",
+        font=dict(family="JetBrains Mono, Inter", color="#eaf7ff", size=11),
+        showlegend=False,
+        margin=dict(l=40, r=20, t=40, b=30),
+        height=420,
+    )
+    for ann in fig.layout.annotations:
+        ann.font = dict(family="Inter", size=13, color="#eaf7ff")
+
+    st.markdown(
+        """
+        <div class="vs-card" style="padding:1rem;">
+          <div class="vs-panel-title"><i class="fa-solid fa-heart-pulse"></i> 训练动态监控面板</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown(
+        '<p style="color:var(--vs-muted);font-size:.86rem;line-height:1.55;margin:-.3rem 0 .8rem;">'
+        '四条曲线同步观察：Loss 应稳步下降，Accuracy 应逐步上升，LR 按策略衰减，Gradient Norm 反映各层梯度健康度。',
+        unsafe_allow_html=True,
+    )
+
+
+# ──────────────────────────────────────────────
+# 运动画廊（展示所有动效）
+# ──────────────────────────────────────────────
+
+
 def render_motion_gallery() -> None:
+    """展示所有教学动效组件的画廊，含新增组件演示。"""
     st = _st()
     st.subheader("核心教学动效")
     render_loading_bar("页面动效服务于观察：每一种发光都对应一个可解释的学习信号")
+
+    # ── 通用组件区 ──
+    st.markdown("### 通用 UI 组件")
+    c0a, c0b, c0c = st.columns(3)
+    with c0a:
+        render_metric_card("Accuracy", "98.2%", delta="+0.5%", icon="fa-solid fa-bullseye", accent=NEON_GREEN)
+    with c0b:
+        render_metric_card("Loss", "0.042", delta="-0.008", icon="fa-solid fa-fire", accent=NEON_PURPLE)
+    with c0c:
+        render_metric_card("Epoch", "127/200", icon="fa-solid fa-rotate", accent=NEON_BLUE)
+    render_card(
+        "快速入门",
+        "<b>Step 1</b> 导入 PyTorch → <b>Step 2</b> 定义模型 → <b>Step 3</b> 训练循环。就这么简单。",
+        icon="fa-solid fa-rocket",
+        accent=NEON_GREEN,
+        footer="适用于所有章节的最小可运行示例",
+    )
+
+    # ── CNN 管线 ──
+    st.markdown("### CNN 层级管线")
+    render_cnn_layer_pipeline()
+
+    # ── 梯度监控 ──
+    st.markdown("### 梯度监控仪表盘")
+    render_gradient_monitor("all")
+
+    # ── 训练动态面板 ──
+    st.markdown("### 训练动态监控面板")
+    render_training_dynamics_panel()
+
+    # ── 原有动效 ──
+    st.markdown("### 交互式教学动效")
     c1, c2 = st.columns(2)
     with c1:
         render_convolution_particle_flow()

@@ -21,6 +21,8 @@ import torch
 import torch.nn.functional as F
 from plotly.subplots import make_subplots
 
+from components.visual_system import NEON_BLUE, NEON_GREEN, NEON_PURPLE, render_visual_system
+
 
 torch.set_num_threads(1)
 
@@ -33,44 +35,18 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+render_visual_system("dark")
+
 st.markdown(
     """
     <style>
-    :root {
-        --ink: #172026;
-        --muted: #596772;
-        --line: #d8dee3;
-        --paper: #f8f6f1;
-        --panel: #ffffff;
-        --teal: #0f8b8d;
-        --rose: #bf3f5b;
-        --amber: #c4871f;
-        --green: #3f7d58;
-        --blue: #3268a8;
-    }
-    .stApp {
-        background:
-            linear-gradient(180deg, rgba(255,255,255,0.94) 0%, rgba(238,246,243,0.96) 100%),
-            #fbfaf6;
-        color: var(--ink);
-    }
     .block-container {
         padding-top: 1.25rem;
         padding-bottom: 2.2rem;
     }
     h1, h2, h3 { letter-spacing: 0; }
-    section[data-testid="stSidebar"] {
-        background: #eef4f2;
-        border-right: 1px solid var(--line);
-    }
-    div[data-testid="stMetric"] {
-        background: rgba(255,255,255,0.82);
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 0.75rem;
-    }
     .hero {
-        border-bottom: 1px solid var(--line);
+        border-bottom: 1px solid var(--vs-line);
         padding-bottom: 0.85rem;
         margin-bottom: 0.85rem;
     }
@@ -80,26 +56,26 @@ st.markdown(
         margin: 0;
     }
     .hero p {
-        color: var(--muted);
+        color: var(--vs-muted);
         max-width: 980px;
         line-height: 1.75;
         margin: 0.45rem 0 0 0;
     }
     .note {
-        border-left: 4px solid var(--teal);
-        background: rgba(255,255,255,0.74);
+        border-left: 4px solid var(--vs-blue);
+        background: var(--vs-panel-soft);
         border-radius: 0 8px 8px 0;
         padding: 0.72rem 0.9rem;
-        color: #26343b;
+        color: var(--vs-ink);
         line-height: 1.7;
         margin: 0.35rem 0 0.85rem 0;
     }
     .callout {
-        background: rgba(255,255,255,0.76);
-        border: 1px solid var(--line);
+        background: var(--vs-panel-soft);
+        border: 1px solid var(--vs-line);
         border-radius: 8px;
         padding: 0.78rem 0.9rem;
-        color: #2b3941;
+        color: var(--vs-ink);
         line-height: 1.68;
         margin: 0.35rem 0 0.75rem 0;
     }
@@ -110,31 +86,100 @@ st.markdown(
         margin: 0.5rem 0 0.85rem 0;
     }
     .mini-card {
-        background: rgba(255,255,255,0.78);
-        border: 1px solid var(--line);
+        background: var(--vs-panel-soft);
+        border: 1px solid var(--vs-line);
         border-radius: 8px;
         padding: 0.75rem 0.85rem;
         min-height: 116px;
     }
     .mini-card strong {
         display: block;
-        color: #1f2d35;
+        color: var(--vs-ink);
         margin-bottom: 0.35rem;
     }
     .mini-card p {
-        color: var(--muted);
+        color: var(--vs-muted);
         margin: 0;
         line-height: 1.62;
         font-size: 0.92rem;
     }
     .small-muted {
-        color: var(--muted);
+        color: var(--vs-muted);
         font-size: 0.92rem;
         line-height: 1.58;
+    }
+    .cnn-pipeline {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 1.5rem 0;
+        position: relative;
+    }
+    .cnn-stage {
+        border: 1px solid rgba(0,240,255,0.28);
+        border-radius: 10px;
+        padding: 1rem 1.2rem;
+        text-align: center;
+        min-width: 90px;
+        animation: cnn-stage-glow 2.8s ease-in-out infinite;
+    }
+    .cnn-stage-label {
+        font-weight: 800;
+        font-size: 1.05rem;
+        color: var(--vs-ink);
+    }
+    .cnn-stage-shape {
+        font-size: 0.82rem;
+        color: var(--vs-muted);
+        margin-top: 0.25rem;
+    }
+    .cnn-input-stage {
+        background: rgba(0,240,255,0.12);
+        border-color: rgba(0,240,255,0.42);
+        animation-delay: 0s;
+    }
+    .cnn-conv-stage {
+        background: rgba(0,240,255,0.15);
+        border-color: rgba(0,240,255,0.45);
+        box-shadow: 0 0 20px rgba(0,240,255,0.15);
+        animation-delay: 0.35s;
+    }
+    .cnn-relu-stage {
+        background: rgba(176,0,255,0.12);
+        border-color: rgba(176,0,255,0.42);
+        animation-delay: 0.7s;
+    }
+    .cnn-pool-stage {
+        background: rgba(0,255,136,0.12);
+        border-color: rgba(0,255,136,0.42);
+        animation-delay: 1.05s;
+    }
+    .cnn-fc-stage {
+        background: rgba(255,209,102,0.12);
+        border-color: rgba(255,209,102,0.42);
+        animation-delay: 1.4s;
+    }
+    .cnn-arrow {
+        color: var(--vs-blue);
+        font-size: 1.2rem;
+        filter: drop-shadow(0 0 6px rgba(0,240,255,0.5));
+        animation: cnn-arrow-pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes cnn-stage-glow {
+        0%, 100% { transform: scale(1); opacity: 0.75; }
+        50% { transform: scale(1.04); opacity: 1; }
+    }
+    @keyframes cnn-arrow-pulse {
+        0%, 100% { opacity: 0.4; transform: translateX(0); }
+        50% { opacity: 1; transform: translateX(4px); }
     }
     @media (max-width: 900px) {
         .mini-grid { grid-template-columns: 1fr; }
         .mini-card { min-height: auto; }
+    }
+    @media (max-width: 760px) {
+        .cnn-pipeline { flex-wrap: wrap; }
     }
     </style>
     """,
@@ -903,6 +948,49 @@ def render_detection_segmentation_guide() -> None:
     )
 
 
+def render_cnn_pipeline_flow() -> None:
+    """CNN 层级管线动效：Conv → ReLU → Pool → FC 数据流可视化。"""
+    st.markdown(
+        f"""
+        <div class="vs-card" style="padding:1rem">
+          <div style="font-weight:850;margin-bottom:.7rem;color:var(--vs-ink)">
+            <i class="fa-solid fa-layer-group"></i> CNN 层级管线：数据流经各层的可视化
+          </div>
+          <div class="cnn-pipeline">
+            <div class="cnn-stage cnn-input-stage">
+              <div class="cnn-stage-label">Input</div>
+              <div class="cnn-stage-shape">H×W×C</div>
+            </div>
+            <div class="cnn-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            <div class="cnn-stage cnn-conv-stage">
+              <div class="cnn-stage-label">Conv</div>
+              <div class="cnn-stage-shape">特征提取</div>
+            </div>
+            <div class="cnn-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            <div class="cnn-stage cnn-relu-stage">
+              <div class="cnn-stage-label">ReLU</div>
+              <div class="cnn-stage-shape">非线性激活</div>
+            </div>
+            <div class="cnn-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            <div class="cnn-stage cnn-pool-stage">
+              <div class="cnn-stage-label">Pool</div>
+              <div class="cnn-stage-shape">降采样</div>
+            </div>
+            <div class="cnn-arrow"><i class="fa-solid fa-arrow-right"></i></div>
+            <div class="cnn-stage cnn-fc-stage">
+              <div class="cnn-stage-label">FC</div>
+              <div class="cnn-stage-shape">分类得分</div>
+            </div>
+          </div>
+          <p style="color:var(--vs-muted);line-height:1.62;margin:.7rem 0 0">
+            数据从左到右流经卷积层提取局部特征（青色高亮），ReLU 引入非线性（紫色脉冲），池化层压缩空间维度（绿色收缩），最终全连接层输出分类得分（金色）。每个阶段的脉冲频率和亮度反映该层的计算活跃度。
+          </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 with st.sidebar:
     st.header("导航")
     selected_arch_name = st.selectbox("选择网络", [arch.name for arch in ARCHITECTURES], index=4)
@@ -931,6 +1019,7 @@ with practice_col:
     if st.button("去实战：CNN 构建器", width="stretch"):
         go_to_playground("cnn")
 
+render_cnn_pipeline_flow()
 render_cnn_arch_learning_map()
 
 if section == "架构演进":
@@ -970,7 +1059,7 @@ elif section == "网络结构与前向传播":
     st.plotly_chart(plot_architecture_blocks(selected_arch, active_idx=min(step - 1, len(selected_arch.stages) - 1)), width="stretch", config=PLOT_CONFIG)
 
     df = forward_dataframe(selected_arch)
-    styled = df.style.apply(lambda row: ["background-color: #e8f4f2" if row["步骤"] == step else "" for _ in row], axis=1)
+    styled = df.style.apply(lambda row: [f"background-color: {NEON_BLUE}22" if row["步骤"] == step else "" for _ in row], axis=1)
     st.dataframe(styled, width="stretch", hide_index=True)
 
     st.markdown("**结构备注**")

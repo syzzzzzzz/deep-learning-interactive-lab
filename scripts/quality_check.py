@@ -1217,6 +1217,87 @@ def check_matplotlib_close_after_show() -> None:
     print(f"[通过] Matplotlib 图未关闭检查：legacy_runner 统一关闭旧脚本图像，额外扫描 {len(scan_files)} 个非旧脚本文件")
 
 
+def check_visual_system_integration() -> None:
+    """Check that visual_system.py contains core neon colors, motion components,
+    Font Awesome / Inter / JetBrains Mono assets, and that core pages import it."""
+    failures: list[str] = []
+
+    vs_path = Path("components/visual_system.py")
+    if not (ROOT / vs_path).exists():
+        raise CheckFailure("视觉系统集成检查失败：components/visual_system.py 不存在")
+
+    text = read_text(vs_path)
+
+    # --- Core neon colour variables ---
+    required_neon = {"NEON_BLUE": "#00f0ff", "NEON_PURPLE": "#b000ff", "NEON_GREEN": "#00ff88"}
+    for var_name, hex_val in required_neon.items():
+        if var_name not in text:
+            failures.append(f"{vs_path}: 缺少核心霓虹色变量 {var_name}")
+        if hex_val not in text:
+            failures.append(f"{vs_path}: 缺少霓虹色值 {hex_val}")
+
+    # --- Core motion / effect components (must never be deleted) ---
+    required_motion_components = [
+        "render_visual_system",
+        "render_particle_field",
+        "render_convolution_particle_flow",
+        "render_gradient_descent_landscape",
+        "render_attention_light_beams",
+        "render_backprop_current_flow",
+        "render_training_dashboard_gauges",
+        "render_motion_gallery",
+    ]
+    for func_name in required_motion_components:
+        if f"def {func_name}" not in text:
+            failures.append(f"{vs_path}: 核心动效组件 {func_name} 被删除或重命名")
+
+    # --- Font assets ---
+    if "font-awesome" not in text.lower():
+        failures.append(f"{vs_path}: 缺少 Font Awesome 引用")
+    for font in ("Inter", "JetBrains Mono"):
+        if font not in text:
+            failures.append(f"{vs_path}: 缺少字体 {font} 引用")
+
+    # --- Core pages must import render_visual_system ---
+    VISUAL_SYSTEM_IMPORT_PAGES = [
+        Path("main.py"),
+        Path("part4_transformer/transformer_models.py"),
+        Path("part6_universal_framework/training_demo.py"),
+    ]
+    for page_path in VISUAL_SYSTEM_IMPORT_PAGES:
+        if not (ROOT / page_path).exists():
+            failures.append(f"{page_path}: 文件不存在，无法检查视觉系统接入")
+            continue
+        page_text = read_text(page_path)
+        if "from components.visual_system import" not in page_text:
+            failures.append(f"{page_path}: 未 import 视觉系统组件")
+        if "render_visual_system" not in page_text:
+            failures.append(f"{page_path}: 未调用 render_visual_system")
+
+    # --- Pages that use specific motion effects ---
+    MOTION_EFFECT_PAGES = {
+        Path("part1_foundations/01_tensors_gradients.py"): [
+            "render_gradient_descent_landscape",
+            "render_backprop_current_flow",
+        ],
+        Path("part2_cnn/01_convolution_visual.py"): [
+            "render_convolution_particle_flow",
+        ],
+    }
+    for page_path, effects in MOTION_EFFECT_PAGES.items():
+        if not (ROOT / page_path).exists():
+            failures.append(f"{page_path}: 文件不存在，无法检查动效接入")
+            continue
+        page_text = read_text(page_path)
+        for effect in effects:
+            if effect not in page_text:
+                failures.append(f"{page_path}: 未引用动效组件 {effect}")
+
+    if failures:
+        raise CheckFailure("视觉系统集成检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 视觉系统集成检查：核心霓虹色、动效组件、字体资产、页面接入均正常")
+
+
 def run_checks(include_smoke: bool) -> None:
     check_python_compile()
     check_placeholders()
@@ -1225,6 +1306,7 @@ def run_checks(include_smoke: bool) -> None:
     check_strict_legacy_module_protocol()
     check_expected_controls()
     check_expected_content()
+    check_visual_system_integration()
     check_playground_codegen()
     check_playground_training_linkage()
     check_main_routes()
