@@ -287,6 +287,14 @@ EXPECTED_CONTENT_REFERENCES = {
         "export_project_config",
         "import_project_config",
         "训练与章节联动",
+        "联动训练演示",
+        "真实轻量训练",
+        "教学模拟",
+        "make_loss_curve",
+        "make_gradient_flow_chart",
+        "make_update_ratio_chart",
+        "make_cnn_feature_map",
+        "make_attention_heatmap",
     ],
 }
 
@@ -595,6 +603,79 @@ def check_playground_codegen() -> None:
     print(f"[通过] 中央控制台组件与代码生成检查：{len(required_presets)} 个预设")
 
 
+def check_playground_training_linkage() -> None:
+    namespace = load_module_without_main(Path("part6_universal_framework/neural_network_playground.py"))
+    presets = namespace["PRESETS"]
+    infer_shapes = namespace["infer_shapes"]
+    run_playground_training = namespace["run_playground_training"]
+
+    failures: list[str] = []
+    mlp = presets["mlp"]
+    mlp_steps = infer_shapes(tuple(mlp["input_shape"]), mlp["layers"])
+    try:
+        mlp_history = run_playground_training(
+            tuple(mlp["input_shape"]),
+            mlp["layers"],
+            mlp_steps,
+            mlp["loss"],
+            mlp["optimizer"],
+            namespace["OPTIMIZER_REGISTRY"][mlp["optimizer"]]["params"],
+            epochs=2,
+            seed=11,
+            batch_size=4,
+        )
+        if len(mlp_history.losses) != 2:
+            failures.append("MLP 联动训练没有记录 2 个 epoch 的损失")
+        if not mlp_history.grad_norms or not any(any(value > 0 for value in values) for values in mlp_history.grad_norms.values()):
+            failures.append("MLP 联动训练没有记录有效梯度流")
+        if not mlp_history.update_ratios or not any(value > 0 for value in mlp_history.update_ratios):
+            failures.append("MLP 联动训练没有记录参数更新幅度")
+    except Exception as exc:  # noqa: BLE001 - report linkage failures together.
+        failures.append(f"MLP 联动训练运行失败：{exc}")
+
+    cnn = presets["cnn"]
+    cnn_steps = infer_shapes(tuple(cnn["input_shape"]), cnn["layers"])
+    try:
+        cnn_history = run_playground_training(
+            tuple(cnn["input_shape"]),
+            cnn["layers"],
+            cnn_steps,
+            cnn["loss"],
+            cnn["optimizer"],
+            namespace["OPTIMIZER_REGISTRY"][cnn["optimizer"]]["params"],
+            epochs=1,
+            seed=13,
+            batch_size=2,
+        )
+        if cnn_history.cnn_feature_maps is None:
+            failures.append("CNN 联动训练没有生成卷积特征图")
+    except Exception as exc:  # noqa: BLE001 - report linkage failures together.
+        failures.append(f"CNN 联动训练运行失败：{exc}")
+
+    transformer = presets["transformer"]
+    transformer_steps = infer_shapes(tuple(transformer["input_shape"]), transformer["layers"])
+    try:
+        transformer_history = run_playground_training(
+            tuple(transformer["input_shape"]),
+            transformer["layers"],
+            transformer_steps,
+            transformer["loss"],
+            transformer["optimizer"],
+            namespace["OPTIMIZER_REGISTRY"][transformer["optimizer"]]["params"],
+            epochs=1,
+            seed=17,
+            batch_size=2,
+        )
+        if transformer_history.attention_heatmap is None:
+            failures.append("Transformer 联动训练没有生成注意力热力图")
+    except Exception as exc:  # noqa: BLE001 - report linkage failures together.
+        failures.append(f"Transformer 联动训练运行失败：{exc}")
+
+    if failures:
+        raise CheckFailure("中央控制台训练联动检查失败：\n" + "\n".join(failures))
+    print("[通过] 中央控制台训练联动检查：损失、梯度、参数更新、CNN 特征图、注意力热力图均可生成")
+
+
 def load_module(rel_path: Path) -> dict[str, object]:
     stdout = io.StringIO()
     stderr = io.StringIO()
@@ -854,6 +935,7 @@ def run_checks(include_smoke: bool) -> None:
     check_expected_controls()
     check_expected_content()
     check_playground_codegen()
+    check_playground_training_linkage()
     check_main_routes()
     check_knowledge_graph_routes()
     check_bagu_routes_placeholder()
