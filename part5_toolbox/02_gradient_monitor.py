@@ -18,6 +18,36 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 from components.visual_system import NEON_BLUE, NEON_GREEN, NEON_PURPLE, render_visual_system
 
+
+def print_learning_guide():
+    print("""
+学习导读：梯度监控不是"看一堆数字"，而是在给训练过程做体检。
+
+1. 梯度健康仪表盘怎么看
+   - 每根柱子代表一层的梯度范数，颜色和脉冲编码健康状态。
+   - 绿色脉冲 = 正常（1e-6 ~ 100），蓝色暗淡 = 消失（< 1e-6），红色闪烁 = 爆炸（> 100）。
+   - 只看单个 batch 不够，至少观察最近 10~50 步的趋势。
+
+2. 和训练曲线怎么联合诊断
+   - loss 发散 + 梯度 max 暴涨 → 学习率过高、标签异常或 loss 实现错误。
+   - loss 不动 + 前层 mean 接近 0 → 梯度消失，优先查初始化、激活函数、残差/归一化。
+   - loss 正常下降但某层长期异常 → 该层可能被冻结或没有接入计算图。
+
+3. 梯度爆炸 vs 梯度消失
+   - 梯度消失：深层网络常见，Sigmoid/Tanh 是主要元凶；解决方案包括 ReLU/GELU、残差连接、He 初始化、BatchNorm。
+   - 梯度爆炸：梯度范数超过 100 就要警惕；解决方案包括梯度裁剪 clip_grad_norm_、降低学习率、Xavier/He 初始化。
+
+工程坑案例：
+   在一个文本分类项目里只看验证准确率以为模型欠拟合，连续加大模型；
+   后来梯度图显示 embedding 层长期接近 0，根因是 tokenizer 把大部分词都映射成了 UNK。
+   先看梯度，可以少走很多弯路。
+
+进阶思考：
+   如果只有最后一层梯度很大，你会先查标签和 loss，还是先重写模型？
+   如果只有前几层梯度消失，残差连接和归一化各解决什么问题？
+""".strip())
+
+
 st.set_page_config(
     page_title="梯度监控与超参搜索",
     layout="wide",
