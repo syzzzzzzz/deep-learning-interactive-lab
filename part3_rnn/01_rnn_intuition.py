@@ -1,358 +1,243 @@
 MODULE_TITLE = "RNN 直觉"
-MODULE_SUMMARY = "从循环隐藏状态理解序列信息如何随时间流动。"
-MODULE_TAGS = ["RNN", "序列", "隐藏状态", "可视化"]
+MODULE_SUMMARY = "从循环隐藏状态、时间展开和梯度衰减理解序列模型的基本机制。"
+MODULE_TAGS = ["RNN", "序列", "隐藏状态", "梯度"]
+MODULE_RELATED_TOPICS = ["隐藏状态", "RNN 超参实验", "LSTM/GRU", "梯度监控"]
+PRACTICE_TARGET = "part6_universal_framework/neural_network_playground?example=mlp"
 
-try:
-    """
-    自动生成自: part3_rnn\01_rnn_intuition.md
-    可独立运行的 Python 源码
-    """
+import io
+import sys
+from contextlib import redirect_stdout
+from pathlib import Path
 
-    import torch
-    import torch.nn as nn
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import matplotlib.gridspec as gridspec
-    from matplotlib.patches import FancyArrowPatch, Circle, FancyBboxPatch
-    import matplotlib.patches as mpatches
-
-    # ─────────────────────────────────────────────────────────
-    # 手动实现 RNN，逐步展示计算过程
-    # ─────────────────────────────────────────────────────────
-
-    class ManualRNNStep:
-        """
-        单步 RNN 计算的完整展示
-
-        公式：
-            h_t = tanh(W_hh · h_{t-1} + W_xh · x_t + b_h)
-            y_t = W_hy · h_t + b_y
-        """
-
-        def __init__(self, input_size: int = 3, hidden_size: int = 4, output_size: int = 2):
-            self.input_size  = input_size
-            self.hidden_size = hidden_size
-            self.output_size = output_size
-
-            # 初始化权重（Xavier）
-            torch.manual_seed(42)
-            scale = (2 / (input_size + hidden_size)) ** 0.5
-            self.W_xh = torch.randn(hidden_size, input_size)  * scale
-            self.W_hh = torch.randn(hidden_size, hidden_size) * scale
-            self.b_h  = torch.zeros(hidden_size)
-            self.W_hy = torch.randn(output_size, hidden_size) * scale
-            self.b_y  = torch.zeros(output_size)
-
-        def step(self, x_t: torch.Tensor, h_prev: torch.Tensor, verbose: bool = True):
-            """
-            执行一步 RNN 计算，打印每个中间值
-
-            x_t:    [input_size]
-            h_prev: [hidden_size]
-            """
-            if verbose:
-                print(f"\n{'='*50}")
-                print(f"输入 x_t:      {x_t.numpy().round(3)}")
-                print(f"上一隐状态 h_{{t-1}}: {h_prev.numpy().round(3)}")
-
-            # 计算各部分
-            xh_part = self.W_xh @ x_t
-            hh_part = self.W_hh @ h_prev
-            pre_act = xh_part + hh_part + self.b_h
-            h_t = torch.tanh(pre_act)
-            y_t = self.W_hy @ h_t + self.b_y
-
-            if verbose:
-                print(f"\nW_xh · x_t:    {xh_part.numpy().round(3)}")
-                print(f"W_hh · h_{{t-1}}: {hh_part.numpy().round(3)}")
-                print(f"pre_activation: {pre_act.numpy().round(3)}")
-                print(f"h_t = tanh(...): {h_t.numpy().round(3)}")
-                print(f"y_t = W_hy·h_t: {y_t.numpy().round(3)}")
-
-            return h_t, y_t
-
-        def run_sequence(self, sequence: torch.Tensor, verbose: bool = False):
-            """
-            处理完整序列
-
-            sequence: [T, input_size]
-            返回: all_h [T, hidden_size], all_y [T, output_size]
-            """
-            T = sequence.shape[0]
-            h = torch.zeros(self.hidden_size)
-            all_h, all_y = [], []
-
-            for t in range(T):
-                h, y = self.step(sequence[t], h, verbose=(verbose and t < 3))
-                all_h.append(h.clone())
-                all_y.append(y.clone())
-
-            return torch.stack(all_h), torch.stack(all_y)
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 
 
-    # 演示
-    rnn_step = ManualRNNStep(input_size=3, hidden_size=4, output_size=2)
-    x_t = torch.tensor([0.5, -0.3, 0.8])
-    h_prev = torch.zeros(4)
-    h_t, y_t = rnn_step.step(x_t, h_prev, verbose=True)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-    # 处理一个序列
-    seq = torch.randn(10, 3)
-    all_h, all_y = rnn_step.run_sequence(seq)
-    print(f"\n序列长度=10，隐状态形状: {all_h.shape}，输出形状: {all_y.shape}")
+from components.lesson_runtime import clamp_float, clamp_int, run_cli, running_under_streamlit
+from components.resource_manager import clean_old_artifacts, get_artifact_path, safe_mpl_figure
 
-    # ============================================================
-    # 代码段 2
-    # ============================================================
 
-    def visualize_vanishing_gradient():
-        """
-        可视化 RNN 中梯度消失的原因
+def simulate_rnn_sequence(
+    sequence_length: int = 8,
+    input_size: int = 3,
+    hidden_size: int = 5,
+    recurrent_scale: float = 0.85,
+    input_strength: float = 1.0,
+    seed: int = 42,
+) -> dict[str, np.ndarray]:
+    """Run a tiny hand-written RNN and return all intermediate states."""
 
-        反向传播时，梯度需要穿越 T 步：
-        ∂L/∂h_0 = ∏_{t=1}^{T} (∂h_t/∂h_{t-1})
-                 = ∏_{t=1}^{T} diag(1 - h_t²) · W_hh
+    sequence_length = clamp_int(sequence_length, 3, 30, "序列长度")
+    input_size = clamp_int(input_size, 1, 8, "输入维度")
+    hidden_size = clamp_int(hidden_size, 2, 16, "隐藏单元数")
+    recurrent_scale = clamp_float(recurrent_scale, 0.05, 1.6, "循环权重尺度")
+    input_strength = clamp_float(input_strength, 0.05, 3.0, "输入强度")
+    torch.manual_seed(seed)
 
-        如果 |W_hh| < 1，乘积指数衰减 → 梯度消失
-        如果 |W_hh| > 1，乘积指数爆炸 → 梯度爆炸
-        """
-        T = 50  # 序列长度
-        hidden_size = 32
+    x = torch.randn(sequence_length, input_size) * input_strength
+    w_xh = torch.randn(hidden_size, input_size) / np.sqrt(input_size)
+    w_hh_raw = torch.randn(hidden_size, hidden_size) / np.sqrt(hidden_size)
+    spectral = torch.linalg.matrix_norm(w_hh_raw, ord=2)
+    w_hh = w_hh_raw / spectral * recurrent_scale
+    b_h = torch.zeros(hidden_size)
 
-        torch.manual_seed(42)
+    hidden_states = []
+    pre_activations = []
+    h = torch.zeros(hidden_size)
+    for t in range(sequence_length):
+        pre = w_xh @ x[t] + w_hh @ h + b_h
+        h = torch.tanh(pre)
+        pre_activations.append(pre.numpy())
+        hidden_states.append(h.numpy())
 
-        # 三种情况：消失、正常、爆炸
-        scenarios = {
-            '梯度消失 (‖W‖<1)': 0.9,
-            '梯度正常 (‖W‖≈1)': 1.0,
-            '梯度爆炸 (‖W‖>1)': 1.1,
-        }
+    return {
+        "inputs": x.numpy(),
+        "hidden_states": np.stack(hidden_states),
+        "pre_activations": np.stack(pre_activations),
+        "w_hh": w_hh.numpy(),
+    }
 
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
-        for ax, (label, scale) in zip(axes, scenarios.items()):
-            # 初始化权重，控制谱范数
-            W = torch.randn(hidden_size, hidden_size)
-            # 将谱范数缩放到目标值
-            sigma = torch.linalg.norm(W, ord=2)
-            W = W * (scale / sigma)
+def gradient_decay_curve(sequence_length: int, recurrent_scale: float, saturation: float) -> np.ndarray:
+    """Approximate how gradients change as they travel backwards in time."""
 
-            # 模拟梯度传播：从最后一步往前
-            grad_norms = []
-            grad = torch.ones(hidden_size)  # 初始梯度
+    sequence_length = clamp_int(sequence_length, 3, 80, "反向传播时间距离")
+    recurrent_scale = clamp_float(recurrent_scale, 0.05, 1.8, "循环 Jacobian 尺度")
+    saturation = clamp_float(saturation, 0.0, 0.95, "tanh 饱和程度")
+    effective_gain = recurrent_scale * (1.0 - saturation)
+    steps = np.arange(sequence_length)
+    return effective_gain ** steps
 
-            for t in range(T):
-                grad = W.T @ grad
-                grad_norms.append(grad.norm().item())
 
-            steps = list(range(1, T + 1))
-            color = '#C44E52' if scale < 1 else ('#55A868' if scale == 1 else '#DD8452')
-            ax.semilogy(steps, grad_norms, color=color, linewidth=2)
-            ax.set_title(label, fontsize=11, fontweight='bold')
-            ax.set_xlabel('反向传播步数（从输出往输入）')
-            ax.set_ylabel('梯度范数（log scale）')
-            ax.grid(True, alpha=0.3)
-            ax.axhline(1e-4, color='gray', linestyle='--', alpha=0.5, label='消失阈值')
-            ax.axhline(1e4,  color='gray', linestyle=':',  alpha=0.5, label='爆炸阈值')
-            ax.legend(fontsize=8)
+def _plot_hidden_heatmap(hidden_states: np.ndarray) -> plt.Figure:
+    with safe_mpl_figure(figsize=(8, 4.5)) as fig:
+        ax = fig.subplots()
+        im = ax.imshow(hidden_states.T, cmap="RdBu_r", aspect="auto", vmin=-1, vmax=1)
+        fig.colorbar(im, ax=ax, fraction=0.046)
+        ax.set_title("隐藏状态随时间变化", fontsize=13, fontweight="bold")
+        ax.set_xlabel("时间步 t")
+        ax.set_ylabel("隐藏单元")
+        fig.tight_layout()
+        return fig
 
-            # 标注最终梯度值
-            final = grad_norms[-1]
-            ax.text(0.95, 0.05, f'最终梯度: {final:.2e}',
-                    transform=ax.transAxes, ha='right', fontsize=9,
-                    bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
 
-        plt.suptitle('RNN 梯度消失/爆炸的根本原因：矩阵连乘',
-                     fontsize=13, fontweight='bold')
-        plt.tight_layout()
-        plt.savefig('vanishing_gradient_math.png', dpi=150, bbox_inches='tight')
-        plt.show()
-
-    visualize_vanishing_gradient()
-
-    # ============================================================
-    # 代码段 3
-    # ============================================================
-
-    def explain_lstm_gates():
-        """
-        用图示解释 LSTM 的四个门
-
-        LSTM 公式：
-        f_t = σ(W_f · [h_{t-1}, x_t] + b_f)   ← 遗忘门：决定忘掉多少
-        i_t = σ(W_i · [h_{t-1}, x_t] + b_i)   ← 输入门：决定记住多少
-        g_t = tanh(W_g · [h_{t-1}, x_t] + b_g) ← 候选记忆
-        o_t = σ(W_o · [h_{t-1}, x_t] + b_o)   ← 输出门：决定输出多少
-
-        c_t = f_t ⊙ c_{t-1} + i_t ⊙ g_t       ← 细胞状态更新
-        h_t = o_t ⊙ tanh(c_t)                  ← 隐藏状态
-        """
-        torch.manual_seed(42)
-
-        input_size  = 4
-        hidden_size = 6
-
-        # 模拟一个 LSTM 步骤，记录所有门的值
-        lstm_cell = nn.LSTMCell(input_size, hidden_size)
-
-        x_seq = torch.randn(20, input_size)
-        h = torch.zeros(1, hidden_size)
-        c = torch.zeros(1, hidden_size)
-
-        gate_history = {'forget': [], 'input': [], 'output': [], 'cell': [], 'hidden': []}
-
-        # 手动提取门值（通过权重矩阵计算）
-        for t in range(20):
-            x_t = x_seq[t:t+1]
-            combined = torch.cat([h, x_t], dim=1)
-
-            # LSTM cell 的权重：weight_ih [4*hidden, input], weight_hh [4*hidden, hidden]
-            gates_raw = (combined @ torch.cat([lstm_cell.weight_hh,
-                                                lstm_cell.weight_ih], dim=1).T
-                         + lstm_cell.bias_hh + lstm_cell.bias_ih)
-
-            f = torch.sigmoid(gates_raw[:, :hidden_size])
-            i = torch.sigmoid(gates_raw[:, hidden_size:2*hidden_size])
-            g = torch.tanh(gates_raw[:, 2*hidden_size:3*hidden_size])
-            o = torch.sigmoid(gates_raw[:, 3*hidden_size:])
-
-            c = f * c + i * g
-            h = o * torch.tanh(c)
-
-            gate_history['forget'].append(f[0].detach().numpy())
-            gate_history['input'].append(i[0].detach().numpy())
-            gate_history['output'].append(o[0].detach().numpy())
-            gate_history['cell'].append(c[0].detach().numpy())
-            gate_history['hidden'].append(h[0].detach().numpy())
-
-        # 可视化
-        fig, axes = plt.subplots(2, 3, figsize=(16, 8))
-
-        gate_names = ['forget', 'input', 'output', 'cell', 'hidden']
-        gate_labels = ['遗忘门 f_t（σ）', '输入门 i_t（σ）', '输出门 o_t（σ）',
-                       '细胞状态 c_t', '隐藏状态 h_t']
-        cmaps = ['Reds', 'Blues', 'Greens', 'RdBu', 'PuOr']
-
-        for idx, (name, label, cmap) in enumerate(zip(gate_names, gate_labels, cmaps)):
-            ax = axes[idx // 3, idx % 3]
-            data = np.array(gate_history[name]).T  # [hidden_size, T]
-            im = ax.imshow(data, aspect='auto', cmap=cmap,
-                           vmin=0 if name in ['forget','input','output'] else -1,
-                           vmax=1)
-            plt.colorbar(im, ax=ax)
-            ax.set_title(label, fontsize=11, fontweight='bold')
-            ax.set_xlabel('时间步 t')
-            ax.set_ylabel('隐藏单元索引')
-
-        # 最后一个子图：门值随时间的均值变化
-        ax = axes[1, 2]
-        for name, label, color in zip(
-            ['forget', 'input', 'output'],
-            ['遗忘门', '输入门', '输出门'],
-            ['red', 'blue', 'green']
-        ):
-            means = [np.mean(v) for v in gate_history[name]]
-            ax.plot(means, color=color, linewidth=2, label=label, alpha=0.8)
-        ax.set_title('各门平均激活值随时间变化', fontsize=11, fontweight='bold')
-        ax.set_xlabel('时间步 t')
-        ax.set_ylabel('平均门值')
-        ax.set_ylim(0, 1)
-        ax.legend()
+def _plot_gradient_curve(curve: np.ndarray, recurrent_scale: float) -> plt.Figure:
+    with safe_mpl_figure(figsize=(7.5, 4.2)) as fig:
+        ax = fig.subplots()
+        ax.plot(curve, marker="o", linewidth=2, color="#3268a8")
+        ax.axhline(1.0, color="gray", linestyle="--", linewidth=1)
+        ax.set_yscale("log")
+        ax.set_title(f"反向传播中的梯度倍率（循环尺度={recurrent_scale:.2f}）", fontsize=12, fontweight="bold")
+        ax.set_xlabel("向前追溯的时间距离")
+        ax.set_ylabel("梯度相对倍率（log）")
         ax.grid(True, alpha=0.3)
-        ax.axhline(0.5, color='gray', linestyle='--', alpha=0.5)
+        fig.tight_layout()
+        return fig
 
-        plt.suptitle('LSTM 门机制可视化（序列长度=20）',
-                     fontsize=14, fontweight='bold')
-        plt.tight_layout()
-        plt.savefig('lstm_gates.png', dpi=150, bbox_inches='tight')
-        plt.show()
 
-    explain_lstm_gates()
-
-    # ============================================================
-    # 代码段 4
-    # ============================================================
-
-    def compare_gru_lstm_gates():
-        """
-        对比 GRU 和 LSTM 的门机制
-
-        GRU 只有两个门（比 LSTM 少一个）：
-        z_t = σ(W_z · [h_{t-1}, x_t])   ← 更新门（合并了遗忘+输入）
-        r_t = σ(W_r · [h_{t-1}, x_t])   ← 重置门
-        n_t = tanh(W_n · [r_t⊙h_{t-1}, x_t])  ← 候选隐状态
-        h_t = (1-z_t)⊙h_{t-1} + z_t⊙n_t
-        """
-        print("LSTM vs GRU 参数量对比：")
-        print("=" * 40)
-
-        for hidden_size in [32, 64, 128, 256]:
-            input_size = 32
-            lstm_params = 4 * (hidden_size * input_size + hidden_size * hidden_size + hidden_size)
-            gru_params  = 3 * (hidden_size * input_size + hidden_size * hidden_size + hidden_size)
-            print(f"hidden={hidden_size:4d}: LSTM={lstm_params:8,}  GRU={gru_params:8,}  "
-                  f"GRU/LSTM={gru_params/lstm_params:.1%}")
-
-        # 可视化门结构对比
-        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-
-        # LSTM 门结构
-        ax = axes[0]
+def _plot_gate_intuition() -> plt.Figure:
+    with safe_mpl_figure(figsize=(8.5, 4.5)) as fig:
+        ax = fig.subplots()
         ax.set_xlim(0, 10)
-        ax.set_ylim(0, 8)
-        ax.set_aspect('equal')
-        ax.axis('off')
-        ax.set_title('LSTM 门结构', fontsize=13, fontweight='bold')
-
-        # 绘制 LSTM 示意图
-        gates_lstm = [
-            (2, 6, '遗忘门\nf_t = σ(·)', '#FF6B6B'),
-            (5, 6, '输入门\ni_t = σ(·)', '#4ECDC4'),
-            (8, 6, '输出门\no_t = σ(·)', '#45B7D1'),
-            (5, 3, '候选记忆\ng_t = tanh(·)', '#96CEB4'),
+        ax.set_ylim(0, 5)
+        ax.axis("off")
+        boxes = [
+            (0.7, 2.8, "输入 x_t", "#d8ecff"),
+            (0.7, 1.0, "旧状态 h_{t-1}", "#f7e0b5"),
+            (3.6, 1.9, "tanh\n候选记忆", "#d7f2dc"),
+            (6.5, 1.9, "新状态 h_t", "#f2d7e6"),
         ]
-        for x, y, label, color in gates_lstm:
-            rect = FancyBboxPatch((x-1.2, y-0.6), 2.4, 1.2,
-                                   boxstyle='round,pad=0.1',
-                                   facecolor=color, alpha=0.8, edgecolor='white', linewidth=2)
+        for x, y, label, color in boxes:
+            rect = plt.Rectangle((x, y), 1.9, 0.9, facecolor=color, edgecolor="#333", linewidth=1.2)
             ax.add_patch(rect)
-            ax.text(x, y, label, ha='center', va='center', fontsize=8, fontweight='bold')
+            ax.text(x + 0.95, y + 0.45, label, ha="center", va="center", fontsize=11, fontweight="bold")
+        arrow_props = dict(arrowstyle="->", linewidth=2, color="#555")
+        ax.annotate("", xy=(3.6, 2.35), xytext=(2.6, 3.25), arrowprops=arrow_props)
+        ax.annotate("", xy=(3.6, 2.1), xytext=(2.6, 1.45), arrowprops=arrow_props)
+        ax.annotate("", xy=(6.5, 2.35), xytext=(5.5, 2.35), arrowprops=arrow_props)
+        ax.text(5.0, 3.6, "普通 RNN 只有一个状态通道\n长距离信息容易被反复乘法冲淡", ha="center", fontsize=11)
+        ax.set_title("RNN 单步更新直觉", fontsize=14, fontweight="bold")
+        fig.tight_layout()
+        return fig
 
-        ax.text(5, 1, '细胞状态 c_t = f_t⊙c_{t-1} + i_t⊙g_t\n隐状态 h_t = o_t⊙tanh(c_t)',
-                ha='center', va='center', fontsize=9,
-                bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.9))
 
-        # GRU 门结构
-        ax = axes[1]
-        ax.set_xlim(0, 10)
-        ax.set_ylim(0, 8)
-        ax.set_aspect('equal')
-        ax.axis('off')
-        ax.set_title('GRU 门结构（更简洁）', fontsize=13, fontweight='bold')
+def compute_rnn_intuition(
+    sequence_length: int = 8,
+    hidden_size: int = 5,
+    recurrent_scale: float = 0.85,
+    input_strength: float = 1.0,
+    saturation: float = 0.15,
+    seed: int = 42,
+    save_artifacts: bool = False,
+) -> dict[str, object]:
+    """Compute the RNN lesson without Streamlit calls."""
 
-        gates_gru = [
-            (3, 6, '更新门\nz_t = σ(·)', '#FF6B6B'),
-            (7, 6, '重置门\nr_t = σ(·)', '#4ECDC4'),
-            (5, 3, '候选状态\nn_t = tanh(·)', '#96CEB4'),
-        ]
-        for x, y, label, color in gates_gru:
-            rect = FancyBboxPatch((x-1.2, y-0.6), 2.4, 1.2,
-                                   boxstyle='round,pad=0.1',
-                                   facecolor=color, alpha=0.8, edgecolor='white', linewidth=2)
-            ax.add_patch(rect)
-            ax.text(x, y, label, ha='center', va='center', fontsize=8, fontweight='bold')
+    artifacts: list[Path] = []
+    log_buffer = io.StringIO()
+    with redirect_stdout(log_buffer):
+        result = simulate_rnn_sequence(
+            sequence_length=sequence_length,
+            hidden_size=hidden_size,
+            recurrent_scale=recurrent_scale,
+            input_strength=input_strength,
+            seed=seed,
+        )
+        curve = gradient_decay_curve(sequence_length * 4, recurrent_scale, saturation)
+        print("RNN 计算公式：h_t = tanh(W_xh x_t + W_hh h_{t-1} + b)")
+        print(f"序列长度={sequence_length}, 隐藏单元={hidden_size}, 循环尺度={recurrent_scale:.2f}")
+        print(f"隐藏状态 shape={result['hidden_states'].shape}")
+        print(f"最后一步隐藏状态={np.round(result['hidden_states'][-1], 3)}")
+        print(f"梯度末端倍率={curve[-1]:.6f}")
+        if curve[-1] < 1e-3:
+            print("诊断：梯度明显消失。工程上可考虑 LSTM/GRU、残差连接、归一化或截断 BPTT。")
+        elif curve[-1] > 10:
+            print("诊断：梯度明显爆炸。工程上应降低学习率或使用梯度裁剪。")
+        else:
+            print("诊断：梯度倍率处在可观察范围，适合做教学演示。")
 
-        ax.text(5, 1, 'h_t = (1-z_t)⊙h_{t-1} + z_t⊙n_t\n（无独立细胞状态）',
-                ha='center', va='center', fontsize=9,
-                bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.9))
+    heatmap_fig = _plot_hidden_heatmap(result["hidden_states"])
+    gradient_fig = _plot_gradient_curve(curve, recurrent_scale)
+    gate_fig = _plot_gate_intuition()
+    figures = [
+        ("rnn_hidden_heatmap_refactored.png", heatmap_fig),
+        ("rnn_gradient_curve_refactored.png", gradient_fig),
+        ("rnn_gate_intuition.png", gate_fig),
+    ]
+    if save_artifacts:
+        for filename, fig in figures:
+            path = get_artifact_path(filename)
+            fig.savefig(path, dpi=150, bbox_inches="tight")
+            artifacts.append(path)
+    return {"log": log_buffer.getvalue(), "figures": figures, "artifacts": artifacts, "curve": curve}
 
-        plt.suptitle('LSTM（4门）vs GRU（2门）结构对比', fontsize=14, fontweight='bold')
-        plt.tight_layout()
-        plt.savefig('lstm_vs_gru.png', dpi=150, bbox_inches='tight')
-        plt.show()
 
-    compare_gru_lstm_gates()
-except Exception as e:
+def _go_to_sequence_models() -> None:
+    import streamlit as st
+
+    st.query_params["module"] = "part3_rnn/sequence_models"
+    st.rerun()
+
+
+def render() -> None:
+    """Render the refactored RNN intuition lesson."""
+
+    import streamlit as st
     from components.error_boundary import render_module_error
 
-    render_module_error("part3_rnn/01_rnn_intuition.py", e)
+    try:
+        clean_old_artifacts()
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
+        st.link_button("返回主界面", "/", width="small")
+        st.title(MODULE_TITLE)
+        st.caption(MODULE_SUMMARY)
+        st.info("RNN 的核心不是“会循环”四个字，而是同一个状态向量在每个时间步反复更新：旧状态决定新状态，新状态继续影响未来。")
+
+        with st.sidebar:
+            sequence_length = st.slider("序列长度", 3, 30, 8)
+            hidden_size = st.slider("隐藏单元数", 2, 16, 5)
+            recurrent_scale = st.slider("循环权重尺度", 0.05, 1.60, 0.85, 0.05)
+            input_strength = st.slider("输入强度", 0.05, 3.0, 1.0, 0.05)
+            saturation = st.slider("tanh 饱和程度", 0.0, 0.95, 0.15, 0.05)
+            seed = st.number_input("随机种子", 0, 9999, 42, 1)
+            if st.button("继续看：序列模型总览", width="stretch"):
+                _go_to_sequence_models()
+
+        data = compute_rnn_intuition(sequence_length, hidden_size, recurrent_scale, input_strength, saturation, int(seed), save_artifacts=True)
+        st.subheader("直觉闭环")
+        st.markdown(
+            """
+            - **隐藏状态热力图**：横轴是时间，纵轴是隐藏单元，颜色表示该单元在当前时间步的激活强弱。
+            - **梯度倍率曲线**：展示反向传播越过很多时间步时，梯度会被反复乘大或乘小。
+            - **单步更新图**：说明普通 RNN 为什么容易忘掉很久以前的信息。
+            """
+        )
+        cols = st.columns(3)
+        for col, title, (_, fig) in zip(cols, ("隐藏状态", "梯度传播", "单步更新"), data["figures"]):
+            with col:
+                st.subheader(title)
+                st.pyplot(fig, clear_figure=False)
+
+        with st.expander("控制台输出与工程解释", expanded=False):
+            st.code(str(data["log"]), language="text")
+            st.markdown("工程经验：普通 RNN 适合短序列教学和基线实验；真实长序列任务通常先考虑 LSTM、GRU、Transformer 或状态空间模型。")
+    except Exception as exc:
+        render_module_error("part3_rnn/01_rnn_intuition.py", exc)
+
+
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+
+    data = compute_rnn_intuition(sequence_length=5, hidden_size=3, save_artifacts=False)
+    return bool(data["figures"]) and len(data["curve"]) > 0
+
+
+if __name__ == "__main__":
+    if running_under_streamlit():
+        render()
+    else:
+        raise SystemExit(run_cli(compute_rnn_intuition))

@@ -438,6 +438,13 @@ def render_张量基础() -> None:
 render = render_张量基础
 
 
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+
+    data = compute_张量基础(save_artifacts=False)
+    return bool(data["figures"]) and bool(data["tensor_info"])
+
+
 def _running_under_streamlit() -> bool:
     try:
         from streamlit.runtime.scriptrunner import get_script_run_ctx

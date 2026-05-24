@@ -306,6 +306,13 @@ def render_卷积可视化() -> None:
 render = render_卷积可视化
 
 
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+
+    data = compute_卷积可视化(save_artifacts=False)
+    return bool(data["figures"]) and bool(data["formula_rows"])
+
+
 def _running_under_streamlit() -> bool:
     try:
         from streamlit.runtime.scriptrunner import get_script_run_ctx

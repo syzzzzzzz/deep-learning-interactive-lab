@@ -221,6 +221,13 @@ def render_注意力演示() -> None:
 render = render_注意力演示
 
 
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+
+    data = compute_注意力演示(save_artifacts=False)
+    return bool(data["figures"]) and bool(data["attn_shape"])
+
+
 def _running_under_streamlit() -> bool:
     try:
         from streamlit.runtime.scriptrunner import get_script_run_ctx

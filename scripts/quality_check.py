@@ -47,11 +47,28 @@ LEGACY_PROTOCOL_FILES = [
     Path("part1_foundations/01_tensors_gradients.py"),
     Path("part1_foundations/03_datasets_optimizers.py"),
     Path("part2_cnn/01_convolution_visual.py"),
+    Path("part2_cnn/02_feature_maps.py"),
     Path("part3_rnn/01_rnn_intuition.py"),
     Path("part4_transformer/01_attention_mechanism.py"),
+    Path("part4_transformer/02_multihead_visual.py"),
+    Path("part5_toolbox/05_dataset_toys.py"),
+]
+
+STRICT_LEGACY_PROTOCOL_FILES = [
+    Path("part1_foundations/01_tensors_gradients.py"),
+    Path("part2_cnn/01_convolution_visual.py"),
+    Path("part2_cnn/02_feature_maps.py"),
+    Path("part3_rnn/01_rnn_intuition.py"),
+    Path("part4_transformer/01_attention_mechanism.py"),
+    Path("part4_transformer/02_multihead_visual.py"),
+    Path("part5_toolbox/05_dataset_toys.py"),
 ]
 
 FOCUS_ROUTES = [
+    "part2_cnn/02_feature_maps",
+    "part3_rnn/01_rnn_intuition",
+    "part4_transformer/02_multihead_visual",
+    "part5_toolbox/05_dataset_toys",
     "part4_transformer/transformer_models",
     "part1_foundations/classical_ml",
     "part1_foundations/math_primer",
@@ -431,6 +448,52 @@ def check_legacy_module_protocol_metadata() -> None:
     print(f"[通过] 老脚本模块协议元数据检查：{len(LEGACY_PROTOCOL_FILES)} 个文件")
 
 
+def has_top_level_name(tree: ast.Module, name: str) -> bool:
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+            return True
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == name:
+                    return True
+    return False
+
+
+def top_level_assignment(tree: ast.Module, name: str) -> object:
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == name:
+                return literal_value(node.value)
+    return None
+
+
+def check_strict_legacy_module_protocol() -> None:
+    """Ensure refactored old scripts expose stable render/compute/smoke hooks."""
+
+    failures: list[str] = []
+    for rel_path in STRICT_LEGACY_PROTOCOL_FILES:
+        tree = parse_python(rel_path)
+        funcs = function_names(tree)
+        if not any(name.startswith("compute") for name in funcs):
+            failures.append(f"{rel_path}: 缺少 compute*() 纯计算入口")
+        if not has_top_level_name(tree, "render"):
+            failures.append(f"{rel_path}: 缺少 render() 页面入口")
+        if not has_top_level_name(tree, "smoke"):
+            failures.append(f"{rel_path}: 缺少 smoke() 轻量自检入口")
+        related = top_level_assignment(tree, "MODULE_RELATED_TOPICS")
+        practice = top_level_assignment(tree, "PRACTICE_TARGET")
+        if rel_path not in {Path("part1_foundations/01_tensors_gradients.py"), Path("part2_cnn/01_convolution_visual.py"), Path("part4_transformer/01_attention_mechanism.py")}:
+            if not isinstance(related, list) or not related:
+                failures.append(f"{rel_path}: 缺少 MODULE_RELATED_TOPICS 知识联动元数据")
+            if not isinstance(practice, str) or not practice.strip():
+                failures.append(f"{rel_path}: 缺少 PRACTICE_TARGET 实战目标")
+    if failures:
+        raise CheckFailure("严格老脚本协议检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 严格老脚本协议检查：{len(STRICT_LEGACY_PROTOCOL_FILES)} 个文件")
+
+
 def streamlit_control_labels(text: str) -> set[str]:
     label_patterns = [
         r"st(?:\.sidebar)?\.(?:slider|selectbox|select_slider|segmented_control|radio|text_input|text_area|number_input|toggle|checkbox|multiselect)\(\s*([\"'])(.*?)\1",
@@ -473,6 +536,13 @@ def load_module(rel_path: Path) -> dict[str, object]:
     stderr = io.StringIO()
     with redirect_stdout(stdout), redirect_stderr(stderr):
         return runpy.run_path(str(ROOT / rel_path), run_name="__main__")
+
+
+def load_module_without_main(rel_path: Path) -> dict[str, object]:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        return runpy.run_path(str(ROOT / rel_path), run_name="__quality_check__")
 
 
 def call_smoke_function(namespace: dict[str, object], name: str) -> None:
@@ -556,6 +626,31 @@ def check_focus_smoke() -> None:
     if failures:
         raise CheckFailure("重点页面渲染 smoke 失败：\n" + "\n".join(failures))
     print(f"[通过] 重点页面渲染 smoke：{len(SMOKE_FUNCTIONS)} 个页面")
+
+
+def check_strict_legacy_smoke() -> None:
+    failures: list[str] = []
+    old_env = os.environ.copy()
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    try:
+        for rel_path in STRICT_LEGACY_PROTOCOL_FILES:
+            try:
+                namespace = load_module_without_main(rel_path)
+                smoke = namespace.get("smoke")
+                if not callable(smoke):
+                    failures.append(f"{rel_path}: smoke 不是可调用对象")
+                    continue
+                result = smoke()
+                if result is False:
+                    failures.append(f"{rel_path}: smoke() 返回 False")
+            except Exception as exc:  # noqa: BLE001 - smoke failures should be reported together.
+                failures.append(f"{rel_path}: {exc}")
+    finally:
+        os.environ.clear()
+        os.environ.update(old_env)
+    if failures:
+        raise CheckFailure("严格老脚本 smoke 失败：\n" + "\n".join(failures))
+    print(f"[通过] 严格老脚本 smoke：{len(STRICT_LEGACY_PROTOCOL_FILES)} 个文件")
 
 
 def check_main_routes() -> None:
@@ -691,6 +786,7 @@ def run_checks(include_smoke: bool) -> None:
     check_placeholders()
     check_bracket_placeholders()
     check_legacy_module_protocol_metadata()
+    check_strict_legacy_module_protocol()
     check_expected_controls()
     check_expected_content()
     check_main_routes()
@@ -700,6 +796,7 @@ def run_checks(include_smoke: bool) -> None:
     check_legacy_top_level_execution()
     check_matplotlib_close_after_show()
     if include_smoke:
+        check_strict_legacy_smoke()
         check_focus_smoke()
     print("[完成] 内容质量检查全部通过")
 

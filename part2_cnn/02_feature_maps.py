@@ -1,377 +1,264 @@
-"""
-自动生成自: part2_cnn\02_feature_maps.md
-可独立运行的 Python 源码
-"""
+MODULE_TITLE = "特征图可视化"
+MODULE_SUMMARY = "观察卷积层如何把边缘、纹理和局部形状逐步变成可分类的特征。"
+MODULE_TAGS = ["CNN", "特征图", "可视化", "调试"]
+MODULE_RELATED_TOPICS = ["卷积直觉", "经典 CNN 架构", "Grad-CAM 可视化", "梯度监控"]
+PRACTICE_TARGET = "part6_universal_framework/neural_network_playground?example=cnn"
 
+import io
+import sys
+from contextlib import redirect_stdout
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from matplotlib.widgets import Slider, Button, RadioButtons
-from typing import List, Dict, Optional
 
-# ─────────────────────────────────────────────────────────
-# 核心：多层特征图提取 + 交互式查看
-# ─────────────────────────────────────────────────────────
 
-class RealTimeFeatureViewer:
-    """
-    实时特征图查看器
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
-    功能：
-    - 注册任意层的 forward hook
-    - 输入一张图像，立即看到所有层的特征图
-    - 支持交互式切换层、通道
+from components.lesson_runtime import clamp_float, clamp_int, run_cli, running_under_streamlit
+from components.resource_manager import clean_old_artifacts, get_artifact_path, safe_mpl_figure
 
-    使用方法：
-        viewer = RealTimeFeatureViewer(model)
-        viewer.register_all_conv_layers()
-        viewer.show(input_tensor)          # 静态查看
-        viewer.interactive_show(input_tensor)  # 交互式
-    """
 
-    def __init__(self, model: nn.Module):
-        self.model = model
-        self.hooks: List = []
-        self.layer_outputs: Dict[str, torch.Tensor] = {}
-        self.layer_names: List[str] = []
+class TinyFeatureCNN(nn.Module):
+    """A deterministic CNN used only for feature-map teaching."""
 
-    def register_layer(self, name: str):
-        """注册单个层"""
-        for n, module in self.model.named_modules():
-            if n == name:
-                def hook(m, inp, out, _name=name):
-                    self.layer_outputs[_name] = out.detach().cpu()
-                self.hooks.append(module.register_forward_hook(hook))
-                if name not in self.layer_names:
-                    self.layer_names.append(name)
-                return
-        print(f"未找到层: {name}")
-
-    def register_all_conv_layers(self):
-        """自动注册所有卷积层"""
-        for name, module in self.model.named_modules():
-            if isinstance(module, (nn.Conv2d, nn.ConvTranspose2d)):
-                self.register_layer(name)
-        print(f"已注册 {len(self.layer_names)} 个卷积层: {self.layer_names}")
-
-    def register_all_layers(self, types=(nn.Conv2d, nn.ReLU, nn.BatchNorm2d, nn.Linear)):
-        """注册指定类型的所有层"""
-        for name, module in self.model.named_modules():
-            if isinstance(module, types) and name:
-                self.register_layer(name)
-
-    def forward(self, x: torch.Tensor):
-        """运行前向传播，捕获所有注册层的输出"""
-        self.layer_outputs.clear()
-        with torch.no_grad():
-            out = self.model(x)
-        return out
-
-    def show(self, x: torch.Tensor, max_channels: int = 16,
-             cmap: str = 'viridis', figsize_per: float = 1.4):
-        """静态显示所有层的特征图"""
-        self.forward(x)
-
-        for layer_name in self.layer_names:
-            if layer_name not in self.layer_outputs:
-                continue
-            feat = self.layer_outputs[layer_name]
-
-            if feat.dim() == 4:
-                feat = feat[0]  # [C, H, W]
-                n_ch = min(feat.shape[0], max_channels)
-                n_cols = min(8, n_ch)
-                n_rows = (n_ch + n_cols - 1) // n_cols
-
-                fig, axes = plt.subplots(n_rows, n_cols,
-                    figsize=(n_cols * figsize_per, n_rows * figsize_per + 0.5))
-                axes = np.array(axes).reshape(n_rows, n_cols)
-
-                vmin, vmax = feat[:n_ch].min().item(), feat[:n_ch].max().item()
-
-                for i in range(n_ch):
-                    ax = axes[i // n_cols, i % n_cols]
-                    im = ax.imshow(feat[i].numpy(), cmap=cmap,
-                                   vmin=vmin, vmax=vmax, aspect='auto')
-                    ax.set_title(f'ch{i}', fontsize=7)
-                    ax.axis('off')
-
-                for i in range(n_ch, n_rows * n_cols):
-                    axes[i // n_cols, i % n_cols].axis('off')
-
-                shape_str = f'{feat.shape[0]}×{feat.shape[1]}×{feat.shape[2]}'
-                plt.suptitle(f'层: {layer_name}  |  特征图形状: {shape_str}',
-                             fontsize=10, fontweight='bold')
-                plt.tight_layout()
-                plt.savefig(f'feat_{layer_name.replace(".", "_")}.png',
-                            dpi=120, bbox_inches='tight')
-                plt.show()
-
-    def show_single_layer(self, layer_name: str, x: torch.Tensor,
-                           channel: int = 0, cmap: str = 'viridis'):
-        """显示单层单通道的特征图，附带统计信息"""
-        self.forward(x)
-        if layer_name not in self.layer_outputs:
-            print(f"层 {layer_name} 未捕获")
-            return
-
-        feat = self.layer_outputs[layer_name][0]  # [C, H, W]
-        ch_map = feat[channel].numpy()
-
-        fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-
-        # 特征图
-        im = axes[0].imshow(ch_map, cmap=cmap)
-        plt.colorbar(im, ax=axes[0])
-        axes[0].set_title(f'{layer_name} | 通道 {channel}', fontsize=11)
-        axes[0].axis('off')
-
-        # 激活值分布直方图
-        axes[1].hist(ch_map.flatten(), bins=40, color='steelblue',
-                     edgecolor='white', alpha=0.8)
-        axes[1].set_title('激活值分布', fontsize=11)
-        axes[1].set_xlabel('激活值')
-        axes[1].set_ylabel('频次')
-        axes[1].axvline(0, color='red', linestyle='--', alpha=0.7, label='零值')
-        axes[1].legend()
-        axes[1].grid(True, alpha=0.3)
-
-        # 所有通道的平均激活强度
-        ch_means = feat.abs().mean(dim=(1, 2)).numpy()
-        colors = ['red' if v == ch_means.max() else 'steelblue' for v in ch_means]
-        axes[2].bar(range(len(ch_means)), ch_means, color=colors, alpha=0.8)
-        axes[2].set_title('各通道平均激活强度\n（红色=当前通道）', fontsize=10)
-        axes[2].set_xlabel('通道索引')
-        axes[2].set_ylabel('|激活值| 均值')
-        axes[2].grid(True, alpha=0.3)
-
-        stats = (f'均值={ch_map.mean():.3f}  标准差={ch_map.std():.3f}  '
-                 f'最大={ch_map.max():.3f}  最小={ch_map.min():.3f}  '
-                 f'零值比={( ch_map == 0).mean():.1%}')
-        plt.suptitle(stats, fontsize=9)
-        plt.tight_layout()
-        plt.savefig(f'feat_single_{layer_name.replace(".", "_")}_ch{channel}.png',
-                    dpi=120, bbox_inches='tight')
-        plt.show()
-
-    def remove_hooks(self):
-        for h in self.hooks:
-            h.remove()
-        self.hooks.clear()
-
-
-# ─────────────────────────────────────────────────────────
-# 滤波器响应热力图：哪些输入区域激活了哪个滤波器？
-# ─────────────────────────────────────────────────────────
-
-def plot_filter_response_heatmap(model: nn.Module, x: torch.Tensor,
-                                  layer_name: str, top_k: int = 4):
-    """
-    可视化 top-k 最活跃通道的响应热力图，叠加在原图上
-
-    原理：将特征图上采样到原图尺寸，用颜色表示激活强度
-    """
-    captured = {}
-
-    def hook(m, inp, out):
-        captured['feat'] = out.detach().cpu()
-
-    # 注册钩子
-    hook_handle = None
-    for name, module in model.named_modules():
-        if name == layer_name:
-            hook_handle = module.register_forward_hook(hook)
-            break
-
-    if hook_handle is None:
-        print(f"未找到层: {layer_name}")
-        return
-
-    with torch.no_grad():
-        model(x)
-    hook_handle.remove()
-
-    feat = captured['feat'][0]  # [C, H, W]
-    # 找 top-k 最活跃通道（按平均激活值排序）
-    ch_scores = feat.abs().mean(dim=(1, 2))
-    top_channels = ch_scores.topk(min(top_k, feat.shape[0])).indices.tolist()
-
-    # 原图（假设单通道或 RGB）
-    orig = x[0].cpu()
-    if orig.shape[0] == 1:
-        orig_img = orig[0].numpy()
-        orig_cmap = 'gray'
-    else:
-        orig_img = orig.permute(1, 2, 0).numpy()
-        orig_img = (orig_img - orig_img.min()) / (orig_img.max() - orig_img.min() + 1e-8)
-        orig_cmap = None
-
-    H_orig, W_orig = orig_img.shape[:2]
-
-    fig, axes = plt.subplots(1, top_k + 1, figsize=((top_k + 1) * 3.5, 3.5))
-
-    # 原图
-    axes[0].imshow(orig_img, cmap=orig_cmap)
-    axes[0].set_title('原始输入', fontsize=10)
-    axes[0].axis('off')
-
-    for i, ch_idx in enumerate(top_channels):
-        heatmap = feat[ch_idx].numpy()
-        # 上采样到原图尺寸
-        heatmap_resized = torch.nn.functional.interpolate(
-            torch.from_numpy(heatmap).unsqueeze(0).unsqueeze(0).float(),
-            size=(H_orig, W_orig), mode='bilinear', align_corners=False
-        )[0, 0].numpy()
-
-        # 归一化
-        hm_min, hm_max = heatmap_resized.min(), heatmap_resized.max()
-        heatmap_norm = (heatmap_resized - hm_min) / (hm_max - hm_min + 1e-8)
-
-        axes[i + 1].imshow(orig_img, cmap=orig_cmap, alpha=0.5)
-        axes[i + 1].imshow(heatmap_norm, cmap='jet', alpha=0.5)
-        axes[i + 1].set_title(f'通道 {ch_idx}\n激活强度={ch_scores[ch_idx]:.3f}', fontsize=9)
-        axes[i + 1].axis('off')
-
-    plt.suptitle(f'层 {layer_name} — Top-{top_k} 最活跃通道响应热力图',
-                 fontsize=11, fontweight='bold')
-    plt.tight_layout()
-    plt.savefig(f'heatmap_{layer_name.replace(".", "_")}.png',
-                dpi=120, bbox_inches='tight')
-    plt.show()
-
-
-# ─────────────────────────────────────────────────────────
-# 完整演示
-# ─────────────────────────────────────────────────────────
-
-def demo_feature_maps():
-    torch.manual_seed(42)
-
-    # 构建带命名层的 CNN
-    class DebugCNN(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.conv1 = nn.Conv2d(1, 8, 3, padding=1)
-            self.bn1   = nn.BatchNorm2d(8)
-            self.relu1 = nn.ReLU()
-            self.conv2 = nn.Conv2d(8, 16, 3, padding=1)
-            self.bn2   = nn.BatchNorm2d(16)
-            self.relu2 = nn.ReLU()
-            self.pool  = nn.MaxPool2d(2)
-            self.conv3 = nn.Conv2d(16, 32, 3, padding=1)
-            self.relu3 = nn.ReLU()
-            self.gap   = nn.AdaptiveAvgPool2d(1)
-            self.fc    = nn.Linear(32, 10)
-
-        def forward(self, x):
-            x = self.relu1(self.bn1(self.conv1(x)))
-            x = self.relu2(self.bn2(self.conv2(x)))
-            x = self.pool(x)
-            x = self.relu3(self.conv3(x))
-            x = self.gap(x).flatten(1)
-            return self.fc(x)
-
-    model = DebugCNN()
-    x = torch.randn(1, 1, 28, 28)
-
-    # 1. 注册所有卷积层并查看特征图
-    viewer = RealTimeFeatureViewer(model)
-    viewer.register_all_conv_layers()
-    viewer.show(x, max_channels=8)
-
-    # 2. 单层单通道详细分析
-    viewer.show_single_layer('conv1', x, channel=0)
-    viewer.show_single_layer('conv2', x, channel=3)
-
-    # 3. 响应热力图
-    plot_filter_response_heatmap(model, x, layer_name='conv1', top_k=4)
-    plot_filter_response_heatmap(model, x, layer_name='conv3', top_k=4)
-
-    viewer.remove_hooks()
-    return model, viewer
-
-model, viewer = demo_feature_maps()
-
-# ============================================================
-# 代码段 2
-# ============================================================
-
-def compare_filters_before_after(model_before: nn.Module,
-                                   model_after: nn.Module,
-                                   layer_name: str,
-                                   max_filters: int = 16):
-    """
-    对比训练前后卷积核的变化
-
-    model_before: 随机初始化的模型
-    model_after:  训练后的模型
-    """
-    def get_filters(model):
-        for name, module in model.named_modules():
-            if name == layer_name and isinstance(module, nn.Conv2d):
-                w = module.weight.detach().cpu()
-                w_min, w_max = w.min(), w.max()
-                return (w - w_min) / (w_max - w_min + 1e-8)
-        return None
-
-    w_before = get_filters(model_before)
-    w_after  = get_filters(model_after)
-
-    if w_before is None or w_after is None:
-        print(f"未找到卷积层: {layer_name}")
-        return
-
-    n = min(max_filters, w_before.shape[0])
-    fig, axes = plt.subplots(2, n, figsize=(n * 1.5, 3.5))
-
-    for i in range(n):
-        in_ch = w_before.shape[1]
-        if in_ch == 1:
-            axes[0, i].imshow(w_before[i, 0].numpy(), cmap='RdBu', vmin=0, vmax=1)
-            axes[1, i].imshow(w_after[i, 0].numpy(),  cmap='RdBu', vmin=0, vmax=1)
-        else:
-            axes[0, i].imshow(np.clip(w_before[i].permute(1,2,0).numpy(), 0, 1))
-            axes[1, i].imshow(np.clip(w_after[i].permute(1,2,0).numpy(),  0, 1))
-
-        axes[0, i].axis('off')
-        axes[1, i].axis('off')
-        if i == 0:
-            axes[0, i].set_ylabel('训练前', fontsize=9)
-            axes[1, i].set_ylabel('训练后', fontsize=9)
-
-    plt.suptitle(f'卷积核对比: {layer_name}（训练前 vs 训练后）',
-                 fontsize=11, fontweight='bold')
-    plt.tight_layout()
-    plt.savefig(f'filter_compare_{layer_name.replace(".", "_")}.png',
-                dpi=120, bbox_inches='tight')
-    plt.show()
-
-
-# 演示：随机初始化 vs 简单训练后
-torch.manual_seed(0)
-
-class TinyCNN(nn.Module):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-        self.conv1 = nn.Conv2d(1, 8, 3, padding=1)
-        self.relu  = nn.ReLU()
-        self.pool  = nn.AdaptiveAvgPool2d(4)
-        self.fc    = nn.Linear(8*16, 10)
-    def forward(self, x):
-        return self.fc(self.pool(self.relu(self.conv1(x))).flatten(1))
+        torch.manual_seed(7)
+        self.conv1 = nn.Conv2d(1, 6, 3, padding=1)
+        self.relu1 = nn.ReLU()
+        self.conv2 = nn.Conv2d(6, 10, 3, padding=1)
+        self.relu2 = nn.ReLU()
+        self.pool = nn.AvgPool2d(2)
+        self.conv3 = nn.Conv2d(10, 12, 3, padding=1)
+        self.relu3 = nn.ReLU()
 
-import copy
-model_before = TinyCNN()
-model_after  = copy.deepcopy(model_before)
+    def forward(self, x: torch.Tensor) -> dict[str, torch.Tensor]:
+        outputs: dict[str, torch.Tensor] = {"input": x}
+        x = self.relu1(self.conv1(x))
+        outputs["conv1"] = x
+        x = self.relu2(self.conv2(x))
+        outputs["conv2"] = x
+        x = self.pool(x)
+        outputs["pool"] = x
+        x = self.relu3(self.conv3(x))
+        outputs["conv3"] = x
+        return outputs
 
-# 快速训练几步
-opt = torch.optim.Adam(model_after.parameters(), lr=0.01)
-for _ in range(50):
-    x = torch.randn(32, 1, 28, 28)
-    y = torch.randint(0, 10, (32,))
-    loss = nn.CrossEntropyLoss()(model_after(x), y)
-    opt.zero_grad(); loss.backward(); opt.step()
 
-compare_filters_before_after(model_before, model_after, 'conv1')
+def make_input_image(pattern: str, size: int = 64, noise: float = 0.04, seed: int = 7) -> np.ndarray:
+    """Create a small synthetic image so the feature maps are reproducible."""
+
+    size = clamp_int(size, 24, 128, "输入尺寸")
+    noise = clamp_float(noise, 0.0, 0.35, "噪声强度")
+    rng = np.random.default_rng(seed)
+    image = np.zeros((size, size), dtype=np.float32)
+    yy, xx = np.mgrid[:size, :size]
+
+    if pattern == "几何图形":
+        image[size // 8 : size // 2, size // 8 : size // 2] = 0.95
+        circle = (yy - size * 0.68) ** 2 + (xx - size * 0.68) ** 2 < (size * 0.17) ** 2
+        image[circle] = 0.75
+        image[size // 3 : size // 3 + 3, :] = 0.55
+        image[:, size // 2 : size // 2 + 3] = 0.65
+    elif pattern == "斜线纹理":
+        image[((xx + yy) % 14) < 5] = 0.85
+        image[((xx - yy) % 19) < 3] = 0.45
+    elif pattern == "中心亮斑":
+        distance = ((yy - size / 2) ** 2 + (xx - size / 2) ** 2) ** 0.5
+        image = np.exp(-(distance**2) / (2 * (size * 0.18) ** 2)).astype(np.float32)
+    else:
+        raise ValueError(f"未知输入模式：{pattern}")
+
+    image += rng.normal(0.0, noise, image.shape).astype(np.float32)
+    return np.clip(image, 0.0, 1.0)
+
+
+def _feature_stats(features: dict[str, torch.Tensor]) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for layer, tensor in features.items():
+        values = tensor.detach().cpu()
+        rows.append(
+            {
+                "层": layer,
+                "shape": tuple(values.shape),
+                "均值": round(float(values.mean()), 4),
+                "标准差": round(float(values.std()), 4),
+                "稀疏率(≈0)": round(float((values.abs() < 1e-5).float().mean()), 4),
+            }
+        )
+    return rows
+
+
+def _plot_feature_grid(features: torch.Tensor, title: str, max_channels: int) -> plt.Figure:
+    channels = clamp_int(max_channels, 1, min(16, features.shape[1]), "最多通道数")
+    maps = features[0, :channels].detach().cpu().numpy()
+    cols = min(4, channels)
+    rows = int(np.ceil(channels / cols))
+    with safe_mpl_figure(figsize=(cols * 2.4, rows * 2.2)) as fig:
+        axes = fig.subplots(rows, cols, squeeze=False)
+        for idx, ax in enumerate(axes.ravel()):
+            ax.axis("off")
+            if idx >= channels:
+                continue
+            data = maps[idx]
+            ax.imshow(data, cmap="viridis")
+            ax.set_title(f"通道 {idx}\nmean={data.mean():.2f}", fontsize=9)
+        fig.suptitle(title, fontsize=13, fontweight="bold")
+        fig.tight_layout()
+        return fig
+
+
+def _plot_single_channel(features: torch.Tensor, layer: str, channel: int) -> plt.Figure:
+    safe_channel = clamp_int(channel, 0, features.shape[1] - 1, "通道编号")
+    data = features[0, safe_channel].detach().cpu().numpy()
+    with safe_mpl_figure(figsize=(5.5, 4.8)) as fig:
+        ax = fig.subplots()
+        im = ax.imshow(data, cmap="magma")
+        fig.colorbar(im, ax=ax, fraction=0.046)
+        ax.set_title(f"{layer} 第 {safe_channel} 个通道响应", fontsize=12, fontweight="bold")
+        ax.set_xlabel("宽度位置")
+        ax.set_ylabel("高度位置")
+        fig.tight_layout()
+        return fig
+
+
+def _plot_input(image: np.ndarray) -> plt.Figure:
+    with safe_mpl_figure(figsize=(4.8, 4.2)) as fig:
+        ax = fig.subplots()
+        ax.imshow(image, cmap="gray", vmin=0, vmax=1)
+        ax.set_title("输入图像", fontsize=12, fontweight="bold")
+        ax.axis("off")
+        fig.tight_layout()
+        return fig
+
+
+def compute_feature_maps(
+    pattern: str = "几何图形",
+    observed_layer: str = "conv2",
+    max_channels: int = 8,
+    channel: int = 0,
+    noise: float = 0.04,
+    seed: int = 7,
+    save_artifacts: bool = False,
+) -> dict[str, object]:
+    """Compute feature maps without touching Streamlit."""
+
+    observed_layer = observed_layer if observed_layer in {"conv1", "conv2", "conv3"} else "conv2"
+    artifacts: list[Path] = []
+    log_buffer = io.StringIO()
+    with redirect_stdout(log_buffer):
+        image = make_input_image(pattern, noise=noise, seed=seed)
+        model = TinyFeatureCNN().eval()
+        x = torch.from_numpy(image).float().unsqueeze(0).unsqueeze(0)
+        with torch.no_grad():
+            features = model(x)
+        stats = _feature_stats(features)
+        print(f"输入模式：{pattern}")
+        print(f"观察层：{observed_layer}")
+        print("读图提示：浅层通常响应边缘和方向，深层更稀疏、更像局部结构探测器。")
+        for row in stats:
+            print(f"{row['层']}: shape={row['shape']}, mean={row['均值']}, sparsity={row['稀疏率(≈0)']}")
+
+    input_fig = _plot_input(image)
+    grid_fig = _plot_feature_grid(features[observed_layer], f"{observed_layer} 特征图网格", max_channels)
+    channel_fig = _plot_single_channel(features[observed_layer], observed_layer, channel)
+    figures = [
+        ("feature_input.png", input_fig),
+        (f"feature_grid_{observed_layer}.png", grid_fig),
+        (f"feature_channel_{observed_layer}.png", channel_fig),
+    ]
+    if save_artifacts:
+        for filename, fig in figures:
+            path = get_artifact_path(filename)
+            fig.savefig(path, dpi=150, bbox_inches="tight")
+            artifacts.append(path)
+    return {
+        "log": log_buffer.getvalue(),
+        "figures": figures,
+        "artifacts": artifacts,
+        "stats": stats,
+        "channel_count": int(features[observed_layer].shape[1]),
+    }
+
+
+def _go_to_playground() -> None:
+    import streamlit as st
+
+    st.query_params["module"] = "part6_universal_framework/neural_network_playground"
+    st.query_params["example"] = "cnn"
+    st.rerun()
+
+
+def render() -> None:
+    """Render the refactored feature-map lesson."""
+
+    import streamlit as st
+    from components.error_boundary import render_module_error
+
+    try:
+        clean_old_artifacts()
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
+        st.link_button("返回主界面", "/", width="small")
+        st.title(MODULE_TITLE)
+        st.caption(MODULE_SUMMARY)
+        st.info("特征图不是原图的复制，而是某个卷积通道对局部模式的响应强度。亮区表示这个通道在该位置更兴奋。")
+
+        with st.sidebar:
+            pattern = st.selectbox("输入模式", ["几何图形", "斜线纹理", "中心亮斑"], index=0)
+            observed_layer = st.selectbox("观察层", ["conv1", "conv2", "conv3"], index=1)
+            max_channels = st.slider("最多显示通道数", 1, 16, 8)
+            channel = st.slider("单通道编号", 0, 15, 0)
+            noise = st.slider("噪声强度", 0.0, 0.35, 0.04, 0.01)
+            seed = st.number_input("随机种子", min_value=0, max_value=9999, value=7, step=1)
+            if st.button("去实战：CNN 构建器", width="stretch"):
+                _go_to_playground()
+
+        data = compute_feature_maps(pattern, observed_layer, max_channels, channel, noise, int(seed), save_artifacts=True)
+        if channel >= data["channel_count"]:
+            st.warning(f"当前层只有 {data['channel_count']} 个通道，单通道编号已自动夹到安全范围。")
+
+        left, right = st.columns([0.42, 0.58])
+        with left:
+            st.subheader("图怎么看")
+            st.markdown(
+                """
+                - `conv1` 通常看边缘、方向和亮度突变。
+                - `conv2` 会组合多个浅层边缘，开始形成角点、纹理和局部形状。
+                - `conv3` 更稀疏，亮区更像“某种结构出现了”的信号。
+                """
+            )
+            st.dataframe(data["stats"], width="stretch")
+        with right:
+            for title, (_, fig) in zip(("输入图像", "特征图网格", "单通道热力图"), data["figures"]):
+                st.subheader(title)
+                st.pyplot(fig, clear_figure=False)
+
+        with st.expander("控制台输出与工程解释", expanded=False):
+            st.code(str(data["log"]), language="text")
+            st.markdown(
+                """
+                工程经验：如果所有层都像噪声，先检查输入归一化和模型是否训练过；如果深层全部为 0，
+                再查 ReLU 死亡、学习率过大或 BatchNorm 统计异常。
+                """
+            )
+    except Exception as exc:
+        render_module_error("part2_cnn/02_feature_maps.py", exc)
+
+
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+
+    data = compute_feature_maps(max_channels=4, channel=0, save_artifacts=False)
+    return bool(data["figures"]) and bool(data["stats"])
+
+
+if __name__ == "__main__":
+    if running_under_streamlit():
+        render()
+    else:
+        raise SystemExit(run_cli(compute_feature_maps))
