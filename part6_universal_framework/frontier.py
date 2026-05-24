@@ -78,6 +78,20 @@ TOPICS = [
         ("RLHF/RLAIF", "Red teaming", "Constitutional AI", "Model evaluations"),
         ("越狱", "欺骗性行为", "滥用", "目标错配"),
     ),
+    FrontierTopic(
+        "AI 智能体与工具使用",
+        "AI 智能体把大语言模型当作推理核心，通过规划、工具调用、记忆和环境反馈完成复杂任务。模型不再只回答问题，而是拆解目标、执行代码、操作浏览器、调用 API，形成感知—规划—行动的循环。",
+        "语言模型的推理能力能否可靠地驱动多步决策？",
+        ("Function Calling", "ReAct", "AutoGPT", "MCP 协议", "Claude Computer Use"),
+        ("工具误调", "死循环", "权限越界", "幻觉驱动错误操作", "安全沙箱不足"),
+    ),
+    FrontierTopic(
+        "推理模型与测试时计算",
+        "推理模型在回答前进行长链思维（Chain-of-Thought），用更多测试时计算换取更高质量输出。这一范式表明：扩展不仅发生在训练阶段，推理阶段的计算投入同样能提升数学、编程和复杂推理表现。",
+        "在推理时投入更多计算，能否像训练时 scaling law 一样可预测地提升能力？",
+        ("o1/o3", "DeepSeek R1", "Chain-of-Thought", "Test-time Compute Scaling"),
+        ("推理成本飙升", "延迟增大", "思维链不可审计", "过度推理"),
+    ),
 ]
 
 
@@ -316,7 +330,7 @@ st.markdown(
     <div class="hero">
       <h1>前沿方向：LLM、AGI 与可信 AI</h1>
       <p>
-      本页把大语言模型、多模态、自监督与少样本学习、可解释性、安全对齐放到同一张地图里。
+      本页把大语言模型、多模态、自监督与少样本学习、可解释性、安全对齐、AI 智能体和推理模型放到同一张地图里。
       重点不是追热点名词，而是看清每个方向在解决什么问题、依赖什么假设、有哪些风险边界。
       </p>
     </div>
@@ -360,11 +374,12 @@ with col_plot:
         "数据规模": 5 if topic.name in {"大语言模型与 AGI", "多模态大模型"} else 3,
         "可解释性": 5 if "可解释性" in topic.name else 2,
         "部署风险": 5 if "安全" in topic.name or "大语言" in topic.name else 3,
-        "工程复杂度": 5 if topic.name in {"多模态大模型", "AI 安全与对齐"} else 4,
+        "工程复杂度": 5 if topic.name in {"多模态大模型", "AI 安全与对齐", "AI 智能体与工具使用"} else 4,
+        "交互复杂度": 4 if "智能体" in topic.name else (5 if "推理模型" in topic.name else 2),
     }
     st.plotly_chart(capability_radar(radar_values), use_container_width=True, config=PLOT_CONFIG)
 
-tabs = st.tabs(["多模态概览", "少标注学习", "XAI", "安全与对齐"])
+tabs = st.tabs(["多模态概览", "少标注学习", "XAI", "安全与对齐", "智能体与推理"])
 
 with tabs[0]:
     st.subheader("CLIP、BLIP、GPT-4V 的位置")
@@ -418,3 +433,48 @@ with tabs[3]:
         )
     with col_b:
         st.plotly_chart(plot_alignment_loop(), use_container_width=True, config=PLOT_CONFIG)
+
+with tabs[4]:
+    st.subheader("智能体架构与推理模型")
+    col_a, col_b = st.columns([0.48, 0.52])
+    with col_a:
+        st.markdown("**AI 智能体的核心循环**")
+        render_rows(
+            [
+                ("感知", "接收用户指令、环境观测或工具返回结果，形成当前上下文。"),
+                ("规划", "把复杂任务分解成子目标，决定下一步调用哪个工具或直接生成答案。"),
+                ("执行", "通过 Function Calling 调用代码解释器、搜索引擎、浏览器或外部 API。"),
+                ("记忆", "维护短期工作记忆和长期经验，在多轮交互中保持一致性。"),
+                ("反思", "检查执行结果是否符合预期，决定继续、重试还是换策略。"),
+            ]
+        )
+        st.markdown(
+            '<div class="note">智能体不是简单的 prompt 拼接。可靠运行需要工具描述精确、输出格式约束、权限沙箱隔离和失败恢复机制，否则幻觉会在多步执行中累积放大。</div>',
+            unsafe_allow_html=True,
+        )
+    with col_b:
+        st.markdown("**推理模型的范式变化**")
+        render_rows(
+            [
+                ("训练时 Scaling", "更多参数、更多数据、更多 GPU → 模型能力持续提升。"),
+                ("测试时 Scaling", "推理阶段投入更多计算（更长思维链） → 同样提升困难任务表现。"),
+                ("思维链", "模型在输出答案前先进行内部推理，步骤越完整、错误率越低。"),
+                ("过程奖励", "奖励模型评估每个推理步骤是否正确，而非只看最终答案。"),
+            ]
+        )
+        st.markdown(
+            '<div class="note">推理模型的工程挑战：延迟可能从秒级膨胀到分钟级，token 消耗大幅增加，且长思维链目前难以完全审计和调试。这意味着部署时需要在质量、速度和成本之间做更精细的权衡。</div>',
+            unsafe_allow_html=True,
+        )
+    st.divider()
+    st.subheader("智能体 vs 单次推理：何时该用哪个？")
+    agent_df = pd.DataFrame(
+        [
+            ("单次问答", "简单查询、翻译、摘要", "低", "低", "低"),
+            ("RAG 增强", "需要检索外部知识", "中", "低", "中"),
+            ("工具调用", "需要计算、代码执行、API", "中", "中", "中"),
+            ("多步智能体", "复杂研究、数据分析、自动化", "高", "高", "高"),
+        ],
+        columns=["模式", "适用场景", "推理成本", "延迟", "可靠性风险"],
+    )
+    st.dataframe(agent_df, use_container_width=True, hide_index=True)

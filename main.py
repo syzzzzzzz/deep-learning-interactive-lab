@@ -118,7 +118,7 @@ PARTS: dict[str, PartInfo] = {
         "🚀",
         "第六部分 统一框架与前沿",
         "框架与前沿",
-        "统一接口、模块化工程、项目模板、学习路径、术语表和前沿方向。",
+        "统一接口、模块化结构、项目模板、学习路径、术语表、AI 智能体、推理模型和前沿方向。",
     ),
     "part7": PartInfo(
         "part7",
@@ -190,7 +190,7 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("part6", "part6_universal_framework", "强化学习入门", "reinforcement_learning", "强化学习概念、多臂老虎机、Q-Learning 和纯 Python 环境 demo。", "核心", ("RL", "强化学习", "实验"), 67),
     ModuleInfo("part6", "part6_universal_framework", "学习路径推荐", "learning_path", "入门测评、个性化路径、知识图谱、进度追踪和下一步推荐。", "核心", ("路径", "知识图谱", "测评"), 68),
     ModuleInfo("part6", "part6_universal_framework", "深度学习术语表", "glossary", "集中检索常见概念、缩写和相关模块。", "复习", ("术语", "搜索", "复习"), 69),
-    ModuleInfo("part6", "part6_universal_framework", "前沿方向", "frontier", "LLM、AGI、多模态、自监督、XAI、安全与对齐。", "前沿", ("LLM", "AGI", "安全"), 70),
+    ModuleInfo("part6", "part6_universal_framework", "前沿方向", "frontier", "LLM、AGI、多模态、AI 智能体、推理模型、自监督、XAI、安全与对齐。", "前沿", ("LLM", "AGI", "Agents", "安全"), 70),
     ModuleInfo("part6", "part6_universal_framework", "经典论文解读实验室", "paper_reading_lab", "用时间线、机制图和最小复现清单读懂经典深度学习论文。", "进阶", ("论文", "可视化", "复现"), 71),
     ModuleInfo("part7", "part7_interview", "计算机网络", "networking", "TCP握手挥手、HTTP/HTTPS、DNS解析、高频面试题与交互练习。", "核心", ("网络", "TCP", "HTTP", "面试"), 70),
     ModuleInfo("part7", "part7_interview", "数据库SQL", "database_sql", "SELECT执行流程、B+树索引、慢查询排查、高频面试题与交互练习。", "核心", ("数据库", "SQL", "索引", "面试"), 71),
