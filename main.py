@@ -798,6 +798,20 @@ def render_home_button() -> None:
     )
 
 
+def render_module_knowledge_nav(module: ModuleInfo) -> None:
+    """把每个章节页接到全站知识图谱：前置、相关、下一步和去实战。"""
+
+    try:
+        from components.knowledge_graph import render知识图谱导航
+
+        render知识图谱导航(module.short_target)
+    except Exception as exc:
+        st = __import__("streamlit")
+        st.warning("知识图谱导航暂时无法显示，但当前章节内容不受影响。")
+        with st.expander("查看知识图谱错误", expanded=False):
+            st.code(str(exc), language="text")
+
+
 def render_legacy_results(module: ModuleInfo, run_dir: Path) -> None:
     import streamlit as st
 
@@ -945,6 +959,7 @@ def render_legacy_module_page(module: ModuleInfo) -> None:
 
     with st.expander("查看源码片段", expanded=False):
         st.code(read_text_preview(module.path), language="python")
+    render_module_knowledge_nav(module)
 
 
 def render_route_error(module: ModuleInfo | None, error: BaseException) -> None:
@@ -1536,6 +1551,7 @@ def render_streamlit_home() -> None:
             try:
                 runpy.run_path(str(module.path), run_name="__main__")
                 render_home_button()
+                render_module_knowledge_nav(module)
             except Exception as exc:
                 st.set_page_config(
                     page_title=f"{module.title} - 打开失败",

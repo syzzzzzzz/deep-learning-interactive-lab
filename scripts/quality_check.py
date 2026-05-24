@@ -210,6 +210,16 @@ EXPECTED_CONTENT_REFERENCES = {
         "part6_universal_framework/05_one_click_training",
         "part6_universal_framework/07_project_template",
         "学习导读",
+        "render_module_knowledge_nav",
+    ],
+    Path("components/knowledge_graph.py"): [
+        "canonical_node_keys",
+        "practice_url",
+        "掌握标准",
+        "去实战目标",
+        "前置知识",
+        "相关知识",
+        "后续推荐",
     ],
     Path("part5_toolbox/01_feature_visualization.py"): [
         "print_learning_guide",
@@ -817,17 +827,51 @@ def check_knowledge_graph_routes() -> None:
     main_namespace = runpy.run_path(str(ROOT / "main.py"))
     graph_namespace = runpy.run_path(str(ROOT / "components" / "knowledge_graph.py"))
     routes = main_namespace["route_map"]()
+    modules = main_namespace["MODULES"]
     graph = graph_namespace["KNOWLEDGE_GRAPH"]
     module_url = graph_namespace["_module_url"]
+    practice_url = graph_namespace["practice_url"]
+    get_node = graph_namespace["get_node"]
+    canonical_node_keys = graph_namespace["canonical_node_keys"]
 
     failures: list[str] = []
+    required_routes = {module.short_target for module in modules}
+    canonical_keys = set(canonical_node_keys())
+    missing = sorted(required_routes - canonical_keys)
+    if missing:
+        failures.append("知识图谱缺少主站模块节点：\n" + "\n".join(missing))
+
+    for key in sorted(canonical_keys):
+        node = get_node(key)
+        if node is None:
+            failures.append(f"{key}: canonical_node_keys() 中存在，但 KNOWLEDGE_GRAPH 无法解析")
+            continue
+        route = route_from_knowledge_url(module_url(key))
+        if route not in routes:
+            failures.append(f"{key}: 理论页映射到 {route or '<empty>'}，但 main.py route_map 中没有对应路由")
+        practice_route = route_from_knowledge_url(practice_url(key))
+        if practice_route not in routes:
+            failures.append(f"{key}: 实战页映射到 {practice_route or '<empty>'}，但 main.py route_map 中没有对应路由")
+        for field_name in ("mastery_criteria", "practice_target", "practice_route", "route"):
+            value = getattr(node, field_name, "")
+            if not isinstance(value, str) or not value.strip():
+                failures.append(f"{key}: 缺少 {field_name}")
+        if not node.related:
+            failures.append(f"{key}: 缺少相关知识 related")
+        if not node.next_steps:
+            failures.append(f"{key}: 缺少后续推荐 next_steps")
+        for relation_name in ("prerequisites", "related", "next_steps"):
+            for target in getattr(node, relation_name):
+                if get_node(target) is None:
+                    failures.append(f"{key}: {relation_name} 引用了不存在的节点 {target}")
+
     for key in sorted(graph):
         route = route_from_knowledge_url(module_url(key))
         if route not in routes:
-            failures.append(f"{key}: 映射到 {route or '<empty>'}，但 main.py MODULES/route_map 中没有对应路由")
+            failures.append(f"{key}: 别名映射到 {route or '<empty>'}，但 main.py route_map 中没有对应路由")
     if failures:
         raise CheckFailure("知识图谱元数据完整性检查失败：\n" + "\n".join(failures))
-    print(f"[通过] 知识图谱元数据完整性检查：{len(graph)} 个节点")
+    print(f"[通过] 知识图谱元数据完整性检查：{len(canonical_keys)} 个主站模块，{len(graph)} 个含别名节点")
 
 
 def check_bagu_routes_placeholder() -> None:

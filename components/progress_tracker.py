@@ -248,10 +248,10 @@ def render进度总览() -> None:
         store = _store()
         graph = {}
         try:
-            from components.knowledge_graph import KNOWLEDGE_GRAPH
+            from components.knowledge_graph import KNOWLEDGE_GRAPH, canonical_node_keys
 
             graph = KNOWLEDGE_GRAPH
-            module_keys = list(KNOWLEDGE_GRAPH)
+            module_keys = canonical_node_keys()
         except Exception:
             module_keys = sorted(store)
         rows = [{"模块": graph[key].title if key in graph else key, "进度": store.get(key, "未学习")} for key in module_keys]
