@@ -457,6 +457,19 @@ RAW_TERMS: tuple[RawTerm, ...] = (
     ("Variance", "方差", "数学基础", "衡量数据围绕均值分散程度的统计量。", "part1/math_primer", ("Mean", "Standardization", "Bias-Variance Tradeoff"), ()),
     ("Vision-Language Model", "视觉语言模型", "前沿与安全", "同时理解图像和文本并能跨模态推理的模型。", "part6/frontier", ("CLIP", "Multimodal Model", "Embedding"), ("VLM",)),
     ("Voting", "投票法", "基础概念", "集成模型中通过多数票或加权票合并预测的方法。", "part1/classical_ml", ("Ensemble", "Bagging", "Classifier"), ()),
+    ("Adapter", "适配器模块", "优化训练", "插入预训练模型层间的小型可训练模块，冻结主干只训练适配器实现高效微调。", "part6/frontier", ("Parameter-Efficient Fine-Tuning", "LoRA", "Fine-tuning"), ()),
+    ("Agentic AI", "智能体式 AI", "前沿与安全", "具备自主规划、工具调用、记忆和多步推理能力的 AI 系统范式。", "part6/frontier", ("Agent", "Tool Use", "LLM"), ()),
+    ("Chain of Thought", "思维链", "前沿与安全", "让模型在回答前逐步推理中间步骤以提升复杂任务表现的提示或训练策略。", "part6/frontier", ("Prompt", "Reasoning", "In-context Learning"), ("CoT",)),
+    ("Direct Preference Optimization", "直接偏好优化", "前沿与安全", "绕过奖励模型、直接用偏好数据对比优化策略的对齐方法。", "part6/frontier", ("RLHF", "Alignment", "Reward Model"), ("DPO",)),
+    ("Knowledge Distillation", "知识蒸馏", "工程部署", "用大模型的软标签或中间表示训练小模型以压缩知识和推理成本。", "part5/deployment_tools", ("Model Compression", "Transfer Learning", "Teacher-Student"), ()),
+    ("KV Cache", "键值缓存", "工程部署", "自回归生成时缓存已计算的键值张量以避免重复计算、加速逐 token 推理。", "part4/05_flash_attention", ("Attention", "Inference", "Memory Bandwidth"), ()),
+    ("LoRA", "低秩适配", "前沿与安全", "在权重矩阵旁注入低秩分解矩阵，只训练少量参数实现大模型高效微调。", "part6/frontier", ("Parameter-Efficient Fine-Tuning", "Adapter", "Fine-tuning"), ("Low-Rank Adaptation",)),
+    ("Mixture of Experts", "混合专家", "前沿与安全", "用门控机制选择性激活部分专家子网络以扩大模型容量而不等比增加计算。", "part6/frontier", ("Transformer", "Gating Mechanism", "Sparse Model"), ("MoE",)),
+    ("Parameter-Efficient Fine-Tuning", "参数高效微调", "前沿与安全", "只更新模型少部分参数以降低微调显存和数据需求的方法类别。", "part6/frontier", ("LoRA", "Adapter", "Fine-tuning"), ("PEFT",)),
+    ("Red Teaming", "红队测试", "前沿与安全", "用对抗性测试、越狱尝试或恶意提示探测模型安全边界和失败模式。", "part6/frontier", ("Safety", "Alignment", "Robustness"), ()),
+    ("Retrieval Augmented Generation", "检索增强生成", "前沿与安全", "在生成前检索外部知识库并注入上下文以减少幻觉和扩展知识边界。", "part6/frontier", ("LLM", "Embedding", "Hallucination"), ("RAG",)),
+    ("Reward Hacking", "奖励攻击", "前沿与安全", "策略找到奖励模型漏洞并获得高分但实际输出不符合人类偏好的现象。", "part6/frontier", ("RLHF", "Alignment", "Reward Model"), ()),
+    ("Test-time Compute", "推理时计算", "前沿与安全", "在推理阶段投入更多计算资源（如多次采样、长链推理）以提升输出质量。", "part6/frontier", ("Chain of Thought", "Inference", "Scaling"), ()),
 )
 
 
