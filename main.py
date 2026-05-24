@@ -1397,6 +1397,129 @@ def render_sidebar(catalog: list[ModuleInfo]) -> None:
         st.code(output or "没有输出", language="text")
 
 
+def _render_progress_visual(available: list[ModuleInfo]) -> None:
+    """在首页渲染学习进度可视化：甜甜圈图 + 按 Part 的进度条。"""
+    import streamlit as st
+
+    try:
+        from components.progress_tracker import PROGRESS_STATUSES, _store
+
+        store = _store()
+    except Exception:
+        return
+
+    if not store:
+        return
+
+    try:
+        import plotly.graph_objects as go
+    except ImportError:
+        return
+
+    # 统计各状态数量
+    counts = {status: 0 for status in PROGRESS_STATUSES}
+    for status in store.values():
+        if status in counts:
+            counts[status] += 1
+
+    total_modules = len(available)
+    studied = sum(1 for m in available if store.get(m.target, "未学习") != "未学习")
+    if studied == 0:
+        return
+
+    # --- 甜甜圈图 ---
+    status_colors = {
+        "未学习": "#d8dee3",
+        "已学习": "#3268a8",
+        "已掌握": "#0f8b8d",
+        "去实战": "#c4871f",
+    }
+    labels = list(PROGRESS_STATUSES)
+    values = [counts.get(s, 0) for s in labels]
+    colors = [status_colors.get(s, "#ccc") for s in labels]
+
+    fig_donut = go.Figure(
+        data=[
+            go.Pie(
+                labels=labels,
+                values=values,
+                hole=0.55,
+                marker=dict(colors=colors),
+                textinfo="label+value",
+                textfont=dict(size=13),
+                sort=False,
+            )
+        ]
+    )
+    fig_donut.update_layout(
+        showlegend=False,
+        margin=dict(l=10, r=10, t=10, b=10),
+        height=260,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        annotations=[
+            dict(
+                text=f"{studied}/{total_modules}",
+                x=0.5,
+                y=0.5,
+                font=dict(size=22, color="#172026"),
+                showarrow=False,
+            )
+        ],
+    )
+
+    # --- 按 Part 的进度条 ---
+    part_data = []
+    for part_key, part_info in PARTS.items():
+        part_modules = [m for m in available if m.part_key == part_key]
+        if not part_modules:
+            continue
+        done = sum(
+            1
+            for m in part_modules
+            if store.get(m.target, "未学习") in ("已学习", "已掌握", "去实战")
+        )
+        part_data.append(
+            (f"{part_info.emoji} {part_info.short_title}", done, len(part_modules))
+        )
+
+    if not part_data:
+        return
+
+    part_labels = [d[0] for d in part_data]
+    part_done = [d[1] for d in part_data]
+    part_total = [d[2] for d in part_data]
+    part_pct = [d / t * 100 if t else 0 for d, t in zip(part_done, part_total)]
+
+    fig_bar = go.Figure()
+    fig_bar.add_trace(
+        go.Bar(
+            y=part_labels,
+            x=part_pct,
+            orientation="h",
+            marker=dict(color="#0f8b8d"),
+            text=[f"{d}/{t}" for d, t in zip(part_done, part_total)],
+            textposition="outside",
+            textfont=dict(size=13),
+            hovertemplate="%{y}: %{x:.0f}%<extra></extra>",
+        )
+    )
+    fig_bar.update_layout(
+        xaxis=dict(range=[0, 105], ticksuffix="%", gridcolor="rgba(0,0,0,0.06)"),
+        yaxis=dict(autorange="reversed"),
+        margin=dict(l=10, r=60, t=10, b=10),
+        height=max(200, len(part_data) * 38 + 40),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+
+    left, right = st.columns([0.35, 0.65])
+    with left:
+        st.plotly_chart(fig_donut, use_container_width=True, key="home-progress-donut")
+    with right:
+        st.plotly_chart(fig_bar, use_container_width=True, key="home-progress-bar")
+
+
 def render_streamlit_home() -> None:
     import streamlit as st
 
@@ -1498,6 +1621,8 @@ def render_streamlit_home() -> None:
         st.warning("学习进度总览暂时无法显示，请继续浏览课程目录。")
         with st.expander("查看进度组件错误", expanded=False):
             st.code(str(exc), language="text")
+
+    _render_progress_visual(available)
 
     st.subheader("知识图谱导航")
     try:
