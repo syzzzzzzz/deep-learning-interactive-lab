@@ -18,7 +18,7 @@
 - `part4_transformer`：注意力机制、多头注意力、位置编码、Transformer、BERT 与 GPT 对比
 - `part5_toolbox`：特征可视化、梯度监控、训练动态、超参数搜索、数据集玩具实验
 - `part6_universal_framework`：统一接口、模块化结构、插件系统、一键训练、Streamlit 演示
-- `part7_interview`：计算机网络、数据库与 SQL、数据结构与算法、操作系统面试训练、交互式刷题
+- `part7_interview`：计算机网络、数据库与 SQL、数据结构与算法、操作系统、深度学习、系统设计六大方向面试训练、交互式刷题与模拟面试
 
 ## 环境要求
 

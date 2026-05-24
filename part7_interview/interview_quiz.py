@@ -392,6 +392,99 @@ def format_elapsed(seconds: float) -> str:
     return f"{minutes} 分 {secs} 秒"
 
 
+def render_question_bank_overview() -> None:
+    """展示题库总览：方向×难度分布热力图和覆盖统计。"""
+    st.subheader("📊 题库总览")
+    st.caption("查看全部题目的方向和难度分布，找到薄弱环节有针对性地练习。")
+
+    direction_order = ["网络", "数据库", "算法", "操作系统", "深度学习", "系统设计"]
+    difficulty_order = ["基础", "高频", "进阶", "大厂追问"]
+
+    # 构建方向×难度矩阵
+    matrix = {}
+    for d in direction_order:
+        matrix[d] = {}
+        for diff in difficulty_order:
+            matrix[d][diff] = sum(
+                1 for q in QUESTIONS if q.direction == d and q.difficulty == diff
+            )
+
+    # 热力图
+    z_values = [[matrix[d][diff] for diff in difficulty_order] for d in direction_order]
+    text_values = [[str(v) if v > 0 else "" for v in row] for row in z_values]
+
+    fig_heatmap = go.Figure(
+        data=go.Heatmap(
+            z=z_values,
+            x=difficulty_order,
+            y=direction_order,
+            text=text_values,
+            texttemplate="%{text}",
+            textfont={"size": 16, "color": "#172026"},
+            colorscale=[
+                [0.0, "#f7f8f4"],
+                [0.2, "#d4ede8"],
+                [0.5, "#7ecac0"],
+                [1.0, "#0f8b8d"],
+            ],
+            showscale=True,
+            colorbar=dict(title="题数", len=0.6),
+            hovertemplate="%{y} · %{x}<br>题数: %{z}<extra></extra>",
+        )
+    )
+    fig_heatmap.update_layout(
+        height=300,
+        margin=dict(l=10, r=10, t=10, b=10),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(side="bottom"),
+    )
+    st.plotly_chart(fig_heatmap, use_container_width=True, config={"displayModeBar": False})
+
+    # 方向汇总条形图 + 难度汇总
+    col_chart, col_stats = st.columns([0.6, 0.4])
+    with col_chart:
+        dir_counts = [sum(matrix[d].values()) for d in direction_order]
+        fig_bar = go.Figure(
+            data=go.Bar(
+                y=direction_order,
+                x=dir_counts,
+                orientation="h",
+                marker_color=["#0f8b8d", "#3268a8", "#c4871f", "#3f7d58", "#7353ba", "#bf3f5b"],
+                text=dir_counts,
+                textposition="auto",
+                hovertemplate="%{y}: %{x} 题<extra></extra>",
+            )
+        )
+        fig_bar.update_layout(
+            height=260,
+            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="题数",
+            showlegend=False,
+        )
+        st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
+
+    with col_stats:
+        total = len(QUESTIONS)
+        st.metric("题库总量", f"{total} 题")
+        st.metric("覆盖方向", f"{len(direction_order)} 个")
+        st.metric("难度梯度", f"{len(difficulty_order)} 级")
+
+        # 覆盖最薄弱的方向
+        min_dir = min(direction_order, key=lambda d: sum(matrix[d].values()))
+        min_count = sum(matrix[min_dir].values())
+        st.caption(f"题量最少方向：{min_dir}（{min_count} 题）")
+
+        # 难度分布
+        diff_totals = {diff: sum(matrix[d][diff] for d in direction_order) for diff in difficulty_order}
+        diff_text = " · ".join(f"{diff} {diff_totals[diff]}" for diff in difficulty_order)
+        st.caption(f"难度分布：{diff_text}")
+
+    st.markdown("---")
+
+
 def render_practice_analysis() -> None:
     st.subheader("本轮练题统计分析")
     results = st.session_state.get("interview_results", [])
@@ -605,6 +698,7 @@ def main() -> None:
     st.markdown("")
 
     render_simulation_panel()
+    render_question_bank_overview()
 
     left, right = st.columns([0.3, 0.7])
     with left:
