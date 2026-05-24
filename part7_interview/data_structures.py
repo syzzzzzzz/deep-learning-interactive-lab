@@ -240,17 +240,36 @@ def main() -> None:
 
     st.subheader("BFS / DFS 可视化")
     search_kind = st.radio("选择图搜索", ["BFS", "DFS"], horizontal=True, key="ds-search")
-    st.markdown(
-        """
-        <div class="viz">      A
-     / \\
-    B   C
-   / \\   \\
-  D   E -> F</div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.success(f"{search_kind} 访问顺序：{' -> '.join(graph_order(search_kind))}")
+    order = graph_order(search_kind)
+    # 构建带动画的图节点展示
+    def _node_html(label: str, pos: int, total: int) -> str:
+        cls = "graph-node"
+        if pos == total - 1:
+            cls += " graph-node-current"
+        else:
+            cls += " graph-node-active"
+        delay = f"animation-delay:{pos * 300}ms"
+        return f'<div class="{cls}" style="{delay}" title="第{pos+1}个访问">{label}</div>'
+
+    nodes_html = "".join(_node_html(n, i, len(order)) for i, n in enumerate(order))
+    # 层级图
+    graph_html = '''
+    <div class="viz" style="text-align:center; padding:1rem;">
+      <div style="margin-bottom:8px;">         A</div>
+      <div>      / \\</div>
+      <div>     B   C</div>
+      <div>    / \\   \\</div>
+      <div>   D   E → F</div>
+    </div>'''
+    st.markdown(graph_html, unsafe_allow_html=True)
+    # 动画访问序列
+    st.markdown(f'''
+    <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin:.8rem 0;flex-wrap:wrap;">
+      <span style="font-weight:700;color:#596772;margin-right:8px;">访问顺序:</span>
+      {"".join(_node_html(n, i, len(order)) + ("" if i == len(order)-1 else "<span style='color:#0f8b8d;font-weight:800;margin:0 2px;'>→</span>") for i, n in enumerate(order))}
+    </div>
+    ''', unsafe_allow_html=True)
+    st.success(f"{search_kind} 访问顺序：{' -> '.join(order)}")
 
     st.subheader("高频问答区")
     with st.expander("数组和链表的区别？"):
