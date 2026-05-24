@@ -67,6 +67,7 @@ http://127.0.0.1:8501/?module=part1_foundations%2Fmath_primer
 http://127.0.0.1:8501/?module=part1_foundations%2Fclassical_ml
 http://127.0.0.1:8501/?module=part4_transformer%2Ftransformer_models
 http://127.0.0.1:8501/?module=part7_interview%2Finterview_quiz
+http://127.0.0.1:8501/?module=part7_interview%2Fdeep_learning_interview
 ```
 
 ## 命令行运行器

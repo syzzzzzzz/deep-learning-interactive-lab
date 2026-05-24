@@ -196,7 +196,8 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("part7", "part7_interview", "数据库SQL", "database_sql", "SELECT执行流程、B+树索引、慢查询排查、高频面试题与交互练习。", "核心", ("数据库", "SQL", "索引", "面试"), 71),
     ModuleInfo("part7", "part7_interview", "数据结构与算法", "data_structures", "数组链表可视化、排序算法动画、BFS/DFS、高频面试题。", "核心", ("数据结构", "算法", "排序", "面试"), 72),
     ModuleInfo("part7", "part7_interview", "操作系统", "operating_system", "进程线程、调度算法、虚拟内存、死锁、高频面试题。", "核心", ("操作系统", "进程", "内存", "面试"), 73),
-    ModuleInfo("part7", "part7_interview", "面试刷题模式", "interview_quiz", "随机出题、按方向难度筛选、错题本、面试官追问。", "核心", ("刷题", "面试", "错题本"), 74),
+    ModuleInfo("part7", "part7_interview", "深度学习", "deep_learning_interview", "梯度消失可视化、BatchNorm vs LayerNorm、注意力复杂度、训练排查清单、LoRA微调、模型部署。", "核心", ("深度学习", "梯度", "归一化", "面试"), 74),
+    ModuleInfo("part7", "part7_interview", "面试刷题模式", "interview_quiz", "随机出题、按方向难度筛选、错题本、面试官追问。", "核心", ("刷题", "面试", "错题本"), 75),
 ]
 
 
