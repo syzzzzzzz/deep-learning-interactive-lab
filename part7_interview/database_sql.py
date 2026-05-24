@@ -37,6 +37,21 @@ def css() -> str:
     .step { background: rgba(255,255,255,.82); border: 1px solid #d8dee3; border-radius: 8px; padding: .72rem .82rem; min-height: 92px; line-height: 1.55; }
     .small { color: #596772; font-size: .92rem; line-height: 1.58; }
     .stButton > button { border-radius: 8px; font-weight: 700; }
+    /* B+树查询路径高亮 */
+    .bptree-container { display: flex; flex-direction: column; align-items: center; margin: 1rem 0; font-family: Consolas, "Courier New", monospace; }
+    .bptree-level { display: flex; gap: 12px; justify-content: center; margin: 6px 0; }
+    .bptree-node { background: rgba(255,255,255,.82); border: 2px solid #d8dee3; border-radius: 8px; padding: 6px 14px; font-weight: 700; font-size: .92rem; transition: all .3s; min-width: 60px; text-align: center; }
+    .bptree-connector { display: flex; justify-content: center; gap: 12px; margin: 0; height: 20px; }
+    .bptree-line { width: 2px; height: 20px; background: #d8dee3; }
+    @keyframes bptree-highlight { 0% { background: rgba(255,255,255,.82); border-color: #d8dee3; box-shadow: none; transform: scale(1); } 100% { background: #0f8b8d; color: #fff; border-color: #0f8b8d; box-shadow: 0 0 16px rgba(15,139,141,0.5); transform: scale(1.08); } }
+    .bptree-active { animation: bptree-highlight .5s ease forwards; }
+    .bptree-found { background: #00ff88 !important; color: #172026 !important; border-color: #00ff88 !important; box-shadow: 0 0 14px rgba(0,255,136,0.5) !important; }
+    .bptree-connector-active .bptree-line { background: #0f8b8d; box-shadow: 0 0 8px rgba(15,139,141,0.4); }
+    .bptree-leaf-link { display: flex; gap: 0; justify-content: center; margin-top: 4px; }
+    .bptree-leaf-link .bptree-node { border-radius: 0; min-width: 50px; font-size: .84rem; padding: 4px 10px; }
+    .bptree-leaf-link .bptree-node:first-child { border-radius: 8px 0 0 8px; }
+    .bptree-leaf-link .bptree-node:last-child { border-radius: 0 8px 8px 0; }
+    @keyframes bptree-scan { 0% { background: rgba(255,255,255,.82); color: #172026; } 50% { background: #0f8b8d; color: #fff; } 100% { background: rgba(255,255,255,.82); color: #172026; } }
     </style>
     """
 
@@ -113,6 +128,55 @@ def main() -> None:
             st.markdown(f'<div class="step"><strong>{title}</strong><br><span class="small">{body}</span></div>', unsafe_allow_html=True)
 
     st.subheader("B+ 树索引直观图")
+    search_val = st.selectbox("模拟查询 key", [5, 18, 35, 48, 70, 90], key="db-bptree-search")
+    # 定义查询路径: root -> internal -> leaf
+    paths = {
+        5:  {"root": 0, "internal": 0, "leaf": 0},
+        18: {"root": 0, "internal": 0, "leaf": 1},
+        35: {"root": 0, "internal": 1, "leaf": 0},
+        48: {"root": 0, "internal": 1, "leaf": 1},
+        70: {"root": 0, "internal": 2, "leaf": 0},
+        90: {"root": 0, "internal": 2, "leaf": 1},
+    }
+    p = paths[search_val]
+    root_cls = "bptree-node bptree-active"
+    inodes = ["bptree-node"] * 3
+    inodes[p["internal"]] = "bptree-node bptree-active"
+    leaves = [["bptree-node"] * 2 for _ in range(3)]
+    leaves[p["internal"]][p["leaf"]] = "bptree-node bptree-found"
+    conn_cls = ["bptree-connector"] * 3
+    conn_cls[p["internal"]] = "bptree-connector bptree-connector-active"
+    st.markdown(f'''
+    <div class="bptree-container" style="animation-delay:0s;">
+      <div class="bptree-level">
+        <div class="{root_cls}" style="animation-delay:.1s;">30 | 60</div>
+      </div>
+      <div class="bptree-connector {conn_cls[0]} {conn_cls[1]} {conn_cls[2]}">
+        <div class="bptree-line" style="margin:0 42px;"></div>
+        <div class="bptree-line" style="margin:0 42px;"></div>
+        <div class="bptree-line" style="margin:0 42px;"></div>
+      </div>
+      <div class="bptree-level">
+        <div class="{inodes[0]}" style="animation-delay:.4s;">5 | 18</div>
+        <div class="{inodes[1]}" style="animation-delay:.4s;">35 | 48</div>
+        <div class="{inodes[2]}" style="animation-delay:.4s;">70 | 90</div>
+      </div>
+      <div class="bptree-connector">
+        <div class="bptree-line" style="margin:0 18px;"></div><div class="bptree-line" style="margin:0 18px;"></div>
+        <div class="bptree-line" style="margin:0 18px;"></div><div class="bptree-line" style="margin:0 18px;"></div>
+        <div class="bptree-line" style="margin:0 18px;"></div><div class="bptree-line" style="margin:0 18px;"></div>
+      </div>
+      <div class="bptree-leaf-link">
+        <div class="{leaves[0][0]}">5</div>
+        <div class="{leaves[0][1]}">18</div>
+        <div class="{leaves[1][0]}">35</div>
+        <div class="{leaves[1][1]}">48</div>
+        <div class="{leaves[2][0]}">70</div>
+        <div class="{leaves[2][1]}">90</div>
+      </div>
+    </div>
+    <div style="text-align:center;color:#596772;font-size:.88rem;">绿框 = 查询 key={search_val} 的最终定位，高亮路径 = 从根到叶的查找过程</div>
+    ''', unsafe_allow_html=True)
     st.markdown(
         """
         <div class="tree">                 [ 30 | 60 ]

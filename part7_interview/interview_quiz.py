@@ -25,6 +25,8 @@ import streamlit as st
 
 T = TypeVar("T")
 
+from components.visual_system import render_training_dashboard_gauges, render_visual_system
+
 st.set_page_config(page_title="CS 面试刷题模式", layout="wide", initial_sidebar_state="expanded")
 
 
@@ -682,6 +684,8 @@ def advance_simulation_if_needed(item: QuizItem, score: dict[str, object]) -> bo
 
 
 def main() -> None:
+    render_visual_system("dark")
+    render_training_dashboard_gauges()
     ensure_state()
     st.markdown(css(), unsafe_allow_html=True)
     st.markdown(

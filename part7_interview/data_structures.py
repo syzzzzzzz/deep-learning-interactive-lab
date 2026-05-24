@@ -15,6 +15,8 @@ from typing import TypeVar
 
 import streamlit as st
 
+from components.visual_system import render_visual_system
+
 
 T = TypeVar("T")
 
@@ -35,6 +37,25 @@ def css() -> str:
     .mini { background: rgba(255,255,255,.82); border: 1px solid #d8dee3; border-radius: 8px; padding: .75rem .85rem; min-height: 116px; line-height: 1.6; }
     .bar { display: inline-block; background: #0f8b8d; color: #fff; border-radius: 6px 6px 0 0; margin-right: 6px; width: 42px; text-align: center; vertical-align: bottom; font-weight: 800; }
     .stButton > button { border-radius: 8px; font-weight: 700; }
+    /* 排序算法动画增强 */
+    @keyframes bar-grow { 0% { height: 0 !important; opacity: 0; } 100% { opacity: 1; } }
+    @keyframes bar-swap { 0% { transform: translateY(-12px); background: #ff6b6b; } 50% { transform: translateY(-12px); background: #ff6b6b; } 100% { transform: translateY(0); background: #0f8b8d; } }
+    @keyframes bar-compare { 0% { background: #0f8b8d; } 50% { background: #ffd93d; } 100% { background: #0f8b8d; } }
+    .bar { animation: bar-grow .5s ease both; }
+    .bar-swap { animation: bar-swap .5s ease both; }
+    .bar-compare { animation: bar-compare .6s ease both; }
+    /* BFS/DFS 节点动画 */
+    .graph-node { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; border: 2px solid #d8dee3; background: rgba(255,255,255,.82); font-weight: 800; margin: 0 6px; transition: all .3s; }
+    @keyframes node-visit { 0% { background: rgba(255,255,255,.82); border-color: #d8dee3; transform: scale(1); } 100% { background: #0f8b8d; color: #fff; border-color: #0f8b8d; transform: scale(1.15); box-shadow: 0 0 12px rgba(15,139,141,0.5); } }
+    @keyframes node-current { 0% { background: #0f8b8d; } 50% { background: #00ff88; color: #172026; } 100% { background: #0f8b8d; } }
+    .graph-node-active { animation: node-visit .4s ease forwards; }
+    .graph-node-current { animation: node-current 1s ease-in-out infinite; background: #00ff88; color: #172026; border-color: #00ff88; }
+    .graph-edges { position: relative; display: flex; justify-content: center; margin: 8px 0; }
+    .graph-edge { display: inline-block; width: 30px; height: 2px; background: #d8dee3; margin: 0 2px; vertical-align: middle; }
+    .graph-edge-active { background: #0f8b8d; box-shadow: 0 0 6px rgba(15,139,141,0.4); }
+    /* BFS层级动画 */
+    @keyframes level-slide { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
+    .bfs-level { animation: level-slide .4s ease both; }
     </style>
     """
 
@@ -117,9 +138,13 @@ def quick_step() -> None:
 
 
 def render_array_bars(values: list[int]) -> None:
+    _render_array_bars_animated(values, [], [])
+
+
+def _render_array_bars_animated(values: list[int], compare_indices: list[int], swap_indices: list[int]) -> None:
     html = "".join(
-        f'<span class="bar" style="height:{value * 22}px; padding-top:4px">{value}</span>'
-        for value in values
+        f'<span class="bar{" bar-compare" if i in compare_indices else ""}{" bar-swap" if i in swap_indices else ""}" style="height:{value * 22}px; padding-top:4px; animation-delay:{i*60}ms">{value}</span>'
+        for i, value in enumerate(values)
     )
     st.markdown(f"<div style='height:190px; display:flex; align-items:flex-end;'>{html}</div>", unsafe_allow_html=True)
 
@@ -160,6 +185,7 @@ def graph_order(kind: str) -> list[str]:
 
 
 def main() -> None:
+    render_visual_system("dark")
     st.markdown(css(), unsafe_allow_html=True)
     st.markdown(
         """
@@ -203,7 +229,13 @@ def main() -> None:
         st.metric("时间复杂度", complexity[0])
         st.metric("空间复杂度", complexity[1])
     with right:
-        render_array_bars(st.session_state["ds_array"])
+        _render_array_bars_animated(
+            st.session_state["ds_array"],
+            [st.session_state["ds_j"], st.session_state["ds_j"] + 1]
+            if algorithm == "冒泡排序" and not st.session_state["ds_done"] and st.session_state["ds_j"] + 1 < len(st.session_state["ds_array"])
+            else [],
+            [],
+        )
         st.info(st.session_state["ds_message"])
 
     st.subheader("BFS / DFS 可视化")

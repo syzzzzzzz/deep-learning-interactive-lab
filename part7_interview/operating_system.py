@@ -16,6 +16,8 @@ from typing import TypeVar
 import pandas as pd
 import streamlit as st
 
+from components.visual_system import render_visual_system
+
 
 T = TypeVar("T")
 
@@ -141,6 +143,7 @@ def render_timeline(timeline: list[tuple[str, int, int]]) -> None:
 
 
 def main() -> None:
+    render_visual_system("dark")
     st.markdown(css(), unsafe_allow_html=True)
     st.markdown(
         """
