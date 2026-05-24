@@ -10,7 +10,9 @@ or:
 from __future__ import annotations
 
 import random
+import re
 import time
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeVar
@@ -36,6 +38,29 @@ class QuizItem:
     follow_up: str
     trap: str
     application: str
+
+
+QUESTION_MODULE_MAP = {
+    "网络": "part7/networking",
+    "数据库": "part7/database_sql",
+    "算法": "part7/data_structures",
+    "操作系统": "part7/operating_system",
+    "深度学习": "part6/neural_network_playground",
+    "系统设计": "part7/interview_quiz",
+}
+
+SCORING_DIMENSIONS = (
+    ("定义准确", "能说清核心概念，不只背关键词。", 30),
+    ("机制完整", "覆盖关键步骤、边界条件和取舍。", 30),
+    ("工程落地", "能联系真实系统或深度学习工程场景。", 25),
+    ("表达结构", "答案有层次，先结论再展开。", 15),
+)
+
+SIMULATION_SCRIPTS = {
+    "后端基础岗": ("网络", "数据库", "算法", "操作系统", "系统设计"),
+    "算法工程岗": ("深度学习", "算法", "操作系统", "系统设计", "数据库"),
+    "MLOps/平台岗": ("系统设计", "操作系统", "网络", "数据库", "深度学习"),
+}
 
 
 QUESTIONS: tuple[QuizItem, ...] = (
@@ -161,6 +186,11 @@ def ensure_state() -> None:
     st.session_state.setdefault("interview_question_start_time", 0.0)
     st.session_state.setdefault("interview_answer_times", [])
     st.session_state.setdefault("interview_results", [])
+    st.session_state.setdefault("interview_auto_score", None)
+    st.session_state.setdefault("interview_auto_saved_qid", "")
+    st.session_state.setdefault("interview_simulation_index", 0)
+    st.session_state.setdefault("interview_simulation_scores", [])
+    st.session_state.setdefault("interview_simulation_role", "算法工程岗")
 
 
 def filtered_questions(direction: str, difficulty: str) -> list[QuizItem]:
@@ -179,6 +209,8 @@ def pick_question(candidates: list[QuizItem]) -> None:
     st.session_state["interview_current_qid"] = random.choice(candidates).qid
     st.session_state["interview_user_answer_visible"] = False
     st.session_state["interview_user_answer"] = ""
+    st.session_state["interview_auto_score"] = None
+    st.session_state["interview_auto_saved_qid"] = ""
     st.session_state["interview_question_start_time"] = time.time()
 
 
@@ -211,6 +243,34 @@ def add_unique(state_key: str, item: QuizItem) -> None:
     st.session_state[state_key] = rows
 
 
+def persist_interview_record(item: QuizItem, outcome: str, user_answer: str, score: dict[str, object] | None = None) -> None:
+    """把面试错题和复习记录写入全站学习档案。"""
+
+    try:
+        from components.progress_tracker import add_learning_record, mark_review_later
+
+        module_key = QUESTION_MODULE_MAP.get(item.direction, "part7/interview_quiz")
+        title = f"{item.direction}｜{item.question}"
+        score_text = ""
+        if score:
+            score_text = f"\n自动评分：{score.get('score', 0)} 分；命中要点：{', '.join(score.get('matched', [])) or '暂无'}"
+        note = (
+            f"结果：{outcome}\n"
+            f"题目：{item.question}\n"
+            f"我的答案：{user_answer.strip() or '未填写'}\n"
+            f"标准答案：{item.answer}\n"
+            f"面试官追问：{item.follow_up}"
+            f"{score_text}"
+        )
+        reflection = f"下一次回答要避开：{item.trap}。工程连接：{item.application}"
+        record_type = "错题" if outcome in {"答错", "稍后复习", "自动评分偏低"} else "学习笔记"
+        add_learning_record(module_key, record_type, title, note, reflection)
+        if outcome == "稍后复习":
+            mark_review_later(module_key, reason=f"面试题待复习：{item.question}", priority="高")
+    except Exception:
+        pass
+
+
 def record_interview_result(item: QuizItem, correct: bool) -> None:
     """记录本轮每次判题结果，用于后续统计分析。"""
     answer_times = st.session_state.get("interview_answer_times", [])
@@ -234,6 +294,87 @@ def record_interview_result(item: QuizItem, correct: bool) -> None:
         }
     )
     st.session_state["interview_results"] = results
+
+
+def answer_tokens(text: str) -> set[str]:
+    cleaned = re.sub(r"[，。；：、！？,.!?;:()\[\]{}<>\"'“”‘’/\\|-]", " ", text.lower())
+    raw = {token.strip() for token in cleaned.split() if len(token.strip()) >= 2}
+    chinese_chunks = set(re.findall(r"[\u4e00-\u9fff]{2,}", text))
+    # 对中文长句做短片段切分，避免必须整句完全命中。
+    chunks: set[str] = set()
+    for chunk in chinese_chunks:
+        if len(chunk) <= 4:
+            chunks.add(chunk)
+        else:
+            chunks.update(chunk[index : index + 2] for index in range(0, len(chunk) - 1))
+            chunks.update(chunk[index : index + 3] for index in range(0, len(chunk) - 2))
+    return raw | chunks
+
+
+def score_user_answer(item: QuizItem, user_answer: str) -> dict[str, object]:
+    """用关键词覆盖、工程连接和结构信号给口述答案做轻量自动评分。"""
+
+    user_tokens = answer_tokens(user_answer)
+    reference_tokens = answer_tokens(item.answer)
+    engineering_tokens = answer_tokens(item.application)
+    essential_tokens = [
+        token
+        for token, count in Counter(reference_tokens).items()
+        if len(token) >= 2 and count >= 1
+    ][:28]
+    matched = [token for token in essential_tokens if token in user_tokens]
+    coverage = len(matched) / max(1, len(essential_tokens))
+
+    structure_hits = sum(marker in user_answer for marker in ("首先", "其次", "最后", "因为", "所以", "但是", "取舍", "如果"))
+    engineering_hits = sum(term in user_answer for term in ("项目", "工程", "服务", "训练", "推理", "线上", "延迟", "吞吐", "日志", "监控"))
+    engineering_coverage = len([token for token in engineering_tokens if token in user_tokens]) / max(1, len(engineering_tokens))
+    length_score = min(1.0, len(user_answer.strip()) / 120)
+
+    dimension_scores = {
+        "定义准确": min(30, round(coverage * 38)),
+        "机制完整": min(30, round((coverage * 0.8 + length_score * 0.2) * 33)),
+        "工程落地": min(25, 8 + engineering_hits * 5 + round(engineering_coverage * 8)) if engineering_hits else round(coverage * 12),
+        "表达结构": min(15, 5 + structure_hits * 3) if structure_hits else round(length_score * 8),
+    }
+    total = int(sum(dimension_scores.values()))
+    missing = [token for token in essential_tokens if token not in user_tokens][:8]
+    if not user_answer.strip():
+        total = 0
+        dimension_scores = {name: 0 for name, _, _ in SCORING_DIMENSIONS}
+        missing = essential_tokens[:8]
+    return {
+        "score": min(100, total),
+        "dimension_scores": dimension_scores,
+        "matched": matched[:10],
+        "missing": missing,
+        "advice": score_advice(total),
+    }
+
+
+def score_advice(score: int) -> str:
+    if score >= 85:
+        return "表达已经接近面试可用，下一步练追问和极端场景。"
+    if score >= 70:
+        return "主干正确，但还需要补边界条件、复杂度或工程取舍。"
+    if score >= 50:
+        return "有部分关键词，但答案结构不稳，建议按“定义-机制-问题-工程场景”重答一遍。"
+    return "当前更像碎片记忆，建议先看标准答案，再把遗漏要点写进错题本。"
+
+
+def render_score_card(score: dict[str, object]) -> None:
+    st.markdown("**自动评分**")
+    st.progress(int(score["score"]) / 100)
+    st.metric("综合分", f"{score['score']} / 100")
+    rows = [
+        {"维度": name, "得分": score["dimension_scores"].get(name, 0), "满分": full, "评分依据": desc}
+        for name, desc, full in SCORING_DIMENSIONS
+    ]
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    matched = "、".join(score.get("matched", [])) or "暂无明显命中"
+    missing = "、".join(score.get("missing", [])) or "暂无明显遗漏"
+    st.caption(f"命中要点：{matched}")
+    st.caption(f"建议补充：{missing}")
+    st.info(str(score["advice"]))
 
 
 def extract_key_points(answer: str) -> list[str]:
@@ -376,6 +517,77 @@ def render_practice_analysis() -> None:
     )
 
 
+def simulation_candidates(role: str) -> list[QuizItem]:
+    directions = SIMULATION_SCRIPTS[role]
+    selected: list[QuizItem] = []
+    for direction in directions:
+        pool = [item for item in QUESTIONS if item.direction == direction and item.difficulty in {"高频", "进阶", "大厂追问"}]
+        if not pool:
+            pool = [item for item in QUESTIONS if item.direction == direction]
+        if pool:
+            selected.append(pool[date_seed(len(selected)) % len(pool)])
+    return selected
+
+
+def date_seed(offset: int) -> int:
+    return int(time.strftime("%Y%m%d")) + offset * 17
+
+
+def start_simulation(role: str) -> None:
+    st.session_state["interview_simulation_role"] = role
+    st.session_state["interview_simulation_index"] = 0
+    st.session_state["interview_simulation_scores"] = []
+    candidates = simulation_candidates(role)
+    if candidates:
+        st.session_state["interview_current_qid"] = candidates[0].qid
+        st.session_state["interview_user_answer_visible"] = False
+        st.session_state["interview_user_answer"] = ""
+        st.session_state["interview_auto_score"] = None
+        st.session_state["interview_auto_saved_qid"] = ""
+        st.session_state["interview_question_start_time"] = time.time()
+
+
+def render_simulation_panel() -> None:
+    st.subheader("模拟面试流程")
+    role = st.selectbox("选择岗位脚本", list(SIMULATION_SCRIPTS), key="simulation-role-select")
+    candidates = simulation_candidates(role)
+    index = st.session_state.get("interview_simulation_index", 0)
+    scores = st.session_state.get("interview_simulation_scores", [])
+    cols = st.columns(3)
+    if cols[0].button("开始模拟面试", key="simulation-start", use_container_width=True):
+        start_simulation(role)
+        st.rerun()
+    cols[1].metric("当前轮次", f"{min(index + 1, len(candidates))} / {len(candidates)}")
+    avg_score = sum(scores) / len(scores) if scores else 0
+    cols[2].metric("模拟均分", f"{avg_score:.0f}")
+
+    st.caption("流程按岗位自动串联 5 个方向：先回答，再自动评分；低于 70 分会自动写入错题档案。")
+    if scores and len(scores) >= len(candidates):
+        st.success("本轮模拟面试完成。建议复盘低分题，再按同岗位脚本重来一轮。")
+    st.markdown("面试路径：" + " → ".join(SIMULATION_SCRIPTS[role]))
+
+
+def advance_simulation_if_needed(item: QuizItem, score: dict[str, object]) -> bool:
+    role = st.session_state.get("interview_simulation_role", "算法工程岗")
+    candidates = simulation_candidates(role)
+    qids = [candidate.qid for candidate in candidates]
+    if item.qid not in qids:
+        return False
+    scores = list(st.session_state.get("interview_simulation_scores", []))
+    scores.append(int(score["score"]))
+    st.session_state["interview_simulation_scores"] = scores
+    next_index = qids.index(item.qid) + 1
+    st.session_state["interview_simulation_index"] = next_index
+    if next_index < len(candidates):
+        st.session_state["interview_current_qid"] = candidates[next_index].qid
+        st.session_state["interview_user_answer_visible"] = False
+        st.session_state["interview_user_answer"] = ""
+        st.session_state["interview_auto_score"] = None
+        st.session_state["interview_auto_saved_qid"] = ""
+        st.session_state["interview_question_start_time"] = time.time()
+    return True
+
+
 def main() -> None:
     ensure_state()
     st.markdown(css(), unsafe_allow_html=True)
@@ -391,6 +603,8 @@ def main() -> None:
 
     st.link_button("← 返回主界面", "/", width="small")
     st.markdown("")
+
+    render_simulation_panel()
 
     left, right = st.columns([0.3, 0.7])
     with left:
@@ -423,6 +637,10 @@ def main() -> None:
             st.session_state["interview_correct_count"] = 0
             st.session_state["interview_answer_times"] = []
             st.session_state["interview_results"] = []
+            st.session_state["interview_auto_score"] = None
+            st.session_state["interview_auto_saved_qid"] = ""
+            st.session_state["interview_simulation_scores"] = []
+            st.session_state["interview_simulation_index"] = 0
 
     with right:
         candidates = filtered_questions(direction, difficulty)
@@ -453,6 +671,12 @@ def main() -> None:
                 st.session_state["interview_user_answer"] = user_answer
                 if st.button("提交并查看标准答案", key="quiz-show-answer", use_container_width=True):
                     st.session_state["interview_user_answer_visible"] = True
+                    score = score_user_answer(item, user_answer)
+                    st.session_state["interview_auto_score"] = score
+                    if int(score["score"]) < 70 and st.session_state.get("interview_auto_saved_qid") != item.qid:
+                        add_unique("interview_wrong_book", item)
+                        persist_interview_record(item, "自动评分偏低", user_answer, score)
+                        st.session_state["interview_auto_saved_qid"] = item.qid
                     # 记录用时
                     start = st.session_state.get("interview_question_start_time", 0.0)
                     if start > 0:
@@ -473,6 +697,12 @@ def main() -> None:
                 if answer_times:
                     last_time = answer_times[-1]
                     st.caption(f"⏱️ 用时 {format_elapsed(last_time)}")
+
+                score = st.session_state.get("interview_auto_score")
+                if score:
+                    render_score_card(score)
+                    if int(score["score"]) < 70:
+                        st.warning("自动评分低于 70 分，建议点击“我答错了”把它写入错题档案。")
 
                 with st.expander("标准答案", expanded=True):
                     st.write(item.answer)
@@ -497,17 +727,29 @@ def main() -> None:
                     st.session_state["interview_answered_count"] = st.session_state.get("interview_answered_count", 0) + 1
                     st.session_state["interview_correct_count"] = st.session_state.get("interview_correct_count", 0) + 1
                     record_interview_result(item, True)
-                    pick_question(candidates)
+                    score = st.session_state.get("interview_auto_score") or score_user_answer(item, st.session_state.get("interview_user_answer", ""))
+                    persist_interview_record(item, "答对", st.session_state.get("interview_user_answer", ""), score)
+                    if not advance_simulation_if_needed(item, score):
+                        pick_question(candidates)
+                    st.rerun()
             with c2:
                 if st.button("我答错了", key="quiz-wrong", use_container_width=True):
                     st.session_state["interview_answered_count"] = st.session_state.get("interview_answered_count", 0) + 1
                     record_interview_result(item, False)
                     add_unique("interview_wrong_book", item)
-                    pick_question(candidates)
+                    score = st.session_state.get("interview_auto_score") or score_user_answer(item, st.session_state.get("interview_user_answer", ""))
+                    persist_interview_record(item, "答错", st.session_state.get("interview_user_answer", ""), score)
+                    if not advance_simulation_if_needed(item, score):
+                        pick_question(candidates)
+                    st.rerun()
             with c3:
                 if st.button("稍后复习", key="quiz-later", use_container_width=True):
                     add_unique("interview_later_book", item)
-                    pick_question(candidates)
+                    score = st.session_state.get("interview_auto_score") or score_user_answer(item, st.session_state.get("interview_user_answer", ""))
+                    persist_interview_record(item, "稍后复习", st.session_state.get("interview_user_answer", ""), score)
+                    if not advance_simulation_if_needed(item, score):
+                        pick_question(candidates)
+                    st.rerun()
 
     st.subheader("错题本")
     wrong = st.session_state.get("interview_wrong_book", [])
@@ -523,6 +765,8 @@ def main() -> None:
             st.dataframe(pd.DataFrame(later), use_container_width=True, hide_index=True)
         else:
             st.info("本轮还没有标记稍后复习。")
+
+    st.caption("错题和稍后复习会同时写入全站学习档案，回到主界面学习报告可以看到长期记录。")
 
     st.markdown(
         """

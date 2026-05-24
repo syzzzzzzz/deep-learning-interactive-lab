@@ -331,6 +331,33 @@ EXPECTED_CONTENT_REFERENCES = {
         "make_cnn_feature_map",
         "make_attention_heatmap",
     ],
+    Path("part7_interview/interview_quiz.py"): [
+        "QUESTION_MODULE_MAP",
+        "SIMULATION_SCRIPTS",
+        "score_user_answer",
+        "render_score_card",
+        "render_simulation_panel",
+        "persist_interview_record",
+        "自动评分",
+        "模拟面试流程",
+        "错题档案",
+    ],
+    Path("part7_interview/networking.py"): [
+        "进入网络专项刷题",
+        "模型推理 API",
+    ],
+    Path("part7_interview/database_sql.py"): [
+        "进入数据库专项刷题",
+        "实验记录数据库",
+    ],
+    Path("part7_interview/data_structures.py"): [
+        "进入算法专项刷题",
+        "Transformer 注意力",
+    ],
+    Path("part7_interview/operating_system.py"): [
+        "进入操作系统专项刷题",
+        "DataLoader",
+    ],
 }
 
 SMOKE_FUNCTIONS = {
@@ -1025,9 +1052,46 @@ def check_learning_progress_system() -> None:
 
 
 def check_bagu_routes_placeholder() -> None:
-    """Reserved check for future interview-route batches."""
+    namespace = load_module_without_main(Path("part7_interview/interview_quiz.py"))
+    failures: list[str] = []
 
-    print("[通过] 八股文路由检查：接口已预留，当前批次未定义八股文路由表")
+    questions = namespace["QUESTIONS"]
+    directions = {"网络", "数据库", "算法", "操作系统", "深度学习", "系统设计"}
+    for direction in directions:
+        count = sum(1 for item in questions if item.direction == direction)
+        if count < 8:
+            failures.append(f"{direction}: 题库数量不足 8 题，当前 {count} 题")
+
+    score_user_answer = namespace["score_user_answer"]
+    sample = next(item for item in questions if item.direction == "网络")
+    strong = score_user_answer(sample, sample.answer + " 工程上还要结合模型推理 API 的延迟、监控和重试。")
+    weak = score_user_answer(sample, "不知道")
+    if strong["score"] <= weak["score"]:
+        failures.append("自动评分没有区分强答案和弱答案")
+    if strong["score"] < 70:
+        failures.append("自动评分对标准答案给分过低")
+
+    for name in ("QUESTION_MODULE_MAP", "SIMULATION_SCRIPTS", "SCORING_DIMENSIONS"):
+        if name not in namespace:
+            failures.append(f"面试训练缺少 {name}")
+
+    scripts = namespace["SIMULATION_SCRIPTS"]
+    if not all(len(flow) >= 5 for flow in scripts.values()):
+        failures.append("模拟面试脚本没有覆盖至少 5 轮追问")
+
+    route_files = {
+        Path("part7_interview/networking.py"): "进入网络专项刷题",
+        Path("part7_interview/database_sql.py"): "进入数据库专项刷题",
+        Path("part7_interview/data_structures.py"): "进入算法专项刷题",
+        Path("part7_interview/operating_system.py"): "进入操作系统专项刷题",
+    }
+    for rel_path, fragment in route_files.items():
+        if fragment not in read_text(rel_path):
+            failures.append(f"{rel_path}: 缺少专项刷题入口")
+
+    if failures:
+        raise CheckFailure("八股文训练营检查失败：\n" + "\n".join(failures))
+    print("[通过] 八股文训练营检查：题库、自动评分、模拟面试、错题持久化和专项入口均已覆盖")
 
 
 def check_back_to_home_entry() -> None:

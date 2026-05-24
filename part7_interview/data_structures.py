@@ -238,9 +238,9 @@ def main() -> None:
         """,
         unsafe_allow_html=True,
     )
+    st.link_button("进入算法专项刷题", "/?module=part7%2Finterview_quiz", width="stretch")
     render_back_home()
 
 
 if __name__ == "__main__":
     safe_run(main)
-
