@@ -1,6 +1,6 @@
 # 深度学习交互式学习网站
 
-这是一个面向初学者的深度学习交互式学习网站。项目使用 Streamlit、PyTorch、Matplotlib、Plotly 和 scikit-learn 构建，把深度学习中的数学基础、经典机器学习、卷积神经网络、循环神经网络、Transformer 和工程工具箱做成可视化、可调参、可逐步观察的网页实验室。
+这是一个面向初学者的深度学习交互式学习网站。项目使用 Streamlit、PyTorch、Matplotlib、Plotly 和 scikit-learn 构建，把深度学习中的数学基础、经典机器学习、卷积神经网络、循环神经网络、Transformer、工程工具箱和 CS 面试训练做成可视化、可调参、可逐步观察的网页实验室。
 
 ## 项目特色
 
@@ -8,6 +8,7 @@
 - **交互式可视化**：通过滑块、选择框、热力图、损失曲线、分类边界和动画观察模型行为。
 - **适合零基础学习**：每个图都配有读图提示，告诉你应该调什么参数、观察什么变化、思考什么问题。
 - **覆盖完整学习路径**：从张量、梯度、数学基础开始，逐步进入 CNN、RNN、Transformer 和项目化训练流程。
+- **CS 面试训练**：涵盖计算机网络、数据库、数据结构与算法、操作系统四大方向的交互式刷题和模拟面试。
 
 ## 章节目录
 
@@ -17,6 +18,7 @@
 - `part4_transformer`：注意力机制、多头注意力、位置编码、Transformer、BERT 与 GPT 对比
 - `part5_toolbox`：特征可视化、梯度监控、训练动态、超参数搜索、数据集玩具实验
 - `part6_universal_framework`：统一接口、模块化结构、插件系统、一键训练、Streamlit 演示
+- `part7_interview`：计算机网络、数据库与 SQL、数据结构与算法、操作系统面试训练、交互式刷题
 
 ## 环境要求
 
@@ -64,6 +66,7 @@ start_lab.bat
 http://127.0.0.1:8501/?module=part1_foundations%2Fmath_primer
 http://127.0.0.1:8501/?module=part1_foundations%2Fclassical_ml
 http://127.0.0.1:8501/?module=part4_transformer%2Ftransformer_models
+http://127.0.0.1:8501/?module=part7_interview%2Finterview_quiz
 ```
 
 ## 命令行运行器
@@ -86,6 +89,7 @@ python main.py part2_cnn/01_convolution_visual
 2. 再看 `经典机器学习`，建立决策边界、过拟合、正则化和距离度量的直觉。
 3. 然后进入 CNN、RNN、Transformer，观察深度学习模型如何把这些基础概念组合成更强的结构。
 4. 每个页面都建议先调极端参数，再回到默认值，这样最容易看出参数真正控制了什么。
+5. 面试准备阶段，使用 `part7_interview` 的刷题模式按方向练习，结合 `面试刷题模式` 模拟真实面试节奏。
 
 ## 维护备注
 
