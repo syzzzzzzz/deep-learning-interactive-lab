@@ -802,6 +802,16 @@ def render_module_knowledge_nav(module: ModuleInfo) -> None:
     """把每个章节页接到全站知识图谱：前置、相关、下一步和去实战。"""
 
     try:
+        from components.progress_tracker import render学习操作面板
+
+        render学习操作面板(module.short_target)
+    except Exception as exc:
+        st = __import__("streamlit")
+        st.warning("学习进度与复盘面板暂时无法显示，但当前章节内容不受影响。")
+        with st.expander("查看学习进度错误", expanded=False):
+            st.code(str(exc), language="text")
+
+    try:
         from components.knowledge_graph import render知识图谱导航
 
         render知识图谱导航(module.short_target)
@@ -1417,7 +1427,7 @@ def _render_progress_visual(available: list[ModuleInfo]) -> None:
     import streamlit as st
 
     try:
-        from components.progress_tracker import PROGRESS_STATUSES, _store
+        from components.progress_tracker import PROGRESS_STATUSES, _store, normalize_module_key
 
         store = _store()
     except Exception:
@@ -1438,7 +1448,7 @@ def _render_progress_visual(available: list[ModuleInfo]) -> None:
             counts[status] += 1
 
     total_modules = len(available)
-    studied = sum(1 for m in available if store.get(m.target, "未学习") != "未学习")
+    studied = sum(1 for m in available if store.get(normalize_module_key(m.target), "未学习") != "未学习")
     if studied == 0:
         return
 
@@ -1492,7 +1502,7 @@ def _render_progress_visual(available: list[ModuleInfo]) -> None:
         done = sum(
             1
             for m in part_modules
-            if store.get(m.target, "未学习") in ("已学习", "已掌握", "去实战")
+            if store.get(normalize_module_key(m.target), "未学习") in ("已学习", "已掌握", "去实战", "稍后复习")
         )
         part_data.append(
             (f"{part_info.emoji} {part_info.short_title}", done, len(part_modules))

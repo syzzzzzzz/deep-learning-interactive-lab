@@ -22,6 +22,8 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 PLACEHOLDER_PATTERNS = [
     "【知识点名称】",
@@ -212,6 +214,20 @@ EXPECTED_CONTENT_REFERENCES = {
         "part6_universal_framework/07_project_template",
         "学习导读",
         "render_module_knowledge_nav",
+        "render学习操作面板",
+    ],
+    Path("components/progress_tracker.py"): [
+        "稍后复习",
+        "今日推荐",
+        "学习报告",
+        "弱点分析",
+        "章节完成标准",
+        "错题",
+        "实验记录",
+        "render学习操作面板",
+        "build_learning_report",
+        "analyze_weaknesses",
+        "recommend_today",
     ],
     Path("components/knowledge_graph.py"): [
         "canonical_node_keys",
@@ -936,6 +952,78 @@ def check_legacy_book_import() -> None:
     print(f"[通过] 旧教材迁移检查：{len(lessons)} 个 Markdown 章节已导入 docs/legacy_book")
 
 
+def check_learning_progress_system() -> None:
+    namespace = load_module_without_main(Path("components/progress_tracker.py"))
+    failures: list[str] = []
+
+    statuses = tuple(namespace["PROGRESS_STATUSES"])
+    for status in ("未学习", "已学习", "已掌握", "去实战", "稍后复习"):
+        if status not in statuses:
+            failures.append(f"PROGRESS_STATUSES 缺少 {status}")
+
+    normalize = namespace["normalize_module_key"]
+    if normalize("part4_transformer/01_attention_mechanism") != "part4/01_attention_mechanism":
+        failures.append("normalize_module_key 无法把长目录路由规范化为知识图谱短路由")
+
+    progress = {
+        "part1/math_primer": "已掌握",
+        "part1/01_tensors_gradients": "已学习",
+        "part4/01_attention_mechanism": "稍后复习",
+        "part5/04_hyperparam_search": "去实战",
+    }
+    profile = {
+        "review_later": {
+            "part4/01_attention_mechanism": {
+                "reason": "softmax 权重解释还不稳",
+                "priority": "高",
+                "created_at": "2026-05-24 12:00",
+            }
+        },
+        "records": [
+            {
+                "id": "r1",
+                "module_key": "part4/01_attention_mechanism",
+                "type": "错题",
+                "title": "Q/K/V 混淆",
+                "note": "把 key 当成数据库主键。",
+                "reflection": "下次先画 query-key-value 三角色。",
+                "created_at": "2026-05-24 12:01",
+                "linked_nodes": ["part4/01_attention_mechanism"],
+            },
+            {
+                "id": "r2",
+                "module_key": "part5/04_hyperparam_search",
+                "type": "实验记录",
+                "title": "学习率过高",
+                "note": "loss 震荡。",
+                "reflection": "先降 3 倍。",
+                "created_at": "2026-05-24 12:02",
+                "linked_nodes": ["part5/04_hyperparam_search"],
+            },
+        ],
+    }
+
+    report = namespace["build_learning_report"](progress, profile)
+    if report["review_count"] < 1:
+        failures.append("学习报告没有统计稍后复习数量")
+    if report["record_counts"].get("错题", 0) < 1:
+        failures.append("学习报告没有统计错题记录")
+    if report["record_counts"].get("实验记录", 0) < 1:
+        failures.append("学习报告没有统计实验记录")
+
+    today = namespace["recommend_today"](progress, profile)
+    if not today or today.get("key") != "part4/01_attention_mechanism":
+        failures.append("今日推荐没有优先选择高优先级稍后复习章节")
+
+    weaknesses = namespace["analyze_weaknesses"](progress, profile, limit=3)
+    if not weaknesses or weaknesses[0]["key"] != "part4/01_attention_mechanism":
+        failures.append("弱点分析没有把错题和稍后复习联动到知识图谱节点")
+
+    if failures:
+        raise CheckFailure("学习进度系统检查失败：\n" + "\n".join(failures))
+    print("[通过] 学习进度系统检查：稍后复习、今日推荐、学习报告、弱点分析、错题/实验记录联动正常")
+
+
 def check_bagu_routes_placeholder() -> None:
     """Reserved check for future interview-route batches."""
 
@@ -1045,6 +1133,7 @@ def run_checks(include_smoke: bool) -> None:
     check_main_routes()
     check_knowledge_graph_routes()
     check_legacy_book_import()
+    check_learning_progress_system()
     check_bagu_routes_placeholder()
     check_back_to_home_entry()
     check_legacy_top_level_execution()
