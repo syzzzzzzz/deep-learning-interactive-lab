@@ -1,0 +1,763 @@
+{
+  "source_project": "deep_learning_book",
+  "format_version": 1,
+  "lesson_count": 38,
+  "lessons": {
+    "part1/01_tensors_gradients": {
+      "route": "part1/01_tensors_gradients",
+      "source_path": "part1_foundations/01_tensors_gradients.md",
+      "local_path": "part1_foundations/01_tensors_gradients.md",
+      "title": "第一章：张量、梯度、反向传播直观理解",
+      "outline": [
+        "1.1 什么是张量",
+        "1.2 梯度：神经网络的\"指南针\"",
+        "1.2.1 手动计算梯度",
+        "1.3 反向传播：链式法则的工程实现",
+        "1.3.1 计算图",
+        "1.3.2 计算图可视化",
+        "1.4 完整的单层神经网络玩具",
+        "1.5 梯度流动可视化工具",
+        "小结"
+      ],
+      "char_count": 15369,
+      "line_count": 593,
+      "code_block_count": 9,
+      "source_folder": "part1_foundations",
+      "source_stem": "01_tensors_gradients"
+    },
+    "part1/02_activations_normalization": {
+      "route": "part1/02_activations_normalization",
+      "source_path": "part1_foundations/02_activations_normalization.md",
+      "local_path": "part1_foundations/02_activations_normalization.md",
+      "title": "第二章：激活函数、初始化、归一化、过拟合",
+      "outline": [
+        "2.1 激活函数：给网络注入非线性",
+        "2.1.1 激活函数选择指南",
+        "2.2 权重初始化：训练的起点",
+        "2.3 归一化：让训练更稳定",
+        "2.4 过拟合与正则化",
+        "小结"
+      ],
+      "char_count": 16246,
+      "line_count": 537,
+      "code_block_count": 5,
+      "source_folder": "part1_foundations",
+      "source_stem": "02_activations_normalization"
+    },
+    "part1/03_datasets_optimizers": {
+      "route": "part1/03_datasets_optimizers",
+      "source_path": "part1_foundations/03_datasets_optimizers.md",
+      "local_path": "part1_foundations/03_datasets_optimizers.md",
+      "title": "第三章：数据集、批次、优化器、损失函数直观实验",
+      "outline": [
+        "3.1 优化器大比拼",
+        "3.2 损失函数详解",
+        "3.3 批次大小的影响",
+        "小结"
+      ],
+      "char_count": 12791,
+      "line_count": 417,
+      "code_block_count": 3,
+      "source_folder": "part1_foundations",
+      "source_stem": "03_datasets_optimizers"
+    },
+    "part2/01_convolution_visual": {
+      "route": "part2/01_convolution_visual",
+      "source_path": "part2_cnn/01_convolution_visual.md",
+      "local_path": "part2_cnn/01_convolution_visual.md",
+      "title": "第一章：卷积、池化、填充、步幅——逐步数字计算与可视化",
+      "outline": [
+        "1.1 卷积的本质",
+        "1.2 逐步数字计算（输入3×32×32，卷积核3×3，步幅1，填充1）",
+        "1.3 三种经典卷积核：边缘检测、模糊、锐化",
+        "1.4 感受野（Receptive Field）可视化",
+        "1.5 池化操作详解",
+        "1.6 CNN 10个常见调试问题",
+        "小结"
+      ],
+      "char_count": 15379,
+      "line_count": 502,
+      "code_block_count": 5,
+      "source_folder": "part2_cnn",
+      "source_stem": "01_convolution_visual"
+    },
+    "part2/02_feature_maps": {
+      "route": "part2/02_feature_maps",
+      "source_path": "part2_cnn/02_feature_maps.md",
+      "local_path": "part2_cnn/02_feature_maps.md",
+      "title": "第五章：特征图实时查看与滤波器调试",
+      "outline": [
+        "5.1 什么是特征图？",
+        "5.2 实时特征图查看器",
+        "5.3 滤波器权重可视化 + 训练前后对比",
+        "小结"
+      ],
+      "char_count": 13270,
+      "line_count": 409,
+      "code_block_count": 3,
+      "source_folder": "part2_cnn",
+      "source_stem": "02_feature_maps"
+    },
+    "part2/03_classic_architectures": {
+      "route": "part2/03_classic_architectures",
+      "source_path": "part2_cnn/03_classic_architectures.md",
+      "local_path": "part2_cnn/03_classic_architectures.md",
+      "title": "第六章：经典 CNN 架构——LeNet / AlexNet / VGG / ResNet",
+      "outline": [
+        "6.1 架构演进时间线",
+        "6.2 LeNet-5（1998）",
+        "6.3 MiniAlexNet（2012 精神继承者）",
+        "6.4 MiniVGG（2014）",
+        "6.5 MiniResNet（2015）——残差连接的魔法",
+        "6.6 四大架构对比实验",
+        "6.7 残差连接的梯度流可视化",
+        "小结"
+      ],
+      "char_count": 14960,
+      "line_count": 484,
+      "code_block_count": 7,
+      "source_folder": "part2_cnn",
+      "source_stem": "03_classic_architectures"
+    },
+    "part2/04_debug_panel": {
+      "route": "part2/04_debug_panel",
+      "source_path": "part2_cnn/04_debug_panel.md",
+      "local_path": "part2_cnn/04_debug_panel.md",
+      "title": "第七章：可交互调试面板——改卷积核、看每层输出",
+      "outline": [
+        "7.1 调试面板设计思路",
+        "7.2 手动卷积核实验台",
+        "小结"
+      ],
+      "char_count": 12063,
+      "line_count": 376,
+      "code_block_count": 1,
+      "source_folder": "part2_cnn",
+      "source_stem": "04_debug_panel"
+    },
+    "part2/05_mnist_toy": {
+      "route": "part2/05_mnist_toy",
+      "source_path": "part2_cnn/05_mnist_toy.md",
+      "local_path": "part2_cnn/05_mnist_toy.md",
+      "title": "第五章：经典 CNN 网络 + 可交互调试面板 + 手写数字玩具",
+      "outline": [
+        "5.1 经典网络架构",
+        "5.2 手写数字分类完整玩具",
+        "小结"
+      ],
+      "char_count": 19525,
+      "line_count": 617,
+      "code_block_count": 2,
+      "source_folder": "part2_cnn",
+      "source_stem": "05_mnist_toy"
+    },
+    "part2/06_modern_architectures": {
+      "route": "part2/06_modern_architectures",
+      "source_path": "part2_cnn/06_modern_architectures.md",
+      "local_path": "part2_cnn/06_modern_architectures.md",
+      "title": "现代 CNN 架构：MobileNet / DenseNet / EfficientNet",
+      "outline": [
+        "1. 架构演进：从深到广到轻",
+        "2. MobileNet：深度可分离卷积",
+        "2.1 标准卷积 vs 深度可分离卷积",
+        "2.2 完整实现",
+        "2.3 MobileNet V2：倒残差结构",
+        "3. DenseNet：密集连接",
+        "3.1 核心思想",
+        "3.2 完整实现",
+        "4. EfficientNet：复合缩放",
+        "4.1 缩放维度",
+        "4.2 实现与缩放实验",
+        "5. 架构综合对比",
+        "小结"
+      ],
+      "char_count": 16658,
+      "line_count": 552,
+      "code_block_count": 9,
+      "source_folder": "part2_cnn",
+      "source_stem": "06_modern_architectures"
+    },
+    "part2/07_advanced_convolution": {
+      "route": "part2/07_advanced_convolution",
+      "source_path": "part2_cnn/07_advanced_convolution.md",
+      "local_path": "part2_cnn/07_advanced_convolution.md",
+      "title": "高级卷积技术：空洞卷积 / 转置卷积 / 分组卷积 / 可变形卷积",
+      "outline": [
+        "1. 空洞卷积（Dilated / Atrous Convolution）",
+        "1.1 核心思想",
+        "1.2 实现",
+        "1.3 空洞空间金字塔池化（ASPP）",
+        "2. 转置卷积（Transposed Convolution / Deconvolution）",
+        "2.1 核心思想",
+        "2.2 逐步可视化",
+        "2.3 棋盘效应与解决方案",
+        "3. 分组卷积（Group Convolution）",
+        "3.1 从标准到分组到深度可分离",
+        "3.2 ResNeXt：分组卷积的典范",
+        "4. 可变形卷积（Deformable Convolution）",
+        "4.1 核心思想",
+        "4.2 简化实现"
+      ],
+      "char_count": 17158,
+      "line_count": 614,
+      "code_block_count": 11,
+      "source_folder": "part2_cnn",
+      "source_stem": "07_advanced_convolution"
+    },
+    "part2/08_visualization_gradcam": {
+      "route": "part2/08_visualization_gradcam",
+      "source_path": "part2_cnn/08_visualization_gradcam.md",
+      "local_path": "part2_cnn/08_visualization_gradcam.md",
+      "title": "CNN 可视化技术：GradCAM / 显著图 / 特征反转 / DeepDream",
+      "outline": [
+        "1. 为什么需要可视化？",
+        "2. GradCAM：梯度加权类激活图",
+        "2.1 原理",
+        "2.2 完整实现",
+        "3. 显著图（Saliency Map）",
+        "3.1 原理",
+        "3.2 实现",
+        "4. 特征反转（Feature Inversion）",
+        "4.1 原理",
+        "4.2 实现",
+        "5. DeepDream：让神经网络做梦",
+        "5.1 原理",
+        "5.2 实现",
+        "6. 综合可视化工具箱"
+      ],
+      "char_count": 15902,
+      "line_count": 628,
+      "code_block_count": 10,
+      "source_folder": "part2_cnn",
+      "source_stem": "08_visualization_gradcam"
+    },
+    "part2/09_transfer_learning": {
+      "route": "part2/09_transfer_learning",
+      "source_path": "part2_cnn/09_transfer_learning.md",
+      "local_path": "part2_cnn/09_transfer_learning.md",
+      "title": "迁移学习：预训练模型 / 微调策略 / 渐进式训练",
+      "outline": [
+        "1. 为什么迁移学习有效？",
+        "2. 预训练模型库",
+        "2.1 PyTorch 内置模型",
+        "2.2 加载预训练模型",
+        "3. 三种迁移学习策略",
+        "3.1 策略对比",
+        "3.2 策略 1：特征提取",
+        "3.3 策略 2：部分微调",
+        "3.4 策略 3：差异化学习率微调",
+        "4. 渐进式解冻训练",
+        "5. 迁移学习实验：策略对比",
+        "6. 实用技巧",
+        "6.1 数据预处理对齐",
+        "6.2 渐进式调整大小"
+      ],
+      "char_count": 12196,
+      "line_count": 505,
+      "code_block_count": 13,
+      "source_folder": "part2_cnn",
+      "source_stem": "09_transfer_learning"
+    },
+    "part3/01_rnn_intuition": {
+      "route": "part3/01_rnn_intuition",
+      "source_path": "part3_rnn/01_rnn_intuition.md",
+      "local_path": "part3_rnn/01_rnn_intuition.md",
+      "title": "第八章：循环结构、梯度消失与门机制直观解释",
+      "outline": [
+        "8.1 为什么需要 RNN？",
+        "8.2 RNN 手动推导",
+        "8.3 梯度消失的数学直觉",
+        "8.4 LSTM 门机制直观解释",
+        "8.5 GRU vs LSTM：门的简化",
+        "小结"
+      ],
+      "char_count": 11843,
+      "line_count": 387,
+      "code_block_count": 5,
+      "source_folder": "part3_rnn",
+      "source_stem": "01_rnn_intuition"
+    },
+    "part3/02_hidden_states": {
+      "route": "part3/02_hidden_states",
+      "source_path": "part3_rnn/02_hidden_states.md",
+      "local_path": "part3_rnn/02_hidden_states.md",
+      "title": "第九章：隐藏状态变化与序列预测可视化",
+      "outline": [
+        "9.1 隐藏状态是什么？",
+        "9.1.1 隐藏状态轨迹可视化",
+        "小结"
+      ],
+      "char_count": 13925,
+      "line_count": 403,
+      "code_block_count": 1,
+      "source_folder": "part3_rnn",
+      "source_stem": "02_hidden_states"
+    },
+    "part3/03_sequence_toys": {
+      "route": "part3/03_sequence_toys",
+      "source_path": "part3_rnn/03_sequence_toys.md",
+      "local_path": "part3_rnn/03_sequence_toys.md",
+      "title": "第六章：RNN / LSTM / GRU 序列模型完整玩具",
+      "outline": [
+        "6.1 循环结构的本质",
+        "6.2 LSTM 门机制详解",
+        "6.3 序列预测玩具",
+        "小结"
+      ],
+      "char_count": 17883,
+      "line_count": 606,
+      "code_block_count": 3,
+      "source_folder": "part3_rnn",
+      "source_stem": "03_sequence_toys"
+    },
+    "part3/04_hyperparam_rnn": {
+      "route": "part3/04_hyperparam_rnn",
+      "source_path": "part3_rnn/04_hyperparam_rnn.md",
+      "local_path": "part3_rnn/04_hyperparam_rnn.md",
+      "title": "第十章：RNN 超参数调试实验台",
+      "outline": [
+        "10.1 哪些超参数最重要？",
+        "10.1.1 超参数对比实验",
+        "小结"
+      ],
+      "char_count": 11881,
+      "line_count": 351,
+      "code_block_count": 1,
+      "source_folder": "part3_rnn",
+      "source_stem": "04_hyperparam_rnn"
+    },
+    "part3/05_seq2seq_attention": {
+      "route": "part3/05_seq2seq_attention",
+      "source_path": "part3_rnn/05_seq2seq_attention.md",
+      "local_path": "part3_rnn/05_seq2seq_attention.md",
+      "title": "Seq2Seq 与注意力机制：从编码器-解码器到 Bahdanau/Luong 注意力",
+      "outline": [
+        "1. Seq2Seq 核心思想",
+        "2. 编码器-解码器基础实现",
+        "3. Bahdanau 注意力（加性注意力）",
+        "3.1 原理",
+        "3.2 实现",
+        "4. Luong 注意力（乘性注意力）",
+        "4.1 对比",
+        "4.2 实现",
+        "5. 完整 Seq2Seq + 注意力模型",
+        "6. 注意力可视化",
+        "7. 无注意力 vs 有注意力对比实验",
+        "8. 从 RNN 注意力到 Transformer 注意力",
+        "小结"
+      ],
+      "char_count": 14307,
+      "line_count": 503,
+      "code_block_count": 10,
+      "source_folder": "part3_rnn",
+      "source_stem": "05_seq2seq_attention"
+    },
+    "part3/06_text_classification": {
+      "route": "part3/06_text_classification",
+      "source_path": "part3_rnn/06_text_classification.md",
+      "local_path": "part3_rnn/06_text_classification.md",
+      "title": "RNN 文本分类：情感分析完整项目",
+      "outline": [
+        "1. 文本分类任务概述",
+        "2. 数据预处理",
+        "3. 多种 RNN 分类模型",
+        "4. Embedding 可视化",
+        "5. 实用技巧",
+        "5.1 处理类别不平衡",
+        "5.2 动态填充（提高效率）",
+        "小结"
+      ],
+      "char_count": 12396,
+      "line_count": 424,
+      "code_block_count": 6,
+      "source_folder": "part3_rnn",
+      "source_stem": "06_text_classification"
+    },
+    "part3/07_advanced_training": {
+      "route": "part3/07_advanced_training",
+      "source_path": "part3_rnn/07_advanced_training.md",
+      "local_path": "part3_rnn/07_advanced_training.md",
+      "title": "RNN 高级训练技术：Teacher Forcing / 预定采样 / BPTT / 梯度策略",
+      "outline": [
+        "1. Teacher Forcing",
+        "1.1 原理",
+        "1.2 实现与对比",
+        "2. 预定采样（Scheduled Sampling）",
+        "2.1 原理",
+        "2.2 实现",
+        "3. BPTT：沿时间反向传播",
+        "3.1 原理",
+        "3.2 实现",
+        "4. 梯度裁剪策略",
+        "4.1 三种裁剪方法",
+        "5. 训练最佳实践总结",
+        "小结"
+      ],
+      "char_count": 14643,
+      "line_count": 507,
+      "code_block_count": 8,
+      "source_folder": "part3_rnn",
+      "source_stem": "07_advanced_training"
+    },
+    "part3/08_debug_problems": {
+      "route": "part3/08_debug_problems",
+      "source_path": "part3_rnn/08_debug_problems.md",
+      "local_path": "part3_rnn/08_debug_problems.md",
+      "title": "RNN/LSTM 调试问题集：15个常见错误与解决方案",
+      "outline": [
+        "1. 梯度爆炸：Loss 突然变 NaN",
+        "2. 梯度消失：长序列前半段学不到",
+        "3. 隐藏状态维度错误",
+        "4. 序列长度不一致导致报错",
+        "5. PAD token 参与了损失计算",
+        "6. Teacher Forcing 导致 Exposure Bias",
+        "7. 双向 LSTM 隐藏状态拼接错误",
+        "8. Dropout 位置不对",
+        "9. Embedding 梯度更新问题",
+        "10. 自回归生成重复/退化",
+        "11. PackedSequence 解包错误",
+        "12. 序列批次顺序影响 PackedSequence",
+        "13. GPU 上隐藏状态未移到正确设备",
+        "14. 多层 LSTM 的 Dropout 只在层间"
+      ],
+      "char_count": 10430,
+      "line_count": 444,
+      "code_block_count": 31,
+      "source_folder": "part3_rnn",
+      "source_stem": "08_debug_problems"
+    },
+    "part4/01_attention_mechanism": {
+      "route": "part4/01_attention_mechanism",
+      "source_path": "part4_transformer/01_attention_mechanism.md",
+      "local_path": "part4_transformer/01_attention_mechanism.md",
+      "title": "第一章：自注意力机制——完整数学推导与逐行张量分析",
+      "outline": [
+        "1.1 为什么需要注意力？",
+        "1.2 Scaled Dot-Product Attention 完整数学推导",
+        "1.2.1 前向传播",
+        "1.2.2 反向传播（完整推导）",
+        "1.3 逐行张量形状分析（具体数字举例）",
+        "1.4 注意力分数的数值分析",
+        "1.5 带 Mask 的注意力（因果掩码）",
+        "小结"
+      ],
+      "char_count": 13757,
+      "line_count": 408,
+      "code_block_count": 14,
+      "source_folder": "part4_transformer",
+      "source_stem": "01_attention_mechanism"
+    },
+    "part4/02_multihead_visual": {
+      "route": "part4/02_multihead_visual",
+      "source_path": "part4_transformer/02_multihead_visual.md",
+      "local_path": "part4_transformer/02_multihead_visual.md",
+      "title": "第二章：Multi-Head Attention 完整实现与权重可视化",
+      "outline": [
+        "2.1 为什么需要多头？",
+        "2.2 完整 Multi-Head Attention 实现",
+        "小结"
+      ],
+      "char_count": 12419,
+      "line_count": 354,
+      "code_block_count": 2,
+      "source_folder": "part4_transformer",
+      "source_stem": "02_multihead_visual"
+    },
+    "part4/03_encoder_decoder": {
+      "route": "part4/03_encoder_decoder",
+      "source_path": "part4_transformer/03_encoder_decoder.md",
+      "local_path": "part4_transformer/03_encoder_decoder.md",
+      "title": "第三章：位置编码——数学原理、完整代码与可视化",
+      "outline": [
+        "3.1 为什么需要位置编码？",
+        "3.2 正弦位置编码的数学原理",
+        "3.3 完整实现代码",
+        "小结"
+      ],
+      "char_count": 7859,
+      "line_count": 254,
+      "code_block_count": 2,
+      "source_folder": "part4_transformer",
+      "source_stem": "03_encoder_decoder"
+    },
+    "part4/04_minimal_transformer": {
+      "route": "part4/04_minimal_transformer",
+      "source_path": "part4_transformer/04_minimal_transformer.md",
+      "local_path": "part4_transformer/04_minimal_transformer.md",
+      "title": "第八章：极简可运行 Transformer 实现",
+      "outline": [
+        "8.1 Transformer 整体架构",
+        "8.2 完整 Transformer 实现（可运行、可调试、可看注意力）",
+        "8.3 Transformer 参数调试面板",
+        "小结"
+      ],
+      "char_count": 19947,
+      "line_count": 636,
+      "code_block_count": 3,
+      "source_folder": "part4_transformer",
+      "source_stem": "04_minimal_transformer"
+    },
+    "part4/05_flash_attention": {
+      "route": "part4/05_flash_attention",
+      "source_path": "part4_transformer/05_flash_attention.md",
+      "local_path": "part4_transformer/05_flash_attention.md",
+      "title": "FlashAttention：高效注意力机制",
+      "outline": [
+        "1. 标准注意力的内存瓶颈",
+        "2. FlashAttention 的核心思想",
+        "2.1 分块策略",
+        "2.2 在线 Softmax 算法",
+        "3. FlashAttention 完整实现",
+        "4. IO 复杂度分析",
+        "4.1 标准注意力的 IO 复杂度",
+        "4.2 FlashAttention 的 IO 复杂度",
+        "5. 性能对比实验",
+        "6. 分块模式可视化",
+        "7. 关键优势总结",
+        "8. 实际应用建议"
+      ],
+      "char_count": 10800,
+      "line_count": 389,
+      "code_block_count": 9,
+      "source_folder": "part4_transformer",
+      "source_stem": "05_flash_attention"
+    },
+    "part4/06_debug_problems": {
+      "route": "part4/06_debug_problems",
+      "source_path": "part4_transformer/06_debug_problems.md",
+      "local_path": "part4_transformer/06_debug_problems.md",
+      "title": "Transformer 调试问题集：15个常见错误与解决方案",
+      "outline": [
+        "1. NaN Loss：注意力分数溢出",
+        "2. 梯度消失：深层 Transformer 训练困难",
+        "3. 因果掩码错误：未来信息泄露",
+        "4. Padding 掩码未正确应用",
+        "5. 位置编码在批次中错位",
+        "6. 内存溢出：存储所有注意力权重",
+        "7. 低效注意力实现导致训练慢",
+        "8. 交叉注意力的 Key/Value 来源错误",
+        "9. Label Smoothing 实现错误",
+        "10. 学习率预热未应用",
+        "11. 权重共享：Embedding 和输出层",
+        "12. Beam Search 实现错误",
+        "13. Tokenizer Padding 方向不匹配",
+        "14. 梯度累积的 Loss 缩放错误"
+      ],
+      "char_count": 14388,
+      "line_count": 632,
+      "code_block_count": 48,
+      "source_folder": "part4_transformer",
+      "source_stem": "06_debug_problems"
+    },
+    "part5/01_feature_visualization": {
+      "route": "part5/01_feature_visualization",
+      "source_path": "part5_toolbox/01_feature_visualization.md",
+      "local_path": "part5_toolbox/01_feature_visualization.md",
+      "title": "第九章补充：特征可视化工具",
+      "outline": [
+        "9.0 为什么要可视化特征？",
+        "9.1 CNN 特征图可视化",
+        "小结"
+      ],
+      "char_count": 10917,
+      "line_count": 351,
+      "code_block_count": 1,
+      "source_folder": "part5_toolbox",
+      "source_stem": "01_feature_visualization"
+    },
+    "part5/02_gradient_monitor": {
+      "route": "part5/02_gradient_monitor",
+      "source_path": "part5_toolbox/02_gradient_monitor.md",
+      "local_path": "part5_toolbox/02_gradient_monitor.md",
+      "title": "第九章：调试工具箱 — 梯度监控 + 训练动态 + 超参搜索",
+      "outline": [
+        "9.1 梯度监控工具（生产级）",
+        "小结"
+      ],
+      "char_count": 19324,
+      "line_count": 588,
+      "code_block_count": 1,
+      "source_folder": "part5_toolbox",
+      "source_stem": "02_gradient_monitor"
+    },
+    "part5/03_training_dynamics": {
+      "route": "part5/03_training_dynamics",
+      "source_path": "part5_toolbox/03_training_dynamics.md",
+      "local_path": "part5_toolbox/03_training_dynamics.md",
+      "title": "第九章补充：训练动态深度分析",
+      "outline": [
+        "9.2 训练动态：超越损失曲线",
+        "9.2.1 权重与激活分布追踪器",
+        "小结"
+      ],
+      "char_count": 11881,
+      "line_count": 353,
+      "code_block_count": 1,
+      "source_folder": "part5_toolbox",
+      "source_stem": "03_training_dynamics"
+    },
+    "part5/04_hyperparam_search": {
+      "route": "part5/04_hyperparam_search",
+      "source_path": "part5_toolbox/04_hyperparam_search.md",
+      "local_path": "part5_toolbox/04_hyperparam_search.md",
+      "title": "第九章补充：超参搜索进阶",
+      "outline": [
+        "9.3 超参搜索：从网格到贝叶斯",
+        "9.3.1 学习率范围测试（LR Finder）",
+        "小结"
+      ],
+      "char_count": 11789,
+      "line_count": 371,
+      "code_block_count": 1,
+      "source_folder": "part5_toolbox",
+      "source_stem": "04_hyperparam_search"
+    },
+    "part5/05_dataset_toys": {
+      "route": "part5/05_dataset_toys",
+      "source_path": "part5_toolbox/05_dataset_toys.md",
+      "local_path": "part5_toolbox/05_dataset_toys.md",
+      "title": "第十三章：数据集玩具——自己造数据、看模型表现",
+      "outline": [
+        "13.1 为什么要自己造数据？",
+        "13.1.1 分类数据集工厂",
+        "小结"
+      ],
+      "char_count": 11427,
+      "line_count": 332,
+      "code_block_count": 1,
+      "source_folder": "part5_toolbox",
+      "source_stem": "05_dataset_toys"
+    },
+    "part6/01_unified_interface": {
+      "route": "part6/01_unified_interface",
+      "source_path": "part6_universal_framework/01_unified_interface.md",
+      "local_path": "part6_universal_framework/01_unified_interface.md",
+      "title": "第十章：万能训练框架 — 统一接口设计",
+      "outline": [
+        "10.1 为什么需要统一接口？",
+        "10.1.1 统一数据接口",
+        "10.2 快速上手模板",
+        "小结"
+      ],
+      "char_count": 13614,
+      "line_count": 451,
+      "code_block_count": 2,
+      "source_folder": "part6_universal_framework",
+      "source_stem": "01_unified_interface"
+    },
+    "part6/02_modular_structure": {
+      "route": "part6/02_modular_structure",
+      "source_path": "part6_universal_framework/02_modular_structure.md",
+      "local_path": "part6_universal_framework/02_modular_structure.md",
+      "title": "第十四章：模块化结构——切换模型只需改一行",
+      "outline": [
+        "14.1 模块化设计原则",
+        "14.1.1 统一模型注册表",
+        "14.2 快速切换模型模板",
+        "小结"
+      ],
+      "char_count": 16217,
+      "line_count": 470,
+      "code_block_count": 2,
+      "source_folder": "part6_universal_framework",
+      "source_stem": "02_modular_structure"
+    },
+    "part6/03_full_project": {
+      "route": "part6/03_full_project",
+      "source_path": "part6_universal_framework/03_full_project.md",
+      "local_path": "part6_universal_framework/03_full_project.md",
+      "title": "第十章：万能可视化框架 — 一个项目玩遍所有模型",
+      "outline": [
+        "10.1 统一模型接口",
+        "10.2 快速上手模板",
+        "全书总结"
+      ],
+      "char_count": 20492,
+      "line_count": 618,
+      "code_block_count": 2,
+      "source_folder": "part6_universal_framework",
+      "source_stem": "03_full_project"
+    },
+    "part6/04_plugin_system": {
+      "route": "part6/04_plugin_system",
+      "source_path": "part6_universal_framework/04_plugin_system.md",
+      "local_path": "part6_universal_framework/04_plugin_system.md",
+      "title": "可扩展插件系统：添加新模型、新数据集、新任务",
+      "outline": [
+        "1. 插件系统设计理念",
+        "2. 三大注册表：模型 / 数据集 / 任务",
+        "3. 注册内置组件",
+        "4. 钩子系统：训练流程的扩展点",
+        "5. 配置驱动：YAML 实验配置",
+        "6. 添加新插件的完整流程",
+        "7. 插件发现与自动加载",
+        "小结"
+      ],
+      "char_count": 17408,
+      "line_count": 560,
+      "code_block_count": 7,
+      "source_folder": "part6_universal_framework",
+      "source_stem": "04_plugin_system"
+    },
+    "part6/05_one_click_training": {
+      "route": "part6/05_one_click_training",
+      "source_path": "part6_universal_framework/05_one_click_training.md",
+      "local_path": "part6_universal_framework/05_one_click_training.md",
+      "title": "一键训练与评估：自动保存、日志、曲线绘制",
+      "outline": [
+        "1. 设计目标",
+        "2. ExperimentRunner 完整实现",
+        "3. 使用示例",
+        "小结"
+      ],
+      "char_count": 15238,
+      "line_count": 475,
+      "code_block_count": 3,
+      "source_folder": "part6_universal_framework",
+      "source_stem": "05_one_click_training"
+    },
+    "part6/06_streamlit_demo": {
+      "route": "part6/06_streamlit_demo",
+      "source_path": "part6_universal_framework/06_streamlit_demo.md",
+      "local_path": "part6_universal_framework/06_streamlit_demo.md",
+      "title": "Streamlit 交互式演示：一键搭建模型演示界面",
+      "outline": [
+        "1. 为什么用 Streamlit？",
+        "2. 通用模型演示界面",
+        "3. 运行方式",
+        "4. 多页面布局（大型项目）",
+        "小结"
+      ],
+      "char_count": 8401,
+      "line_count": 342,
+      "code_block_count": 4,
+      "source_folder": "part6_universal_framework",
+      "source_stem": "06_streamlit_demo"
+    },
+    "part6/07_project_template": {
+      "route": "part6/07_project_template",
+      "source_path": "part6_universal_framework/07_project_template.md",
+      "local_path": "part6_universal_framework/07_project_template.md",
+      "title": "项目模板：比赛 / 作业 / 个人项目完整结构",
+      "outline": [
+        "1. 项目目录结构",
+        "2. 核心文件内容",
+        "2.1 config.yaml（实验配置）",
+        "2.2 scripts/train.py（训练入口）",
+        "2.3 scripts/evaluate.py（评估脚本）",
+        "2.4 requirements.txt",
+        "2.5 .gitignore",
+        "3. 快速启动命令",
+        "4. 比赛专用技巧",
+        "4.1 K-Fold 交叉验证",
+        "4.2 模型集成",
+        "小结"
+      ],
+      "char_count": 9162,
+      "line_count": 422,
+      "code_block_count": 9,
+      "source_folder": "part6_universal_framework",
+      "source_stem": "07_project_template"
+    }
+  }
+}

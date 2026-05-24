@@ -428,6 +428,14 @@ def render知识图谱导航(current_key: str) -> None:
         info_cols[1].markdown(f"**去实战目标**  \n{node.practice_target}")
         info_cols[2].link_button("进入对应实战页", practice_url(node.name), width="stretch")
 
+        try:
+            from components.legacy_book import render_legacy_book_reference
+
+            render_legacy_book_reference(node.name)
+        except Exception as legacy_error:
+            with st.expander("旧教材原稿暂时无法显示", expanded=False):
+                st.code(str(legacy_error), language="text")
+
         prereq_col, related_col, next_col = st.columns(3)
         with prereq_col:
             st.markdown("**前置知识**")

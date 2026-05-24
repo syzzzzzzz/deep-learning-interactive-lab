@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import ast
 import io
+import json
 import os
 import re
 import runpy
@@ -215,11 +216,19 @@ EXPECTED_CONTENT_REFERENCES = {
     Path("components/knowledge_graph.py"): [
         "canonical_node_keys",
         "practice_url",
+        "render_legacy_book_reference",
         "掌握标准",
         "去实战目标",
         "前置知识",
         "相关知识",
         "后续推荐",
+    ],
+    Path("components/legacy_book.py"): [
+        "deep_learning_book",
+        "get_legacy_lesson",
+        "render_legacy_book_reference",
+        "下载旧教材 Markdown",
+        "预览旧教材原文",
     ],
     Path("part5_toolbox/01_feature_visualization.py"): [
         "print_learning_guide",
@@ -372,6 +381,7 @@ def project_files(suffixes: tuple[str, ...]) -> list[Path]:
         ".pytest_cache",
         ".mypy_cache",
         ".streamlit_module_outputs",
+        "legacy_book",
     }
     files: list[Path] = []
     for path in ROOT.rglob("*"):
@@ -874,6 +884,58 @@ def check_knowledge_graph_routes() -> None:
     print(f"[通过] 知识图谱元数据完整性检查：{len(canonical_keys)} 个主站模块，{len(graph)} 个含别名节点")
 
 
+def check_legacy_book_import() -> None:
+    manifest_path = ROOT / "docs" / "legacy_book" / "manifest.json"
+    if not manifest_path.exists():
+        raise CheckFailure("旧教材迁移检查失败：缺少 docs/legacy_book/manifest.json")
+
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001 - malformed JSON should be reported.
+        raise CheckFailure(f"旧教材迁移检查失败：manifest.json 无法解析：{exc}") from exc
+
+    lessons = payload.get("lessons")
+    failures: list[str] = []
+    if not isinstance(lessons, dict):
+        failures.append("manifest.json 缺少 lessons 对象")
+        lessons = {}
+    lesson_count = int(payload.get("lesson_count", 0) or 0)
+    if lesson_count < 38 or len(lessons) < 38:
+        failures.append(f"旧教材章节数量不足：lesson_count={lesson_count}, lessons={len(lessons)}")
+
+    required_routes = [
+        "part1/01_tensors_gradients",
+        "part2/01_convolution_visual",
+        "part3/05_seq2seq_attention",
+        "part4/01_attention_mechanism",
+        "part5/02_gradient_monitor",
+        "part6/07_project_template",
+    ]
+    for route in required_routes:
+        item = lessons.get(route)
+        if not isinstance(item, dict):
+            failures.append(f"旧教材缺少关键章节：{route}")
+            continue
+        local_path = item.get("local_path")
+        title = item.get("title")
+        outline = item.get("outline")
+        if not isinstance(local_path, str) or not (ROOT / "docs" / "legacy_book" / local_path).exists():
+            failures.append(f"{route}: local_path 不存在或文件缺失")
+        if not isinstance(title, str) or not title.strip():
+            failures.append(f"{route}: 缺少标题")
+        if not isinstance(outline, list) or not outline:
+            failures.append(f"{route}: 缺少章节大纲")
+
+    namespace = load_module_without_main(Path("components/legacy_book.py"))
+    get_legacy_lesson = namespace["get_legacy_lesson"]
+    if get_legacy_lesson("part4_transformer/01_attention_mechanism") is None:
+        failures.append("legacy_book.get_legacy_lesson 无法通过长目录路由找到注意力旧教材")
+
+    if failures:
+        raise CheckFailure("旧教材迁移检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 旧教材迁移检查：{len(lessons)} 个 Markdown 章节已导入 docs/legacy_book")
+
+
 def check_bagu_routes_placeholder() -> None:
     """Reserved check for future interview-route batches."""
 
@@ -982,6 +1044,7 @@ def run_checks(include_smoke: bool) -> None:
     check_playground_training_linkage()
     check_main_routes()
     check_knowledge_graph_routes()
+    check_legacy_book_import()
     check_bagu_routes_placeholder()
     check_back_to_home_entry()
     check_legacy_top_level_execution()
