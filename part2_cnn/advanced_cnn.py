@@ -18,6 +18,8 @@ import streamlit as st
 import torch
 import torch.nn.functional as F
 
+from components.visual_system import render_advanced_conv_comparison
+
 
 torch.set_num_threads(1)
 
@@ -106,6 +108,9 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+
+render_advanced_conv_comparison()
 
 
 @dataclass(frozen=True)

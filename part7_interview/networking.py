@@ -15,6 +15,8 @@ from typing import TypeVar
 import pandas as pd
 import streamlit as st
 
+from components.visual_system import render_visual_system
+
 
 T = TypeVar("T")
 
@@ -36,6 +38,23 @@ def css() -> str:
     .flow { background: #172026; color: #f7fbfc; border-radius: 8px; padding: .82rem 1rem; font-family: Consolas, "Courier New", monospace; line-height: 1.72; white-space: pre-wrap; }
     .small { color: #596772; font-size: .92rem; line-height: 1.58; }
     .stButton > button { border-radius: 8px; font-weight: 700; }
+    /* TCP 三次握手动态箭头 */
+    .tcp-wrap { display: flex; align-items: flex-start; justify-content: center; gap: 0; margin: 1.2rem 0; position: relative; }
+    .tcp-side { width: 120px; text-align: center; }
+    .tcp-side .tcp-box { background: rgba(255,255,255,.82); border: 2px solid #0f8b8d; border-radius: 10px; padding: .7rem .5rem; font-weight: 700; }
+    .tcp-arrows { flex: 1; max-width: 380px; position: relative; min-height: 220px; }
+    .tcp-arrow-row { display: flex; align-items: center; justify-content: center; margin: 18px 0; position: relative; }
+    .tcp-arrow-line { flex: 1; height: 3px; position: relative; margin: 0 6px; }
+    .tcp-arrow-line::after { content: ''; position: absolute; right: -2px; top: -5px; border: solid #0f8b8d; border-width: 0 3px 3px 0; display: inline-block; padding: 5px; transform: rotate(-45deg); }
+    .tcp-arrow-label { background: #0f8b8d; color: #fff; font-size: .82rem; font-weight: 700; padding: 3px 12px; border-radius: 12px; white-space: nowrap; }
+    .tcp-arrow-rev .tcp-arrow-line::after { right: auto; left: -2px; transform: rotate(135deg); }
+    @keyframes tcp-slide { 0% { transform: translateX(-100%); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
+    @keyframes tcp-slide-rev { 0% { transform: translateX(100%); opacity: 0; } 100% { transform: translateX(0); opacity: 1; } }
+    .tcp-s1 { animation: tcp-slide .5s ease both; }
+    .tcp-s2 { animation: tcp-slide-rev .5s ease .6s both; }
+    .tcp-s3 { animation: tcp-slide .5s ease 1.2s both; }
+    .tcp-glow { animation: tcp-glow-pulse 2s ease-in-out infinite alternate; }
+    @keyframes tcp-glow-pulse { 0% { box-shadow: 0 0 6px rgba(15,139,141,0.3); } 100% { box-shadow: 0 0 18px rgba(15,139,141,0.7); } }
     </style>
     """
 
@@ -60,17 +79,37 @@ def render_back_home() -> None:
 
 def handshake_diagram() -> None:
     st.subheader("TCP 三次握手")
-    cols = st.columns([1.1, 0.45, 1.1, 0.45, 1.1])
-    with cols[0]:
-        st.markdown('<div class="step"><strong>1. 客户端</strong><br>SYN=1<br>seq=x<br><span class="small">请求建立连接。</span></div>', unsafe_allow_html=True)
-    with cols[1]:
-        st.markdown('<div class="arrow">SYN →</div>', unsafe_allow_html=True)
-    with cols[2]:
-        st.markdown('<div class="step"><strong>2. 服务端</strong><br>SYN=1, ACK=1<br>seq=y, ack=x+1<br><span class="small">确认收到，并请求建立反向通道。</span></div>', unsafe_allow_html=True)
-    with cols[3]:
-        st.markdown('<div class="arrow">ACK →</div>', unsafe_allow_html=True)
-    with cols[4]:
-        st.markdown('<div class="step"><strong>3. 客户端</strong><br>ACK=1<br>ack=y+1<br><span class="small">双方确认收发能力，连接进入 ESTABLISHED。</span></div>', unsafe_allow_html=True)
+    st.markdown(
+        '''
+        <div class="tcp-wrap">
+          <div class="tcp-side">
+            <div class="tcp-box tcp-glow">🖥️ 客户端</div>
+          </div>
+          <div class="tcp-arrows">
+            <div class="tcp-arrow-row tcp-s1">
+              <div class="tcp-arrow-label">SYN=1, seq=x</div>
+              <div class="tcp-arrow-line" style="background:linear-gradient(90deg,#0f8b8d,#00f0ff);"></div>
+            </div>
+            <div class="tcp-arrow-row tcp-arrow-rev tcp-s2">
+              <div class="tcp-arrow-line" style="background:linear-gradient(270deg,#0f8b8d,#00f0ff);"></div>
+              <div class="tcp-arrow-label">SYN=1 ACK=1, seq=y ack=x+1</div>
+            </div>
+            <div class="tcp-arrow-row tcp-s3">
+              <div class="tcp-arrow-label">ACK=1, ack=y+1</div>
+              <div class="tcp-arrow-line" style="background:linear-gradient(90deg,#0f8b8d,#00ff88);"></div>
+            </div>
+            <div style="text-align:center;margin-top:6px;animation:tcp-slide .5s ease 1.8s both;">
+              <span style="background:#00ff88;color:#172026;font-weight:800;padding:4px 16px;border-radius:12px;">✅ ESTABLISHED</span>
+            </div>
+          </div>
+          <div class="tcp-side">
+            <div class="tcp-box tcp-glow">🗄️ 服务端</div>
+          </div>
+        </div>
+        <div style="text-align:center;color:#596772;font-size:.88rem;margin-top:.4rem;">逐帧动画：SYN → SYN-ACK → ACK，三次交互确认双向通信能力</div>
+        ''',
+        unsafe_allow_html=True,
+    )
 
 
 def wave_diagram() -> None:
@@ -107,6 +146,7 @@ def protocol_interaction() -> None:
 
 
 def main() -> None:
+    render_visual_system("dark")
     st.markdown(css(), unsafe_allow_html=True)
     st.markdown(
         """

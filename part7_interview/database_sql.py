@@ -15,6 +15,8 @@ from typing import TypeVar
 import pandas as pd
 import streamlit as st
 
+from components.visual_system import render_visual_system
+
 
 T = TypeVar("T")
 
@@ -76,6 +78,7 @@ def estimate_cost(sql: str, use_index: bool) -> pd.DataFrame:
 
 
 def main() -> None:
+    render_visual_system("dark")
     st.markdown(css(), unsafe_allow_html=True)
     st.markdown(
         """
