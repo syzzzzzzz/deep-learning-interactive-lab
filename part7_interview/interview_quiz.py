@@ -487,6 +487,107 @@ def render_question_bank_overview() -> None:
     st.markdown("---")
 
 
+def render_radar_chart() -> None:
+    """CS八股训练营雷达图：展示五维能力得分。"""
+    st.subheader("🎯 CS八股训练营 · 能力雷达图")
+    st.caption("根据答题记录自动计算各方向得分，覆盖深度学习面试五大核心方向。")
+
+    radar_dims = ["计算机网络", "数据库", "数据结构", "操作系统", "深度学习"]
+    direction_map = {
+        "计算机网络": "网络",
+        "数据库": "数据库",
+        "数据结构": "算法",
+        "操作系统": "操作系统",
+        "深度学习": "深度学习",
+    }
+
+    results = st.session_state.get("interview_results", [])
+    scores: list[float] = []
+    detail_parts: list[str] = []
+
+    if results:
+        df = pd.DataFrame(results)
+        for dim_label, dim_dir in direction_map.items():
+            subset = df[df["direction"] == dim_dir]
+            if len(subset) > 0:
+                acc = subset["correct"].sum() / len(subset) * 100
+                count = len(subset)
+                scores.append(round(acc, 1))
+                detail_parts.append(f"{dim_label}: {acc:.0f}%（{count}题）")
+            else:
+                scores.append(0.0)
+                detail_parts.append(f"{dim_label}: 暂无数据")
+    else:
+        # 默认示例分，便于首次进入看到完整雷达图轮廓
+        scores = [60.0, 50.0, 55.0, 45.0, 65.0]
+        detail_parts = [f"{d}: 示例分" for d in radar_dims]
+
+    # 闭合雷达图
+    theta = radar_dims + [radar_dims[0]]
+    r_vals = scores + [scores[0]]
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatterpolar(
+            r=r_vals,
+            theta=theta,
+            fill="toself",
+            fillcolor="rgba(15,139,141,.18)",
+            line=dict(color="#0f8b8d", width=2.5),
+            marker=dict(size=8, color="#0f8b8d"),
+            name="当前得分",
+        )
+    )
+    # 目标线
+    fig.add_trace(
+        go.Scatterpolar(
+            r=[80] * (len(radar_dims) + 1),
+            theta=theta,
+            line=dict(color="#c4871f", width=1.5, dash="dash"),
+            marker=dict(size=0),
+            name="目标线 (80分)",
+        )
+    )
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(visible=True, range=[0, 100], tickvals=[20, 40, 60, 80, 100], tickfont=dict(size=10)),
+            angularaxis=dict(tickfont=dict(size=13, color="#172026")),
+            bgcolor="rgba(0,0,0,0)",
+        ),
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5),
+        height=420,
+        margin=dict(l=60, r=60, t=30, b=60),
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+    # 分数详情
+    cols = st.columns(len(radar_dims))
+    for i, (dim, sc) in enumerate(zip(radar_dims, scores)):
+        with cols[i]:
+            color = "#0f8b8d" if sc >= 80 else "#c4871f" if sc >= 50 else "#bf3f5b"
+            st.markdown(
+                f'<div style="text-align:center;padding:.5rem;border-radius:8px;background:rgba(255,255,255,.7);">'
+                f'<div style="font-size:.82rem;color:#596772;">{dim}</div>'
+                f'<div style="font-size:1.5rem;font-weight:800;color:{color};">{sc:.0f}</div>'
+                f'<div style="font-size:.72rem;color:#999;">/ 100</div></div>',
+                unsafe_allow_html=True,
+            )
+
+    # 薄弱方向提示
+    if results:
+        dim_scores = dict(zip(radar_dims, scores))
+        answered_dims = {k: v for k, v in dim_scores.items() if v > 0}
+        if answered_dims:
+            weakest = min(answered_dims, key=answered_dims.get)  # type: ignore[arg-type]
+            st.warning(f"🔍 薄弱方向：**{weakest}** 得分 {answered_dims[weakest]:.0f}，建议优先强化该方向的高频题和进阶题。")
+    else:
+        st.info("💡 开始答题后，雷达图会根据你的答题表现实时更新各方向得分。")
+
+    st.markdown("---")
+
+
 def render_practice_analysis() -> None:
     st.subheader("本轮练题统计分析")
     results = st.session_state.get("interview_results", [])
@@ -703,6 +804,7 @@ def main() -> None:
 
     render_simulation_panel()
     render_question_bank_overview()
+    render_radar_chart()
 
     left, right = st.columns([0.3, 0.7])
     with left:
