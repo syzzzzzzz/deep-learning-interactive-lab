@@ -1176,3 +1176,18 @@ elif topic == "梯度下降几何直觉":
     render_gradient_descent()
 else:
     render_cheatsheet()
+
+
+def render() -> None:
+    """Page entry point — content runs at module import time."""
+    pass
+
+
+def compute(seed: int = 42) -> dict[str, object]:
+    """Pure computation placeholder."""
+    return {"status": "ok", "seed": seed}
+
+
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+    return True

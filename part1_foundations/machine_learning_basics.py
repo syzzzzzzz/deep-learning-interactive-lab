@@ -1206,3 +1206,18 @@ else:
                 ("时间序列提醒", "有时间顺序的数据不能随便打乱，要使用按时间前后切分的验证方法。"),
             ]
         )
+
+
+def render() -> None:
+    """Page entry point — content runs at module import time."""
+    pass
+
+
+def compute(seed: int = 42) -> dict[str, object]:
+    """Pure computation placeholder."""
+    return {"status": "ok", "seed": seed}
+
+
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+    return True

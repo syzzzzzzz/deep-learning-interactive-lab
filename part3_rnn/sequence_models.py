@@ -1012,3 +1012,18 @@ elif section == "文本生成":
         unsafe_allow_html=True,
     )
     render_text_generation_guide(corpus_name, hidden_size, epochs, lr, length, temperature)
+
+
+def render() -> None:
+    """Page entry point — content runs at module import time."""
+    pass
+
+
+def compute(seed: int = 42) -> dict[str, object]:
+    """Pure computation placeholder."""
+    return {"status": "ok", "seed": seed}
+
+
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+    return True

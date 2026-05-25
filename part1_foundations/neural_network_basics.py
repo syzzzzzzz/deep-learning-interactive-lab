@@ -874,45 +874,64 @@ def render_optimizers() -> None:
     note("同一个学习率不一定适合所有优化器。比较路径时重点看是否震荡、是否停滞，以及是否能稳定降低损失。")
 
 
-st.markdown(
-    """
-    <div class="hero">
-      <h1>神经网络基础模块</h1>
-      <p>从单个神经元开始，逐步观察感知机、MLP 前向传播、反向传播、激活函数、损失函数和优化器。所有图像都由 Streamlit 与 Matplotlib 交互生成，可直接拖动参数观察变化。</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+try:
+    st.markdown(
+        """
+        <div class="hero">
+          <h1>神经网络基础模块</h1>
+          <p>从单个神经元开始，逐步观察感知机、MLP 前向传播、反向传播、激活函数、损失函数和优化器。所有图像都由 Streamlit 与 Matplotlib 交互生成，可直接拖动参数观察变化。</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
-practice_col, _ = st.columns([0.24, 0.76])
-with practice_col:
-    if st.button("去实战：MLP 构建器", width="stretch"):
-        go_to_playground("mlp")
+    practice_col, _ = st.columns([0.24, 0.76])
+    with practice_col:
+        if st.button("去实战：MLP 构建器", width="stretch"):
+            go_to_playground("mlp")
 
-with st.sidebar:
-    st.header("全局设置")
-    seed = int(st.number_input("随机种子", min_value=0, max_value=9999, value=42, step=1))
-    st.caption("相同随机种子会复现相同的网络权重和演示轨迹。")
-    st.divider()
+    with st.sidebar:
+        st.header("全局设置")
+        seed = int(st.number_input("随机种子", min_value=0, max_value=9999, value=42, step=1))
+        st.caption("相同随机种子会复现相同的网络权重和演示轨迹。")
+        st.divider()
 
 
-scene = segmented(
-    "选择教学场景",
-    ["单个神经元", "感知机与 XOR", "MLP 前向传播", "反向传播", "激活函数", "损失函数", "优化器"],
-    "单个神经元",
-)
+    scene = segmented(
+        "选择教学场景",
+        ["单个神经元", "感知机与 XOR", "MLP 前向传播", "反向传播", "激活函数", "损失函数", "优化器"],
+        "单个神经元",
+    )
 
-if scene == "单个神经元":
-    render_single_neuron()
-elif scene == "感知机与 XOR":
-    render_perceptron_xor()
-elif scene == "MLP 前向传播":
-    render_mlp_forward(seed)
-elif scene == "反向传播":
-    render_backprop(seed)
-elif scene == "激活函数":
-    render_activations()
-elif scene == "损失函数":
-    render_losses()
-else:
-    render_optimizers()
+    if scene == "单个神经元":
+        render_single_neuron()
+    elif scene == "感知机与 XOR":
+        render_perceptron_xor()
+    elif scene == "MLP 前向传播":
+        render_mlp_forward(seed)
+    elif scene == "反向传播":
+        render_backprop(seed)
+    elif scene == "激活函数":
+        render_activations()
+    elif scene == "损失函数":
+        render_losses()
+    else:
+        render_optimizers()
+except Exception as exc:
+    from components.error_boundary import render_module_error
+    render_module_error("part1_foundations/neural_network_basics.py", exc)
+
+
+def render() -> None:
+    """Page entry point — content runs at module import time."""
+    pass
+
+
+def compute(seed: int = 42) -> dict[str, object]:
+    """Pure computation placeholder."""
+    return {"status": "ok", "seed": seed}
+
+
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+    return True

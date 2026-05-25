@@ -494,25 +494,29 @@ def render_vae_tab() -> None:
 
 
 def main() -> None:
-    render_hero()
-    render_concept_cards()
+    try:
+        render_hero()
+        render_concept_cards()
 
-    st.sidebar.header("交互参数")
-    total_frames = st.sidebar.slider("GAN 动画帧数", 24, 80, 48, 4)
-    max_epoch = st.sidebar.slider("生成图像最大 epoch", 20, 120, 60, 5)
-    difficulty = st.sidebar.slider("判别器敏感度", 0.4, 2.4, 1.2, 0.1)
-    delay = st.sidebar.slider("动画间隔秒", 0.02, 0.25, 0.06, 0.01)
-    seed = st.sidebar.slider("随机种子", 0, 99, 7)
+        st.sidebar.header("交互参数")
+        total_frames = st.sidebar.slider("GAN 动画帧数", 24, 80, 48, 4)
+        max_epoch = st.sidebar.slider("生成图像最大 epoch", 20, 120, 60, 5)
+        difficulty = st.sidebar.slider("判别器敏感度", 0.4, 2.4, 1.2, 0.1)
+        delay = st.sidebar.slider("动画间隔秒", 0.02, 0.25, 0.06, 0.01)
+        seed = st.sidebar.slider("随机种子", 0, 99, 7)
 
-    tabs = st.tabs(["GAN 博弈", "生成演变", "自编码器", "VAE"])
-    with tabs[0]:
-        render_gan_tab(total_frames, difficulty, delay)
-    with tabs[1]:
-        render_generation_tab(max_epoch, delay)
-    with tabs[2]:
-        render_autoencoder_tab(seed)
-    with tabs[3]:
-        render_vae_tab()
+        tabs = st.tabs(["GAN 博弈", "生成演变", "自编码器", "VAE"])
+        with tabs[0]:
+            render_gan_tab(total_frames, difficulty, delay)
+        with tabs[1]:
+            render_generation_tab(max_epoch, delay)
+        with tabs[2]:
+            render_autoencoder_tab(seed)
+        with tabs[3]:
+            render_vae_tab()
+    except Exception as exc:
+        from components.error_boundary import render_module_error
+        render_module_error("part4_transformer/gan_ae.py", exc)
 
 
 if __name__ == "__main__":

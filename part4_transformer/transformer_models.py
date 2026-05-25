@@ -1065,40 +1065,44 @@ def render_bert_gpt() -> None:
 
 
 def main() -> None:
-    render_hero()
-    render_concept_cards()
+    try:
+        render_hero()
+        render_concept_cards()
 
-    st.sidebar.header("交互参数")
-    text = st.sidebar.text_area(
-        "输入文本",
-        value="The cat sat on the mat because it was tired",
-        height=92,
-        help="支持英文按词切分，中文会按字和标点切分。",
-    )
-    seed = st.sidebar.slider("随机种子", 0, 99, 7)
-    d_model = st.sidebar.select_slider("注意力演示维度", options=[8, 16, 32, 64], value=16)
-    num_layers = st.sidebar.slider("架构图层数标注", 1, 12, 6)
-    head_sharpness = st.sidebar.slider("多头注意力锐度", 0.5, 3.0, 1.4, 0.1)
+        st.sidebar.header("交互参数")
+        text = st.sidebar.text_area(
+            "输入文本",
+            value="The cat sat on the mat because it was tired",
+            height=92,
+            help="支持英文按词切分，中文会按字和标点切分。",
+        )
+        seed = st.sidebar.slider("随机种子", 0, 99, 7)
+        d_model = st.sidebar.select_slider("注意力演示维度", options=[8, 16, 32, 64], value=16)
+        num_layers = st.sidebar.slider("架构图层数标注", 1, 12, 6)
+        head_sharpness = st.sidebar.slider("多头注意力锐度", 0.5, 3.0, 1.4, 0.1)
 
-    tab_names = ["总览", "自注意力", "多头", "位置编码", "残差归一化", "文本热力图", "BERT vs GPT"]
-    tabs = st.tabs(tab_names)
+        tab_names = ["总览", "自注意力", "多头", "位置编码", "残差归一化", "文本热力图", "BERT vs GPT"]
+        tabs = st.tabs(tab_names)
 
-    with tabs[0]:
-        render_overview(num_layers)
-    with tabs[1]:
-        pack = render_self_attention(text, d_model, seed)
-    with tabs[2]:
-        pack = compute_attention(tokenize(text), d_model=d_model, seed=seed)
-        render_multihead(pack, head_sharpness)
-    with tabs[3]:
-        render_positional()
-    with tabs[4]:
-        render_residual_norm(seed)
-    with tabs[5]:
-        pack = compute_attention(tokenize(text), d_model=d_model, seed=seed)
-        render_text_heatmap(pack)
-    with tabs[6]:
-        render_bert_gpt()
+        with tabs[0]:
+            render_overview(num_layers)
+        with tabs[1]:
+            pack = render_self_attention(text, d_model, seed)
+        with tabs[2]:
+            pack = compute_attention(tokenize(text), d_model=d_model, seed=seed)
+            render_multihead(pack, head_sharpness)
+        with tabs[3]:
+            render_positional()
+        with tabs[4]:
+            render_residual_norm(seed)
+        with tabs[5]:
+            pack = compute_attention(tokenize(text), d_model=d_model, seed=seed)
+            render_text_heatmap(pack)
+        with tabs[6]:
+            render_bert_gpt()
+    except Exception as exc:
+        from components.error_boundary import render_module_error
+        render_module_error("part4_transformer/transformer_models.py", exc)
 
 
 if __name__ == "__main__":

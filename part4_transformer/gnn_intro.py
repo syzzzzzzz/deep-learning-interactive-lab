@@ -600,22 +600,26 @@ def render_classification_tab(kind: str) -> None:
 
 
 def main() -> None:
-    render_hero()
-    render_concept_cards()
+    try:
+        render_hero()
+        render_concept_cards()
 
-    st.sidebar.header("交互参数")
-    kind = st.sidebar.selectbox("图类型", ["社交网络", "论文引用", "知识图谱"])
-    seed = st.sidebar.slider("随机种子", 0, 99, 13)
+        st.sidebar.header("交互参数")
+        kind = st.sidebar.selectbox("图类型", ["社交网络", "论文引用", "知识图谱"])
+        seed = st.sidebar.slider("随机种子", 0, 99, 13)
 
-    tabs = st.tabs(["图表示", "GCN", "GAT", "节点分类"])
-    with tabs[0]:
-        render_representation_tab(kind)
-    with tabs[1]:
-        render_gcn_tab(kind, seed)
-    with tabs[2]:
-        render_gat_tab(kind, seed)
-    with tabs[3]:
-        render_classification_tab(kind)
+        tabs = st.tabs(["图表示", "GCN", "GAT", "节点分类"])
+        with tabs[0]:
+            render_representation_tab(kind)
+        with tabs[1]:
+            render_gcn_tab(kind, seed)
+        with tabs[2]:
+            render_gat_tab(kind, seed)
+        with tabs[3]:
+            render_classification_tab(kind)
+    except Exception as exc:
+        from components.error_boundary import render_module_error
+        render_module_error("part4_transformer/gnn_intro.py", exc)
 
 
 if __name__ == "__main__":
