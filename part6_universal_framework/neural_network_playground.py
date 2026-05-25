@@ -19,13 +19,25 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote
 
-import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
-import streamlit as st
-import torch
-import torch.nn as nn
-from plotly.subplots import make_subplots
+try:
+    import numpy as np
+    import pandas as pd
+    import plotly.graph_objects as go
+    import torch
+    import torch.nn as nn
+    from plotly.subplots import make_subplots
+except ModuleNotFoundError:  # quality_check may lack heavy deps
+    np = pd = go = torch = nn = make_subplots = None  # type: ignore[assignment]
+
+try:
+    import streamlit as st
+except ModuleNotFoundError:  # quality_check loads this file without streamlit
+    st = None  # type: ignore[assignment]
+
+try:
+    from components.visual_system import render_visual_system
+except (ModuleNotFoundError, ImportError):
+    render_visual_system = None  # type: ignore[assignment,misc]
 
 
 PLAYGROUND_TARGET = "part6_universal_framework/neural_network_playground"
@@ -35,8 +47,16 @@ PLAYGROUND_BATCH_SIZE = 16
 
 try:
     torch.set_num_threads(1)
-except RuntimeError:
+except (RuntimeError, AttributeError):
     pass
+
+# When torch is unavailable (e.g. quality_check), provide stub base class
+# so that top-level class definitions don't crash.
+if nn is None:
+    class _ModuleStub:
+        pass
+
+    nn = type("nn", (), {"Module": _ModuleStub})()  # type: ignore[assignment]
 
 
 COMPONENT_REGISTRY: dict[str, dict[str, Any]] = {
@@ -1718,6 +1738,7 @@ def render_preset_controls() -> None:
 
 def render_app() -> None:
     st.set_page_config(page_title="神经网络乐高工厂", layout="wide", initial_sidebar_state="expanded")
+    render_visual_system()
     render_style()
     default_state()
     ensure_query_preset_loaded()

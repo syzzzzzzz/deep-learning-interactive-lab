@@ -840,6 +840,172 @@ def render_training_dynamics_panel() -> None:
 
 
 # ──────────────────────────────────────────────
+# 训练曲线实时扫描光标动效
+# ──────────────────────────────────────────────
+
+
+def render_training_curve_scanner() -> None:
+    """训练曲线实时扫描光标动效：一条 loss 下降曲线，发光竖线光标从左到右扫描。
+
+    CSS 动画驱动，光标经过时显示当前 epoch 的 loss 值，风格与 render_gradient_descent_landscape() 统一。
+    """
+    st = _st()
+    import math
+
+    # 模拟 50 个 epoch 的 loss 曲线
+    n_epochs = 50
+    loss_points = []
+    for e in range(n_epochs):
+        loss = 2.3 * math.exp(-0.06 * (e + 1)) + 0.18 + 0.05 * math.sin(e * 0.8)
+        loss_points.append(loss)
+
+    # 生成 SVG 折线路径点
+    svg_w, svg_h = 900, 240
+    pad_l, pad_r, pad_t, pad_b = 40, 20, 25, 35
+    plot_w = svg_w - pad_l - pad_r
+    plot_h = svg_h - pad_t - pad_b
+
+    min_loss = min(loss_points) * 0.92
+    max_loss = max(loss_points) * 1.06
+    range_loss = max_loss - min_loss or 1
+
+    points = []
+    for i, loss in enumerate(loss_points):
+        x = pad_l + (i / (n_epochs - 1)) * plot_w
+        y = pad_t + (1 - (loss - min_loss) / range_loss) * plot_h
+        points.append((x, y))
+
+    polyline = " ".join(f"{x:.1f},{y:.1f}" for x, y in points)
+
+    # 渐变填充区域
+    fill_path = (
+        f"M{points[0][0]:.1f},{pad_t + plot_h} "
+        + " ".join(f"L{x:.1f},{y:.1f}" for x, y in points)
+        + f" L{points[-1][0]:.1f},{pad_t + plot_h} Z"
+    )
+
+    # Y 轴刻度
+    y_ticks_html = ""
+    for i in range(5):
+        val = min_loss + (range_loss * i / 4)
+        yy = pad_t + (1 - i / 4) * plot_h
+        y_ticks_html += (
+            f'<text x="{pad_l - 6}" y="{yy + 4:.1f}" '
+            f'text-anchor="end" fill="rgba(157,178,199,.6)" font-size="10" '
+            f'font-family="JetBrains Mono">{val:.2f}</text>'
+            f'<line x1="{pad_l}" y1="{yy:.1f}" x2="{svg_w - pad_r}" y2="{yy:.1f}" '
+            f'stroke="rgba(0,240,255,.07)" stroke-width="1"/>'
+        )
+
+    # X 轴刻度
+    x_ticks_html = ""
+    for i in range(0, n_epochs, 10):
+        x = pad_l + (i / (n_epochs - 1)) * plot_w
+        x_ticks_html += (
+            f'<text x="{x:.1f}" y="{svg_h - 6}" text-anchor="middle" '
+            f'fill="rgba(157,178,199,.6)" font-size="10" '
+            f'font-family="JetBrains Mono">{i + 1}</text>'
+        )
+
+    # 光标扫过的 epoch 值标注（关键点）
+    key_epochs = [0, 9, 19, 29, 39, 49]
+    labels_html = ""
+    for idx in key_epochs:
+        x, y = points[idx]
+        loss = loss_points[idx]
+        delay = round(3.5 * (idx / (n_epochs - 1)), 2)
+        labels_html += (
+            f'<g class="vs-scan-label" style="animation-delay:{delay}s">'
+            f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3.5" fill="{NEON_GREEN}" opacity="0"/>'
+            f'<rect x="{x - 28:.1f}" y="{y - 28:.1f}" width="56" height="20" rx="5" '
+            f'fill="rgba(0,255,136,.15)" stroke="{NEON_GREEN}" stroke-width="0.8" opacity="0"/>'
+            f'<text x="{x:.1f}" y="{y - 14:.1f}" text-anchor="middle" '
+            f'fill="{NEON_GREEN}" font-size="10" font-weight="700" '
+            f'font-family="JetBrains Mono" opacity="0">{loss:.3f}</text>'
+            f'</g>'
+        )
+
+    st.markdown(
+        f"""
+        <div class="vs-card vs-curve-scanner" title="训练曲线扫描：光标从左到右逐 epoch 扫描 loss 下降过程。">
+          <div class="vs-panel-title"><i class="fa-solid fa-wave-square"></i> 训练曲线实时扫描</div>
+          <div class="vs-scanner-wrap">
+            <svg viewBox="0 0 {svg_w} {svg_h}" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="vs-scan-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="{NEON_PURPLE}" stop-opacity="0.25"/>
+                  <stop offset="100%" stop-color="{NEON_PURPLE}" stop-opacity="0.02"/>
+                </linearGradient>
+                <linearGradient id="vs-scan-line" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="{NEON_PURPLE}" stop-opacity="0.6"/>
+                  <stop offset="50%" stop-color="{NEON_BLUE}" stop-opacity="1"/>
+                  <stop offset="100%" stop-color="{NEON_GREEN}" stop-opacity="0.8"/>
+                </linearGradient>
+                <filter id="vs-glow">
+                  <feGaussianBlur stdDeviation="3" result="blur"/>
+                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+                <filter id="vs-glow-strong">
+                  <feGaussianBlur stdDeviation="6" result="blur"/>
+                  <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              {y_ticks_html}
+              {x_ticks_html}
+              <!-- 填充区域 -->
+              <path d="{fill_path}" fill="url(#vs-scan-fill)"/>
+              <!-- 曲线 -->
+              <polyline points="{polyline}" fill="none" stroke="url(#vs-scan-line)"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#vs-glow)"/>
+              <!-- 关键点标注 -->
+              {labels_html}
+              <!-- 扫描光标（竖线 + 光晕） -->
+              <g class="vs-scan-cursor">
+                <rect x="-1.5" y="{pad_t}" width="3" height="{plot_h}" rx="1.5"
+                  fill="{NEON_BLUE}" filter="url(#vs-glow-strong)"/>
+                <ellipse cx="0" cy="{pad_t + plot_h / 2:.1f}" rx="18" ry="{plot_h / 2:.1f}"
+                  fill="{NEON_BLUE}" opacity="0.08"/>
+              </g>
+              <!-- 坐标轴标签 -->
+              <text x="{svg_w / 2:.1f}" y="{svg_h - 0}" text-anchor="middle"
+                fill="rgba(157,178,199,.55)" font-size="11" font-family="Inter">Epoch</text>
+              <text x="10" y="{svg_h / 2:.1f}" text-anchor="middle"
+                fill="rgba(157,178,199,.55)" font-size="11" font-family="Inter"
+                transform="rotate(-90, 10, {svg_h / 2:.1f})">Loss</text>
+            </svg>
+          </div>
+          <p>光标从 Epoch 1 扫描到 Epoch 50，直观展示 loss 随训练逐步收敛的过程。早期下降剧烈，后期趋于平稳——这是典型的指数衰减学习曲线。</p>
+        </div>
+        <style>
+        .vs-curve-scanner{{padding:1rem;overflow:hidden}}
+        .vs-scanner-wrap{{position:relative;border-radius:8px;overflow:hidden;
+          border:1px solid rgba(0,240,255,.22);background:rgba(0,0,0,.22)}}
+        .vs-scanner-wrap svg{{display:block;width:100%;height:auto}}
+        /* 扫描光标动画：从左到右 */
+        .vs-scan-cursor{{
+          animation:vs-scan-sweep 3.5s ease-in-out infinite;
+        }}
+        @keyframes vs-scan-sweep{{
+          0%{{transform:translateX({pad_l}px);opacity:.3}}
+          5%{{opacity:1}}
+          95%{{opacity:1}}
+          100%{{transform:translateX({pad_l + plot_w}px);opacity:.3}}
+        }}
+        /* 关键点标注：光标到达时弹出 */
+        .vs-scan-label{{opacity:0;animation:vs-label-pop 3.5s ease-in-out infinite}}
+        @keyframes vs-label-pop{{
+          0%,8%{{opacity:0;transform:scale(.85)}}
+          12%,88%{{opacity:1;transform:scale(1)}}
+          92%,100%{{opacity:0;transform:scale(.85)}}
+        }}
+        .vs-curve-scanner p{{color:var(--vs-muted);line-height:1.62;margin:.7rem 0 0}}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ──────────────────────────────────────────────
 # 高级卷积对比动效
 # ──────────────────────────────────────────────
 

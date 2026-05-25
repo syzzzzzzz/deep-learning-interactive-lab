@@ -12,10 +12,13 @@ try:
     from collections import defaultdict
     from typing import Dict, List, Optional
     import streamlit as st
-    from components.visual_system import render_training_dynamics_panel
+    from components.visual_system import render_training_dynamics_panel, render_training_curve_scanner
 
     # ── 视觉系统：训练动态监控面板 ──
     render_training_dynamics_panel()
+
+    # ── 视觉系统：训练曲线实时扫描光标 ──
+    render_training_curve_scanner()
 
     # ─────────────────────────────────────────────────────────
     # 分布追踪器：记录权重/激活的统计量随训练的变化
