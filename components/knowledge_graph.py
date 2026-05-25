@@ -100,6 +100,8 @@ MODULE_SEEDS: tuple[ModuleSeed, ...] = (
     ModuleSeed("part7/database_sql", "part7/database_sql", "数据库 SQL", "SELECT 执行流程、B+ 树索引、慢查询排查、高频面试题与交互练习。", "核心", ("数据库", "SQL", "索引", "面试")),
     ModuleSeed("part7/data_structures", "part7/data_structures", "数据结构与算法", "数组链表可视化、排序算法动画、BFS/DFS、高频面试题。", "核心", ("数据结构", "算法", "排序", "面试")),
     ModuleSeed("part7/operating_system", "part7/operating_system", "操作系统", "进程线程、调度算法、虚拟内存、死锁、高频面试题。", "核心", ("操作系统", "进程", "内存", "面试")),
+    ModuleSeed("part7/system_design", "part7/system_design", "系统设计", "CAP 定理、缓存三兄弟、消息队列、推荐架构、分布式训练和推理平台设计。", "核心", ("系统设计", "架构", "分布式", "面试")),
+    ModuleSeed("part7/deep_learning_interview", "part7/deep_learning_interview", "深度学习面试", "梯度消失、归一化、注意力复杂度、训练排查、LoRA 微调和模型部署。", "核心", ("深度学习", "梯度", "归一化", "面试")),
     ModuleSeed("part7/interview_quiz", "part7/interview_quiz", "面试刷题模式", "随机出题、按方向难度筛选、错题本、面试官追问。", "核心", ("刷题", "面试", "错题本")),
 )
 
@@ -129,6 +131,8 @@ ALIASES: dict[str, str] = {
     "neural_network_playground": "part6/neural_network_playground",
     "training_demo": "part6/training_demo",
     "learning_path": "part6/learning_path",
+    "system_design": "part7/system_design",
+    "deep_learning_interview": "part7/deep_learning_interview",
 }
 
 
@@ -197,7 +201,9 @@ PREREQUISITES: dict[str, list[str]] = {
     "part7/database_sql": ["part6/learning_path"],
     "part7/data_structures": ["part1/math_primer"],
     "part7/operating_system": ["part7/data_structures"],
-    "part7/interview_quiz": ["part7/networking", "part7/database_sql", "part7/data_structures", "part7/operating_system"],
+    "part7/system_design": ["part7/networking", "part7/database_sql", "part7/operating_system"],
+    "part7/deep_learning_interview": ["part1/neural_network_basics", "part5/02_gradient_monitor", "part6/training_demo"],
+    "part7/interview_quiz": ["part7/networking", "part7/database_sql", "part7/data_structures", "part7/operating_system", "part7/system_design", "part7/deep_learning_interview"],
 }
 
 
@@ -266,6 +272,8 @@ THEORY_TO_PRACTICE: dict[str, str] = {
     "part7/database_sql": "part7/interview_quiz",
     "part7/data_structures": "part7/interview_quiz",
     "part7/operating_system": "part7/interview_quiz",
+    "part7/system_design": "part7/interview_quiz",
+    "part7/deep_learning_interview": "part7/interview_quiz",
     "part7/interview_quiz": "part7/interview_quiz",
 }
 
@@ -278,6 +286,8 @@ NEXT_STEPS: dict[str, list[str]] = {
     "part4/transformer_models": ["part4/05_flash_attention", "part4/06_debug_problems", "part6/neural_network_playground"],
     "part5/03_training_dynamics": ["part5/02_gradient_monitor", "part5/04_hyperparam_search", "part6/training_demo"],
     "part6/neural_network_playground": ["part6/training_demo", "part6/03_full_project", "part5/tuning_challenge"],
+    "part7/system_design": ["part7/interview_quiz", "part6/neural_network_playground"],
+    "part7/deep_learning_interview": ["part7/interview_quiz", "part4/transformer_models"],
     "part7/interview_quiz": ["part6/learning_path", "part5/quiz_system"],
 }
 
