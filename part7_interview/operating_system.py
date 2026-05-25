@@ -47,6 +47,23 @@ def css() -> str:
     .diagram { background: #172026; color: #f7fbfc; border-radius: 8px; padding: .82rem 1rem; font-family: Consolas, "Courier New", monospace; line-height: 1.72; white-space: pre-wrap; }
     .pill { display: inline-block; border: 1px solid #d8dee3; background: rgba(255,255,255,.84); border-radius: 8px; padding: .62rem .75rem; margin: .22rem; min-width: 9rem; }
     .stButton > button { border-radius: 8px; font-weight: 700; }
+
+    /* ── 调度时间片动效 ── */
+    .rr-wrapper { position: relative; width: 100%; padding: .6rem 0 1.8rem; }
+    .rr-ring { position: relative; width: 220px; height: 220px; margin: 0 auto 1rem; }
+    .rr-ring svg { width: 100%; height: 100%; }
+    .rr-node { position: absolute; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .92rem; color: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.18); transition: transform .28s, box-shadow .28s; }
+    .rr-node.active { transform: scale(1.28); box-shadow: 0 0 0 4px rgba(15,139,141,.45), 0 4px 16px rgba(0,0,0,.22); }
+    .rr-pointer { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #0f8b8d; box-shadow: 0 0 8px #0f8b8d; animation: rr-spin 6s linear infinite; }
+    @keyframes rr-spin { from { transform: rotate(0deg) translateX(100px) rotate(0deg); } to { transform: rotate(360deg) translateX(100px) rotate(-360deg); } }
+    .rr-timeline { display: flex; gap: 2px; align-items: end; min-height: 80px; padding: .4rem 0; overflow-x: auto; }
+    .rr-slice { border-radius: 4px 4px 0 0; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; font-size: .72rem; font-weight: 700; color: #fff; min-width: 36px; animation: rr-grow .5s ease-out both; }
+    @keyframes rr-grow { from { height: 0 !important; opacity: 0; } to { opacity: 1; } }
+    .rr-label-row { display: flex; gap: 2px; min-height: 20px; }
+    .rr-label-cell { min-width: 36px; text-align: center; font-size: .68rem; color: #596772; }
+    .rr-legend { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: .5rem; }
+    .rr-legend-item { display: flex; align-items: center; gap: 4px; font-size: .82rem; }
+    .rr-legend-dot { width: 12px; height: 12px; border-radius: 3px; }
     </style>
     """
 
@@ -142,6 +159,60 @@ def render_timeline(timeline: list[tuple[str, int, int]]) -> None:
     st.markdown(f'<div class="diagram">{"".join(parts)}|</div>', unsafe_allow_html=True)
 
 
+def _rr_html(timeline: list[tuple[str, int, int]], quantum: int) -> str:
+    """生成调度时间片轮转动效 HTML：环形队列 + 时间轴甘特图。"""
+    import math
+
+    colors = {"P1": "#0f8b8d", "P2": "#3268a8", "P3": "#c4871f", "P4": "#7353ba"}
+    unique_names = list(dict.fromkeys(name for name, _, _ in timeline))
+    total_end = max(end for _, _, end in timeline)
+
+    # ── 环形节点定位 ──
+    cx, cy, radius = 110, 110, 90
+    node_html_parts: list[str] = []
+    for i, name in enumerate(unique_names):
+        angle = 2 * math.pi * i / len(unique_names) - math.pi / 2
+        nx = cx + radius * math.cos(angle) - 28
+        ny = cy + radius * math.sin(angle) - 28
+        bg = colors.get(name, "#596772")
+        node_html_parts.append(
+            f'<div class="rr-node" style="left:{nx:.0f}px;top:{ny:.0f}px;background:{bg};" id="rr-node-{name}">{name}</div>'
+        )
+
+    # ── 时间轴甘特条 ──
+    bar_unit = max(32, min(48, 600 // max(total_end, 1)))
+    slice_parts: list[str] = []
+    label_parts: list[str] = []
+    for idx, (name, start, end) in enumerate(timeline):
+        w = (end - start) * bar_unit
+        bg = colors.get(name, "#596772")
+        delay = idx * 0.35
+        slice_parts.append(
+            f'<div class="rr-slice" style="width:{w}px;height:{w + 16}px;background:{bg};animation-delay:{delay:.2f}s;">{name}</div>'
+        )
+        label_parts.append(f'<div class="rr-label-cell" style="width:{w}px;">{start}-{end}</div>')
+
+    legend_items = "".join(
+        f'<span class="rr-legend-item"><span class="rr-legend-dot" style="background:{colors.get(n, "#596772")};"></span>{n}</span>'
+        for n in unique_names
+    )
+
+    return f"""
+    <div class="rr-wrapper">
+      <div class="rr-ring">
+        {''.join(node_html_parts)}
+        <div class="rr-pointer" style="left:106px;top:106px;"></div>
+      </div>
+      <div style="text-align:center;margin-bottom:.4rem;font-size:.88rem;color:#596772;">
+        ⏱ Round Robin · 时间片 = {quantum} · 共 {len(timeline)} 个调度切片
+      </div>
+      <div class="rr-timeline">{''.join(slice_parts)}</div>
+      <div class="rr-label-row">{''.join(label_parts)}</div>
+      <div class="rr-legend">{legend_items}</div>
+    </div>
+    """
+
+
 def main() -> None:
     render_visual_system("dark")
     st.markdown(css(), unsafe_allow_html=True)
@@ -183,6 +254,7 @@ def main() -> None:
         timeline = rr(JOBS, quantum)
     with right:
         render_timeline(timeline)
+        st.markdown(_rr_html(timeline, quantum if algorithm == "Round Robin" else 1), unsafe_allow_html=True)
         df = metrics(timeline, JOBS)
         st.table(df)
         st.metric("平均等待时间", f"{df['等待时间'].mean():.2f}")

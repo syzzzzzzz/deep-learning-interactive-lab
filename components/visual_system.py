@@ -1203,6 +1203,156 @@ def render_transformer_attention_heatmap(
 
 
 # ──────────────────────────────────────────────
+# 中央控制台模型拼装动效
+# ──────────────────────────────────────────────
+
+
+def render_central_console_assembly() -> None:
+    """中央控制台模型拼装动效：展示用户拖拽拼装神经网络的过程。
+
+    用 CSS 动画依次展示 Input → Hidden 1 → Hidden 2 → Output 四个层的拼装过程，
+    每个层用不同颜色方块表示并带发光效果，同时展示数据在网络中流动的粒子动画
+    以及模型配置参数的实时显示。
+    """
+    st = _st()
+
+    layers = [
+        ("输入层", "Input", "784 neurons", NEON_BLUE, "fa-solid fa-arrow-right-to-bracket"),
+        ("隐藏层 1", "Hidden 1", "256 neurons", NEON_PURPLE, "fa-solid fa-layer-group"),
+        ("隐藏层 2", "Hidden 2", "128 neurons", NEON_GREEN, "fa-solid fa-layer-group"),
+        ("输出层", "Output", "10 neurons", "#ffd166", "fa-solid fa-arrow-right-from-bracket"),
+    ]
+
+    layer_blocks = []
+    for idx, (label, short, detail, color, icon) in enumerate(layers):
+        delay = round(idx * 0.6, 2)
+        layer_blocks.append(
+            f"""
+            <div class="vs-asm-layer" style="--asm-color:{color};--asm-delay:{delay}s">
+              <div class="vs-asm-block">
+                <i class="{icon}"></i>
+                <strong>{escape(short)}</strong>
+                <code>{escape(detail)}</code>
+              </div>
+              <span class="vs-asm-label">{escape(label)}</span>
+            </div>
+            """
+        )
+
+    # 连接箭头
+    arrows = "".join(
+        f'<div class="vs-asm-arrow" style="--asa-delay:{round(idx * 0.6 + 0.3, 2)}s">'
+        f'<i class="fa-solid fa-link"></i></div>'
+        for idx in range(len(layers) - 1)
+    )
+
+    # 数据流动粒子
+    flow_particles = "".join(
+        f'<span class="vs-asm-particle" style="--asp-delay:{round(idx * 0.18, 2)}s;'
+        f'--asp-color:{layers[idx % len(layers)][3]}"></span>'
+        for idx in range(20)
+    )
+
+    # 拼装进度指示（模拟拖拽拼装过程）
+    progress_segments = "".join(
+        f'<div class="vs-asm-seg" style="--seg-color:{color};--seg-delay:{round(idx * 0.6 + 0.45, 2)}s"></div>'
+        for idx, (_, _, _, color, _) in enumerate(layers)
+    )
+
+    # 模型配置参数
+    config_params = [
+        ("Loss", "CrossEntropy", NEON_PURPLE),
+        ("Optimizer", "Adam (lr=0.001)", NEON_BLUE),
+        ("Batch Size", "64", NEON_GREEN),
+        ("Epochs", "20", "#ffd166"),
+    ]
+    config_items = "".join(
+        f'<div class="vs-asm-param" style="--param-color:{color}">'
+        f'<span class="vs-asm-param-key">{escape(key)}</span>'
+        f'<span class="vs-asm-param-val">{escape(val)}</span></div>'
+        for key, val, color in config_params
+    )
+
+    st.markdown(
+        f"""
+        <div class="vs-card vs-console-assembly" title="中央控制台：拖拽拼装神经网络，从输入层到输出层逐步组装完成。">
+          <div class="vs-panel-title"><i class="fa-solid fa-gears"></i> 中央控制台 — 模型拼装</div>
+          <div class="vs-asm-progress">{progress_segments}</div>
+          <div class="vs-asm-stage">
+            <div class="vs-asm-layers">{''.join(layer_blocks)}</div>
+            <div class="vs-asm-arrows">{arrows}</div>
+            <div class="vs-asm-flow">{flow_particles}</div>
+          </div>
+          <div class="vs-asm-config">
+            <div class="vs-asm-config-title"><i class="fa-solid fa-sliders"></i> 模型配置</div>
+            <div class="vs-asm-params">{config_items}</div>
+          </div>
+          <p>拖拽各层模块依次拼装：输入层接收数据 → 隐藏层提取特征 → 输出层生成预测。右侧实时显示当前模型配置参数。</p>
+        </div>
+        <style>
+        .vs-console-assembly{{padding:1rem;overflow:hidden}}
+        .vs-asm-progress{{display:flex;gap:4px;margin-bottom:.7rem}}
+        .vs-asm-seg{{flex:1;height:5px;border-radius:3px;background:var(--seg-color);
+            box-shadow:0 0 10px var(--seg-color);opacity:0;
+            animation:vs-asm-seg-in .4s ease forwards;animation-delay:var(--seg-delay)}}
+        @keyframes vs-asm-seg-in{{to{{opacity:1}}}}
+        .vs-asm-stage{{position:relative;min-height:160px;border:1px solid rgba(0,240,255,.22);
+            border-radius:10px;background:rgba(0,0,0,.18);padding:1.2rem .8rem;overflow:hidden}}
+        .vs-asm-layers{{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:2}}
+        .vs-asm-layer{{display:flex;flex-direction:column;align-items:center;gap:.3rem;
+            animation:vs-asm-drop .65s cubic-bezier(.34,1.56,.64,1) both;animation-delay:var(--asm-delay)}}
+        @keyframes vs-asm-drop{{from{{opacity:0;transform:translateY(-30px) scale(.7) rotate(-6deg)}}
+            to{{opacity:1;transform:translateY(0) scale(1) rotate(0deg)}}}}
+        .vs-asm-block{{width:90px;height:80px;border-radius:10px;display:flex;flex-direction:column;
+            align-items:center;justify-content:center;gap:.15rem;
+            border:2px solid var(--asm-color);background:rgba(0,0,0,.35);
+            box-shadow:0 0 22px rgba(0,0,0,.3),0 0 18px color-mix(in srgb,var(--asm-color) 35%,transparent);
+            animation:vs-asm-glow 2.2s ease-in-out infinite alternate;animation-delay:var(--asm-delay)}}
+        @keyframes vs-asm-glow{{from{{box-shadow:0 0 10px rgba(0,0,0,.3),0 0 8px color-mix(in srgb,var(--asm-color) 20%,transparent)}}
+            to{{box-shadow:0 0 14px rgba(0,0,0,.2),0 0 30px color-mix(in srgb,var(--asm-color) 55%,transparent)}}}}
+        .vs-asm-block i{{color:var(--asm-color);font-size:1rem;filter:drop-shadow(0 0 6px var(--asm-color))}}
+        .vs-asm-block strong{{font-size:.78rem;color:var(--vs-ink);font-weight:800}}
+        .vs-asm-block code{{font-size:.65rem;color:var(--vs-muted);background:rgba(255,255,255,.06);
+            padding:.1rem .35rem;border-radius:4px}}
+        .vs-asm-label{{font-size:.72rem;color:var(--asm-color);font-weight:700;
+            text-shadow:0 0 8px color-mix(in srgb,var(--asm-color) 50%,transparent)}}
+        .vs-asm-arrows{{position:absolute;top:50%;left:0;right:0;display:flex;justify-content:space-around;
+            transform:translateY(-50%);z-index:1;pointer-events:none}}
+        .vs-asm-arrow{{color:var(--vs-blue);font-size:.85rem;opacity:.5;
+            animation:vs-asm-arrow-pulse 1.6s ease-in-out infinite;animation-delay:var(--asa-delay)}}
+        @keyframes vs-asm-arrow-pulse{{0%,100%{{opacity:.2;transform:scale(.75)}}50%{{opacity:1;transform:scale(1.2)}}}}
+        .vs-asm-flow{{position:absolute;inset:0;z-index:3;pointer-events:none}}
+        .vs-asm-particle{{position:absolute;width:5px;height:5px;border-radius:50%;top:48%;
+            background:var(--asp-color);box-shadow:0 0 10px var(--asp-color);
+            animation:vs-asm-particle-fly 3s linear infinite;animation-delay:var(--asp-delay)}}
+        @keyframes vs-asm-particle-fly{{0%{{left:-2%;opacity:0}}8%{{opacity:1}}92%{{opacity:1}}100%{{left:102%;opacity:0}}}}
+        .vs-asm-config{{margin-top:.75rem;padding:.65rem .8rem;border:1px solid rgba(0,240,255,.18);
+            border-radius:8px;background:rgba(0,0,0,.14)}}
+        .vs-asm-config-title{{font-weight:800;font-size:.85rem;color:var(--vs-ink);margin-bottom:.45rem;
+            display:flex;align-items:center;gap:.35rem}}
+        .vs-asm-config-title i{{color:var(--vs-blue);filter:drop-shadow(0 0 6px var(--vs-blue))}}
+        .vs-asm-params{{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem}}
+        .vs-asm-param{{display:flex;flex-direction:column;align-items:center;gap:.15rem;
+            padding:.35rem .4rem;border-radius:6px;border:1px solid color-mix(in srgb,var(--param-color) 30%,transparent);
+            background:rgba(0,0,0,.18);animation:vs-asm-param-in .5s ease both;
+            animation-delay:calc(var(--asm-delay, 0s) + .5s)}}
+        .vs-asm-param-key{{font-size:.68rem;color:var(--vs-muted);text-transform:uppercase;letter-spacing:.04em}}
+        .vs-asm-param-val{{font-family:"JetBrains Mono";font-size:.78rem;font-weight:700;
+            color:var(--param-color);text-shadow:0 0 6px color-mix(in srgb,var(--param-color) 40%,transparent)}}
+        @keyframes vs-asm-param-in{{from{{opacity:0;transform:translateY(8px)}}to{{opacity:1;transform:translateY(0)}}}}
+        .vs-console-assembly>p{{color:var(--vs-muted);line-height:1.62;margin:.7rem 0 0}}
+        @media(max-width:700px){{
+            .vs-asm-block{{width:68px;height:62px}}
+            .vs-asm-block strong{{font-size:.68rem}}
+            .vs-asm-params{{grid-template-columns:repeat(2,minmax(0,1fr))}}
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+# ──────────────────────────────────────────────
 # 运动画廊（展示所有动效）
 # ──────────────────────────────────────────────
 
@@ -1249,6 +1399,10 @@ def render_motion_gallery() -> None:
     # ── RNN 隐藏状态传递 ──
     st.markdown("### RNN 隐藏状态传递")
     render_rnn_hidden_state_flow()
+
+    # ── 中央控制台模型拼装 ──
+    st.markdown("### 中央控制台模型拼装")
+    render_central_console_assembly()
 
     # ── Transformer 注意力热力图 ──
     st.markdown("### Transformer 注意力热力图")
