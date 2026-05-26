@@ -24,7 +24,14 @@ import torch.nn as nn
 from sklearn.datasets import make_classification
 from sklearn.preprocessing import StandardScaler
 
-from components.visual_system import render_loading_bar, render_training_dashboard_gauges, render_visual_system
+from components.visual_system import (
+    render_beginner_hint,
+    render_loading_bar,
+    render_motion_note,
+    render_neon_metric_card,
+    render_training_dashboard_gauges,
+    render_visual_system,
+)
 
 
 MODULE_TITLE = "训练过程可视化演示"
@@ -493,6 +500,15 @@ def render_app() -> None:
     render_visual_system("dark")
     render_header()
     render_loading_bar("训练仪表盘加载：指标指针会随着训练状态给出直观信号")
+    render_beginner_hint(
+        "先看 loss，再看 accuracy",
+        "loss 是优化器真正最小化的目标；accuracy 是给人看的结果指标。两者一起看，才能判断模型是在学习还是在记答案。",
+        action="训练前先记住当前学习率和 epoch 数，点击开始训练后观察 loss 是否平滑下降。",
+    )
+    render_motion_note(
+        "仪表盘不是装饰",
+        "Loss 看优化方向，Accuracy 看任务效果，LR 看步子大小，梯度范数看更新是否过猛或过弱。",
+    )
     render_training_dashboard_gauges()
 
     top_left, top_right = st.columns([0.78, 0.22])
@@ -526,6 +542,11 @@ def render_app() -> None:
         st.plotly_chart(make_dataset_chart(features_2d, y_tensor), use_container_width=True, config=PLOT_CONFIG)
     with overview_cols[1]:
         st.subheader("演示设置")
+        metric_cols = st.columns(2)
+        with metric_cols[0]:
+            render_neon_metric_card("样本数", str(SAMPLE_COUNT), caption="教学页固定小样本，保证训练反馈足够快。")
+        with metric_cols[1]:
+            render_neon_metric_card("输入维度", str(INPUT_DIM), caption="每个样本进入 MLP 前有 6 个特征。")
         st.write(f"样本数：{SAMPLE_COUNT}")
         st.write(f"输入特征：{INPUT_DIM}")
         st.write("模型：Linear → ReLU → Linear")

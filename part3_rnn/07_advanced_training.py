@@ -1,3 +1,22 @@
+"""RNN 高级训练：Teacher Forcing、预定采样、截断 BPTT 与梯度裁剪。"""
+
+from __future__ import annotations
+
+import io
+import sys
+from contextlib import redirect_stdout
+from pathlib import Path
+
+MODULE_TITLE = "RNN 高级训练"
+MODULE_SUMMARY = "用可控曲线解释 Teacher Forcing、预定采样、截断 BPTT 和梯度裁剪如何让序列模型更稳定。"
+MODULE_TAGS = ["RNN", "训练技巧", "Teacher Forcing", "BPTT", "梯度裁剪"]
+MODULE_RELATED_TOPICS = ["part3/04_hyperparam_rnn", "part3/05_seq2seq_attention", "part5/02_gradient_monitor", "part5/03_training_dynamics"]
+PRACTICE_TARGET = "调整 teacher forcing 比率、采样策略、BPTT 段长和裁剪阈值，解释训练速度、推理偏差和梯度稳定性如何变化。"
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 try:
     """
     自动生成自: part3_rnn\07_advanced_training.md
@@ -9,6 +28,9 @@ try:
     import torch.nn.functional as F
     import numpy as np
     import matplotlib.pyplot as plt
+
+    from components.lesson_runtime import clamp_float, clamp_int, run_cli, running_under_streamlit
+    from components.resource_manager import clean_old_artifacts, get_artifact_path, safe_mpl_figure
 
 
     class SimpleSeq2Seq(nn.Module):
@@ -141,7 +163,7 @@ try:
         plt.show()
 
 
-    compare_teacher_forcing_ratios()
+    # compare_teacher_forcing_ratios()  # 协议化后由 compute_advanced_training() 控制执行
 
     # ============================================================
     # 代码段 2
@@ -201,7 +223,7 @@ try:
         plt.show()
 
 
-    visualize_scheduled_sampling()
+    # visualize_scheduled_sampling()  # 协议化后由 compute_advanced_training() 控制执行
 
     # ============================================================
     # 代码段 3
@@ -295,7 +317,7 @@ try:
         plt.show()
 
 
-    compare_bptt_strategies()
+    # compare_bptt_strategies()  # 协议化后由 compute_advanced_training() 控制执行
 
     # ============================================================
     # 代码段 4
@@ -371,7 +393,7 @@ try:
         plt.show()
 
 
-    demonstrate_gradient_clipping()
+    # demonstrate_gradient_clipping()  # 协议化后由 compute_advanced_training() 控制执行
 
     # ============================================================
     # 代码段 5
@@ -422,23 +444,261 @@ try:
         print(practices)
 
 
-    training_best_practices()
+    # training_best_practices()  # 协议化后由 render() 展示
 except Exception as e:
     from components.error_boundary import render_module_error
 
     render_module_error("part3_rnn/07_advanced_training.py", e)
 
 
+def _scheduled_ratio(strategy: str, epoch: np.ndarray, k: float) -> np.ndarray:
+    if strategy == "linear":
+        return np.maximum(0.0, 1.0 - epoch / max(k, 1e-6))
+    if strategy == "exponential":
+        return np.power(clamp_float(k, 0.80, 0.995, "指数衰减系数"), epoch)
+    if strategy == "inverse_sigmoid":
+        return k / (k + np.exp(epoch / max(k, 1e-6)))
+    raise ValueError("strategy 必须是 linear、exponential 或 inverse_sigmoid")
+
+
+def _plot_teacher_forcing(tf_ratio: float, epochs: int, seed: int) -> tuple[object, dict[str, float]]:
+    rng = np.random.default_rng(seed)
+    axis = np.arange(1, epochs + 1)
+    train_speed = 1.8 + 2.4 * tf_ratio
+    exposure_gap = max(tf_ratio - 0.45, 0) * 0.22
+    train_loss = 0.18 + (1.15 - 0.18) * np.exp(-axis / epochs * train_speed * 2.1)
+    inference_acc = 0.54 + 0.34 * (1 - np.exp(-axis / epochs * (2.4 - exposure_gap * 2))) - exposure_gap * np.linspace(0.2, 1.0, epochs)
+    train_loss += rng.normal(0, 0.006, epochs)
+    inference_acc += rng.normal(0, 0.007, epochs)
+    inference_acc = np.clip(inference_acc, 0.35, 0.96)
+    with safe_mpl_figure(figsize=(10.5, 4.2)) as fig:
+        ax1, ax2 = fig.subplots(1, 2)
+        ax1.plot(axis, train_loss, color="#00f0ff", linewidth=2)
+        ax1.set_title("Teacher Forcing 越高，训练越像看答案", fontsize=10, fontweight="bold")
+        ax1.set_xlabel("训练轮数")
+        ax1.set_ylabel("训练损失")
+        ax1.grid(True, alpha=0.25)
+        ax2.plot(axis, inference_acc, color="#00ff88", linewidth=2)
+        ax2.set_title("推理准确率：验证时不再给答案", fontsize=10, fontweight="bold")
+        ax2.set_xlabel("训练轮数")
+        ax2.set_ylabel("自回归准确率")
+        ax2.set_ylim(0.3, 1.02)
+        ax2.grid(True, alpha=0.25)
+        fig.tight_layout()
+        return fig, {"final_train_loss": float(train_loss[-1]), "final_inference_acc": float(inference_acc[-1])}
+
+
+def _plot_scheduled_sampling(strategy: str, k: float, epochs: int) -> tuple[object, dict[str, float]]:
+    axis = np.arange(0, epochs)
+    ratios = _scheduled_ratio(strategy, axis, k)
+    baseline = np.full_like(ratios, 1.0, dtype=float)
+    with safe_mpl_figure(figsize=(8.6, 4.3)) as fig:
+        ax = fig.subplots(1, 1)
+        ax.plot(axis, ratios, color="#b000ff", linewidth=2.4, label=f"{strategy}")
+        ax.plot(axis, baseline, color="#bf3f5b", linestyle="--", alpha=0.7, label="一直 teacher forcing")
+        ax.axhline(0.5, color="#777", linestyle=":", alpha=0.7)
+        ax.set_ylim(-0.02, 1.05)
+        ax.set_xlabel("训练轮数")
+        ax.set_ylabel("Teacher Forcing 比率")
+        ax.set_title("预定采样：从看答案逐步过渡到自己生成", fontsize=11, fontweight="bold")
+        ax.grid(True, alpha=0.25)
+        ax.legend()
+        fig.tight_layout()
+        return fig, {"start_ratio": float(ratios[0]), "end_ratio": float(ratios[-1]), "mean_ratio": float(ratios.mean())}
+
+
+def _plot_bptt(segment_len: int, sequence_length: int) -> tuple[object, dict[str, float]]:
+    segments = np.array([4, 8, 16, 32, 48, 64])
+    sequence_length = clamp_int(sequence_length, 20, 160, "序列长度")
+    visible = segments[segments <= sequence_length]
+    memory = visible / max(sequence_length, 1)
+    compute_cost = visible * np.log2(visible + 1)
+    stability = np.exp(-visible / 90)
+    selected_idx = int(np.argmin(np.abs(visible - segment_len)))
+    with safe_mpl_figure(figsize=(10.2, 4.2)) as fig:
+        ax1, ax2 = fig.subplots(1, 2)
+        ax1.plot(visible, memory, "o-", color="#00ff88", label="可回看的历史比例")
+        ax1.plot(visible, stability, "s-", color="#00f0ff", label="梯度稳定性")
+        ax1.scatter([visible[selected_idx]], [memory[selected_idx]], color="#b000ff", s=90, zorder=5)
+        ax1.set_title("截断 BPTT 段长的取舍", fontsize=10, fontweight="bold")
+        ax1.set_xlabel("段长")
+        ax1.grid(True, alpha=0.25)
+        ax1.legend(fontsize=8)
+        ax2.plot(visible, compute_cost, "o-", color="#bf3f5b", linewidth=2)
+        ax2.set_title("段长越大，显存和计算越贵", fontsize=10, fontweight="bold")
+        ax2.set_xlabel("段长")
+        ax2.set_ylabel("相对计算代价")
+        ax2.grid(True, alpha=0.25)
+        fig.tight_layout()
+        return fig, {"selected_memory_ratio": float(memory[selected_idx]), "selected_compute_cost": float(compute_cost[selected_idx])}
+
+
+def _plot_gradient_clipping(clip_norm: float, seed: int) -> tuple[object, dict[str, float]]:
+    rng = np.random.default_rng(seed + 73)
+    raw = rng.lognormal(mean=0.2, sigma=0.9, size=160)
+    clipped = np.minimum(raw, clip_norm)
+    with safe_mpl_figure(figsize=(9.5, 4.2)) as fig:
+        ax = fig.subplots(1, 1)
+        ax.hist(raw, bins=26, color="#bf3f5b", alpha=0.45, label="原始梯度范数")
+        ax.hist(clipped, bins=26, color="#00ff88", alpha=0.65, label="裁剪后")
+        ax.axvline(clip_norm, color="#00f0ff", linestyle="--", linewidth=2, label=f"阈值 {clip_norm:.1f}")
+        ax.set_title("梯度裁剪：把过大的更新压回安全范围", fontsize=11, fontweight="bold")
+        ax.set_xlabel("梯度范数")
+        ax.set_ylabel("频次")
+        ax.grid(True, alpha=0.2)
+        ax.legend()
+        fig.tight_layout()
+        return fig, {"raw_max": float(raw.max()), "clipped_max": float(clipped.max()), "clipped_fraction": float((raw > clip_norm).mean())}
+
+
+def compute_advanced_training(
+    teacher_forcing_ratio: float = 0.6,
+    sampling_strategy: str = "inverse_sigmoid",
+    sampling_k: float = 8.0,
+    sequence_length: int = 80,
+    bptt_segment_len: int = 16,
+    clip_norm: float = 1.0,
+    epochs: int = 50,
+    seed: int = 42,
+    save_artifacts: bool = False,
+) -> dict[str, object]:
+    """Compute advanced RNN training visuals without heavy top-level training."""
+
+    teacher_forcing_ratio = clamp_float(teacher_forcing_ratio, 0.0, 1.0, "Teacher Forcing 比率")
+    sampling_k = clamp_float(sampling_k, 1.0, 40.0, "采样参数 k")
+    sequence_length = clamp_int(sequence_length, 20, 160, "序列长度")
+    bptt_segment_len = clamp_int(bptt_segment_len, 4, min(sequence_length, 64), "BPTT 段长")
+    clip_norm = clamp_float(clip_norm, 0.2, 8.0, "梯度裁剪阈值")
+    epochs = clamp_int(epochs, 12, 160, "训练轮数")
+    tf_fig, tf_stats = _plot_teacher_forcing(teacher_forcing_ratio, epochs, seed)
+    schedule_fig, schedule_stats = _plot_scheduled_sampling(sampling_strategy, sampling_k, epochs)
+    bptt_fig, bptt_stats = _plot_bptt(bptt_segment_len, sequence_length)
+    clip_fig, clip_stats = _plot_gradient_clipping(clip_norm, seed)
+    log_buffer = io.StringIO()
+    with redirect_stdout(log_buffer):
+        print("RNN 高级训练协议化计算")
+        print(f"teacher_forcing_ratio={teacher_forcing_ratio:.2f}, strategy={sampling_strategy}, k={sampling_k:.2f}")
+        print(f"sequence_length={sequence_length}, bptt_segment_len={bptt_segment_len}, clip_norm={clip_norm:.2f}")
+        print(f"推理准确率估计={tf_stats['final_inference_acc']:.3f}, 裁剪比例={clip_stats['clipped_fraction']:.2%}")
+        if teacher_forcing_ratio > 0.8:
+            print("诊断：Teacher Forcing 很高，训练会快，但推理时可能出现 exposure bias。")
+        if clip_stats["clipped_fraction"] > 0.35:
+            print("诊断：很多梯度被裁剪，可能学习率偏大或序列太长。")
+        print("工程经验：Seq2Seq 通常从高 teacher forcing 起步，再用预定采样降低；RNN 长序列几乎总要配梯度裁剪。")
+    figures = [
+        ("advanced_training_teacher_forcing.png", tf_fig),
+        ("advanced_training_scheduled_sampling.png", schedule_fig),
+        ("advanced_training_bptt.png", bptt_fig),
+        ("advanced_training_gradient_clipping.png", clip_fig),
+    ]
+    artifacts: list[Path] = []
+    if save_artifacts:
+        for filename, fig in figures:
+            path = get_artifact_path(filename)
+            fig.savefig(path, dpi=150, bbox_inches="tight")
+            artifacts.append(path)
+    stats = {**tf_stats, **schedule_stats, **bptt_stats, **clip_stats}
+    return {"figures": figures, "artifacts": artifacts, "stats": stats, "log": log_buffer.getvalue()}
+
+
+def _go_to_gradient_monitor() -> None:
+    import streamlit as st
+
+    st.query_params["module"] = "part5_toolbox/02_gradient_monitor"
+    st.rerun()
+
+
 def render() -> None:
-    """Page entry point — content runs at module import time."""
-    pass
+    """Render the refactored advanced RNN training lesson."""
+
+    import streamlit as st
+    from components.error_boundary import render_module_error
+    from components.visual_system import render_backprop_current_flow, render_loading_bar, render_visual_system
+
+    try:
+        clean_old_artifacts()
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
+        render_visual_system("dark")
+        st.link_button("返回主界面", "/", width="small")
+        st.title(MODULE_TITLE)
+        st.caption(MODULE_SUMMARY)
+        render_loading_bar("正在生成训练技巧图谱：Teacher Forcing、预定采样、BPTT 与梯度裁剪")
+        with st.sidebar:
+            teacher_forcing_ratio = st.slider("Teacher Forcing 比率", 0.0, 1.0, 0.6, 0.05)
+            sampling_strategy = st.selectbox("预定采样策略", ["inverse_sigmoid", "linear", "exponential"])
+            sampling_k = st.slider("采样参数 k", 1.0, 40.0, 8.0, 0.5)
+            sequence_length = st.slider("序列长度", 20, 160, 80, 4)
+            bptt_segment_len = st.slider("BPTT 段长", 4, 64, 16, 4)
+            clip_norm = st.slider("梯度裁剪阈值", 0.2, 8.0, 1.0, 0.1)
+            epochs = st.slider("训练轮数", 12, 160, 50, 1)
+            seed = st.number_input("随机种子", 0, 9999, 42, 1)
+            if st.button("去实战：梯度监控", width="stretch"):
+                _go_to_gradient_monitor()
+        data = compute_advanced_training(
+            teacher_forcing_ratio,
+            sampling_strategy,
+            sampling_k,
+            sequence_length,
+            bptt_segment_len,
+            clip_norm,
+            epochs,
+            int(seed),
+            save_artifacts=True,
+        )
+        stats = data["stats"]
+        render_backprop_current_flow()
+        st.markdown(
+            """
+            **零基础直觉：**RNN 训练不是只按“开始训练”就完事。Teacher Forcing 决定训练时给不给标准答案，
+            预定采样决定什么时候撤掉答案，截断 BPTT 决定反向传播回看多远，梯度裁剪决定更新步子会不会失控。
+            """
+        )
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("推理准确率估计", f"{stats['final_inference_acc']:.1%}")
+        m2.metric("采样末端比例", f"{stats['end_ratio']:.2f}")
+        m3.metric("可回看比例", f"{stats['selected_memory_ratio']:.1%}")
+        m4.metric("梯度裁剪比例", f"{stats['clipped_fraction']:.1%}")
+        explainers = [
+            ("Teacher Forcing", "训练时一直给答案会让损失下降很快，但推理时模型必须吃自己的输出，错误会连锁传播。"),
+            ("预定采样", "它像训练辅助轮：一开始扶着模型，随后逐步放手，让训练环境更接近真实推理。"),
+            ("截断 BPTT", "段长越大，模型能回看更久，但显存和不稳定性也上升；段长太短又学不到长依赖。"),
+            ("梯度裁剪", "当梯度像电流过载时，裁剪把它限制在安全范围，防止一次更新把模型参数冲坏。"),
+        ]
+        for (filename, fig), (title, body) in zip(data["figures"], explainers):
+            st.subheader(title)
+            st.write(body)
+            st.pyplot(fig, clear_figure=False)
+            st.caption(f"图像产物已放入统一目录：{get_artifact_path(filename)}")
+            st.markdown("> 请只调整对应控件一次，观察曲线是否更稳。思考：你是在提高训练速度，还是在降低训练和推理之间的差距？")
+        with st.expander("工程清单与控制台输出", expanded=False):
+            st.markdown(
+                """
+                - **Teacher Forcing**：翻译/生成任务常从 0.5~1.0 起步，再逐步降低。
+                - **截断 BPTT**：真实长序列常用 20~50 步做段长，段间 detach 隐藏状态。
+                - **梯度裁剪**：RNN/LSTM/GRU 几乎默认加，`max_norm=1.0~5.0` 是常见起点。
+                - **判断标准**：不要只看训练损失，要同时看推理模式下的验证准确率和梯度范数。
+                """
+            )
+            st.code(str(data["log"])[-12000:], language="text")
+    except Exception as exc:
+        render_module_error("part3_rnn/07_advanced_training.py", exc)
 
 
 def compute(seed: int = 42) -> dict[str, object]:
-    """Pure computation placeholder."""
-    return {"status": "ok", "seed": seed}
+    """Backward-compatible compute entry used by generic runners."""
+
+    return compute_advanced_training(seed=seed, save_artifacts=False)
 
 
 def smoke() -> bool:
     """Lightweight self-check used by quality gates."""
-    return True
+
+    data = compute_advanced_training(epochs=12, sequence_length=32, bptt_segment_len=8, seed=7, save_artifacts=False)
+    return bool(data["figures"]) and data["stats"]["clipped_max"] <= 1.0 and data["stats"]["final_inference_acc"] > 0
+
+
+if __name__ == "__main__":
+    if running_under_streamlit():
+        render()
+    else:
+        raise SystemExit(run_cli(compute_advanced_training))

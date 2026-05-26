@@ -1,3 +1,22 @@
+"""CNN 可解释性可视化：Grad-CAM、显著图、特征反转和 DeepDream。"""
+
+from __future__ import annotations
+
+import io
+import sys
+from contextlib import redirect_stdout
+from pathlib import Path
+
+MODULE_TITLE = "CNN 可视化与 Grad-CAM"
+MODULE_SUMMARY = "用 Grad-CAM、像素显著图、特征反转和 DeepDream 解释 CNN 到底看到了什么。"
+MODULE_TAGS = ["CNN", "Grad-CAM", "显著图", "可解释性", "DeepDream"]
+MODULE_RELATED_TOPICS = ["part2/02_feature_maps", "part2/07_advanced_convolution", "part5/01_feature_visualization", "part5/02_gradient_monitor"]
+PRACTICE_TARGET = "切换输入图案、目标类别、平滑次数和 Dream 强度，解释热力图、显著图和概率分布为什么变化。"
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 try:
     """
     自动生成自: part2_cnn\08_visualization_gradcam.md
@@ -9,7 +28,13 @@ try:
     import torch.nn.functional as F
     import numpy as np
     import matplotlib.pyplot as plt
-    from PIL import Image
+    try:
+        from PIL import Image
+    except Exception:
+        Image = None
+
+    from components.lesson_runtime import clamp_float, clamp_int, run_cli, running_under_streamlit
+    from components.resource_manager import clean_old_artifacts, get_artifact_path, safe_mpl_figure
 
 
     class GradCAM:
@@ -165,7 +190,7 @@ try:
         plt.show()
 
 
-    demo_gradcam()
+    # demo_gradcam()  # 协议化后由 compute_visualization_gradcam() 控制执行
 
     # ============================================================
     # 代码段 2
@@ -244,7 +269,7 @@ try:
         plt.show()
 
 
-    demo_saliency()
+    # demo_saliency()  # 协议化后由 compute_visualization_gradcam() 控制执行
 
     # ============================================================
     # 代码段 3
@@ -337,7 +362,7 @@ try:
         plt.show()
 
 
-    demo_feature_inversion()
+    # demo_feature_inversion()  # 协议化后由 compute_visualization_gradcam() 控制执行
 
     # ============================================================
     # 代码段 4
@@ -433,7 +458,7 @@ try:
         plt.show()
 
 
-    demo_deepdream()
+    # demo_deepdream()  # 协议化后由 compute_visualization_gradcam() 控制执行
 
     # ============================================================
     # 代码段 5
@@ -522,8 +547,275 @@ try:
         visualizer.full_analysis(x)
 
 
-    run_visualization_demo()
+    # run_visualization_demo()  # 协议化后由 compute_visualization_gradcam() 控制执行
 except Exception as e:
     from components.error_boundary import render_module_error
 
     render_module_error("part2_cnn/08_visualization_gradcam.py", e)
+
+
+def _make_visual_pattern(pattern: str, noise: float, seed: int) -> np.ndarray:
+    rng = np.random.default_rng(seed)
+    image = np.zeros((28, 28), dtype=np.float32)
+    if pattern == "方块":
+        image[8:20, 8:20] = 1.0
+    elif pattern == "十字":
+        image[12:16, :] = 1.0
+        image[:, 12:16] = 1.0
+    elif pattern == "圆环":
+        yy, xx = np.mgrid[0:28, 0:28]
+        dist = np.sqrt((yy - 14) ** 2 + (xx - 14) ** 2)
+        image[(dist > 6) & (dist < 10)] = 1.0
+    else:
+        image[6:22, 12:16] = 1.0
+        image[18:22, 8:20] = 0.85
+    image += rng.normal(0, noise, image.shape).astype(np.float32)
+    return np.clip(image, 0, 1)
+
+
+def _smooth_grad(model: torch.nn.Module, x: torch.Tensor, target_class: int, samples: int, stdev: float, seed: int) -> np.ndarray:
+    torch.manual_seed(seed)
+    samples = clamp_int(samples, 1, 24, "SmoothGrad 次数")
+    smooth = None
+    for _ in range(samples):
+        noisy_x = (x + torch.randn_like(x) * stdev).detach().requires_grad_(True)
+        saliency, _ = compute_saliency_map(model, noisy_x, target_class)
+        smooth = saliency if smooth is None else smooth + saliency
+    return smooth / samples
+
+
+def _safe_gradcam(model: torch.nn.Module, x: torch.Tensor, target_class: int | None) -> tuple[np.ndarray, int]:
+    grad_cam = GradCAM(model, target_layer="conv3")
+    cam, predicted = grad_cam.generate(x, target_class)
+    if cam.ndim == 0:
+        cam = np.zeros((28, 28), dtype=np.float32)
+    cam = F.interpolate(torch.from_numpy(cam).float().view(1, 1, *cam.shape), size=(28, 28), mode="bilinear", align_corners=False)
+    cam_np = cam.squeeze().numpy()
+    cam_np = (cam_np - cam_np.min()) / (cam_np.max() - cam_np.min() + 1e-8)
+    return cam_np, int(predicted)
+
+
+def _light_feature_inversion(model: torch.nn.Module, x: torch.Tensor, layer_name: str, steps: int, lr: float) -> tuple[np.ndarray, list[float]]:
+    steps = clamp_int(steps, 4, 40, "反转步数")
+    generated, history = feature_inversion(model, x, layer_name, num_iter=steps, lr=lr)
+    image = generated[0, 0].detach().numpy()
+    image = (image - image.min()) / (image.max() - image.min() + 1e-8)
+    return image, [float(value) for value in history]
+
+
+def _light_deepdream(model: torch.nn.Module, x: torch.Tensor, layer_name: str, strength: float, steps: int) -> np.ndarray:
+    steps = clamp_int(steps, 4, 40, "Dream 步数")
+    dreamed = deepdream(model, x, layer_name, num_iter=steps, lr=strength, clip=True)
+    image = dreamed[0, 0].detach().numpy()
+    return np.clip(image, 0, 1)
+
+
+def _plot_explainability_panel(
+    image: np.ndarray,
+    cam: np.ndarray,
+    saliency: np.ndarray,
+    smooth_saliency: np.ndarray,
+    probs: np.ndarray,
+    predicted_class: int,
+) -> object:
+    with safe_mpl_figure(figsize=(11, 6.4)) as fig:
+        axes = fig.subplots(2, 3)
+        axes[0, 0].imshow(image, cmap="gray", vmin=0, vmax=1)
+        axes[0, 0].set_title("输入图案", fontsize=10, fontweight="bold")
+        axes[0, 1].imshow(image, cmap="gray", alpha=0.45)
+        axes[0, 1].imshow(cam, cmap="jet", alpha=0.55)
+        axes[0, 1].set_title("Grad-CAM\n关注区域", fontsize=10, fontweight="bold")
+        axes[0, 2].imshow(saliency, cmap="hot")
+        axes[0, 2].set_title("显著图\n像素敏感度", fontsize=10, fontweight="bold")
+        axes[1, 0].imshow(smooth_saliency, cmap="hot")
+        axes[1, 0].set_title("SmoothGrad\n降噪后显著图", fontsize=10, fontweight="bold")
+        axes[1, 1].bar(range(len(probs)), probs, color="#00f0ff")
+        axes[1, 1].set_title(f"预测概率\n类别 {predicted_class}", fontsize=10, fontweight="bold")
+        axes[1, 1].set_xticks(range(len(probs)))
+        axes[1, 2].imshow(image, cmap="gray", alpha=0.35)
+        axes[1, 2].imshow(cam * smooth_saliency, cmap="viridis", alpha=0.75)
+        axes[1, 2].set_title("CAM x SmoothGrad\n交叉验证", fontsize=10, fontweight="bold")
+        for ax in axes.flat:
+            if ax is not axes[1, 1]:
+                ax.axis("off")
+        fig.suptitle("CNN 可解释性面板：区域、像素和概率一起看", fontsize=13, fontweight="bold")
+        fig.tight_layout()
+        return fig
+
+
+def _plot_feature_dream_panel(original: np.ndarray, inversion: np.ndarray, dream: np.ndarray, history: list[float]) -> object:
+    with safe_mpl_figure(figsize=(10.5, 3.8)) as fig:
+        axes = fig.subplots(1, 4)
+        axes[0].imshow(original, cmap="gray", vmin=0, vmax=1)
+        axes[0].set_title("原图", fontsize=9, fontweight="bold")
+        axes[1].imshow(inversion, cmap="gray", vmin=0, vmax=1)
+        axes[1].set_title("特征反转", fontsize=9, fontweight="bold")
+        axes[2].imshow(dream, cmap="gray", vmin=0, vmax=1)
+        axes[2].set_title("DeepDream", fontsize=9, fontweight="bold")
+        axes[3].plot(history, color="#00ff88", linewidth=2)
+        axes[3].set_title("反转损失", fontsize=9, fontweight="bold")
+        axes[3].set_xlabel("步数")
+        axes[3].grid(True, alpha=0.25)
+        for ax in axes[:3]:
+            ax.axis("off")
+        fig.suptitle("特征可视化：从“模型看哪里”到“模型想要什么”", fontsize=12, fontweight="bold")
+        fig.tight_layout()
+        return fig
+
+
+def compute_visualization_gradcam(
+    pattern: str = "方块",
+    target_class: int = -1,
+    smooth_samples: int = 8,
+    noise: float = 0.03,
+    dream_strength: float = 0.04,
+    optimization_steps: int = 12,
+    seed: int = 42,
+    save_artifacts: bool = False,
+) -> dict[str, object]:
+    """Compute lightweight CNN explainability visuals without running import-time demos."""
+
+    if pattern not in {"方块", "十字", "圆环", "折线"}:
+        raise ValueError("pattern 必须是 方块、十字、圆环 或 折线")
+    target_class = clamp_int(int(target_class), -1, 9, "目标类别")
+    smooth_samples = clamp_int(smooth_samples, 1, 24, "SmoothGrad 次数")
+    noise = clamp_float(noise, 0.0, 0.35, "噪声强度")
+    dream_strength = clamp_float(dream_strength, 0.005, 0.12, "Dream 强度")
+    optimization_steps = clamp_int(optimization_steps, 4, 40, "优化步数")
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
+    model = SimpleCNN()
+    model.eval()
+    image = _make_visual_pattern(pattern, noise, seed)
+    x = torch.from_numpy(image).float().unsqueeze(0).unsqueeze(0)
+    with torch.no_grad():
+        logits = model(x)
+        probs = torch.softmax(logits, dim=1)[0].detach().numpy()
+    selected_class = None if target_class < 0 else target_class
+    cam, predicted_class = _safe_gradcam(model, x, selected_class)
+    class_for_grad = predicted_class if selected_class is None else selected_class
+    saliency, _ = compute_saliency_map(model, x.clone().detach().requires_grad_(True), class_for_grad)
+    smooth_saliency = _smooth_grad(model, x, class_for_grad, smooth_samples, stdev=max(noise, 0.03), seed=seed)
+    inversion, inversion_history = _light_feature_inversion(model, x, "conv2", optimization_steps, lr=0.04)
+    dream = _light_deepdream(model, x, "conv2", dream_strength, optimization_steps)
+
+    panel_fig = _plot_explainability_panel(image, cam, saliency, smooth_saliency, probs, predicted_class)
+    feature_fig = _plot_feature_dream_panel(image, inversion, dream, inversion_history)
+    figures = [
+        ("visualization_gradcam_panel.png", panel_fig),
+        ("visualization_feature_dream.png", feature_fig),
+    ]
+    artifacts: list[Path] = []
+    if save_artifacts:
+        for filename, fig in figures:
+            path = get_artifact_path(filename)
+            fig.savefig(path, dpi=150, bbox_inches="tight")
+            artifacts.append(path)
+    log_buffer = io.StringIO()
+    with redirect_stdout(log_buffer):
+        print("CNN 可解释性协议化计算")
+        print(f"输入图案={pattern}, 目标类别={'预测类别' if target_class < 0 else target_class}, SmoothGrad={smooth_samples}, noise={noise:.2f}")
+        print(f"预测类别={predicted_class}, 置信度={probs[predicted_class]:.3f}")
+        print(f"Grad-CAM 均值={cam.mean():.3f}, 显著图均值={saliency.mean():.3f}, Dream 强度={dream_strength:.3f}")
+        print("解释建议：Grad-CAM 看区域，显著图看像素敏感度，特征反转/DeepDream 看某层偏好的模式。")
+    stats = {
+        "predicted_class": int(predicted_class),
+        "confidence": float(probs[predicted_class]),
+        "cam_mean": float(cam.mean()),
+        "saliency_mean": float(saliency.mean()),
+        "smooth_saliency_mean": float(smooth_saliency.mean()),
+        "inversion_final_loss": float(inversion_history[-1]) if inversion_history else 0.0,
+    }
+    return {"figures": figures, "artifacts": artifacts, "stats": stats, "log": log_buffer.getvalue()}
+
+
+def _go_to_feature_visualization() -> None:
+    import streamlit as st
+
+    st.query_params["module"] = "part5_toolbox/01_feature_visualization"
+    st.rerun()
+
+
+def render() -> None:
+    """Render the Grad-CAM and CNN explainability lesson."""
+
+    import streamlit as st
+    from components.error_boundary import render_module_error
+    from components.visual_system import render_attention_light_beams, render_loading_bar, render_visual_system
+
+    try:
+        clean_old_artifacts()
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
+        render_visual_system("dark")
+        st.link_button("返回主界面", "/", width="small")
+        st.title(MODULE_TITLE)
+        st.caption(MODULE_SUMMARY)
+        render_loading_bar("正在生成 Grad-CAM、显著图、SmoothGrad、特征反转和 DeepDream")
+        with st.sidebar:
+            pattern = st.selectbox("输入图案", ["方块", "十字", "圆环", "折线"])
+            target_label = st.selectbox("目标类别", ["使用预测类别"] + [str(i) for i in range(10)])
+            target_class = -1 if target_label == "使用预测类别" else int(target_label)
+            smooth_samples = st.slider("SmoothGrad 次数", 1, 24, 8, 1)
+            noise = st.slider("噪声强度", 0.0, 0.35, 0.03, 0.01)
+            dream_strength = st.slider("Dream 强度", 0.005, 0.12, 0.04, 0.005)
+            optimization_steps = st.slider("优化步数", 4, 40, 12, 1)
+            seed = st.number_input("随机种子", 0, 9999, 42, 1)
+            if st.button("去实战：特征可视化工具箱", width="stretch"):
+                _go_to_feature_visualization()
+        data = compute_visualization_gradcam(pattern, target_class, smooth_samples, noise, dream_strength, optimization_steps, int(seed), save_artifacts=True)
+        stats = data["stats"]
+        render_attention_light_beams()
+        st.markdown(
+            """
+            **零基础直觉：**可解释性不是让模型“开口说话”，而是用几种探针去观察它。
+            Grad-CAM 看它大概盯着哪个区域，显著图看哪个像素一改就影响结果，特征反转和 DeepDream 则反过来问：
+            某一层最想看到什么样的图案？
+            """
+        )
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("预测类别", str(stats["predicted_class"]))
+        c2.metric("置信度", f"{stats['confidence']:.1%}")
+        c3.metric("CAM 均值", f"{stats['cam_mean']:.3f}")
+        c4.metric("显著图均值", f"{stats['saliency_mean']:.3f}")
+        explainers = [
+            ("综合可解释性面板", "Grad-CAM 给区域级证据，显著图给像素级证据，SmoothGrad 用多次噪声平均让显著图更稳定。"),
+            ("特征反转与 DeepDream", "特征反转试图还原能产生类似特征的图；DeepDream 则把某层喜欢的模式不断放大。"),
+        ]
+        for (filename, fig), (title, body) in zip(data["figures"], explainers):
+            st.subheader(title)
+            st.write(body)
+            st.pyplot(fig, clear_figure=False)
+            st.caption(f"图像产物已放入统一目录：{get_artifact_path(filename)}")
+            st.markdown("> 请切换输入图案或目标类别，观察 Grad-CAM 和显著图是否跟着移动。思考：权重热区是解释线索，还是完整因果证明？")
+        with st.expander("常见误区与控制台输出", expanded=False):
+            st.markdown(
+                """
+                - **误区 1：热力图越红就一定是因果解释。** 正确理解：它是线索，不是完整证明。
+                - **误区 2：显著图噪声多说明模型没学会。** 正确理解：梯度本来就敏感，SmoothGrad 是常见降噪办法。
+                - **误区 3：DeepDream 是真实图片生成。** 正确理解：它是在放大某层偏好的模式，更像模型偏好的可视化。
+                """
+            )
+            st.code(str(data["log"])[-12000:], language="text")
+    except Exception as exc:
+        render_module_error("part2_cnn/08_visualization_gradcam.py", exc)
+
+
+def compute(seed: int = 42) -> dict[str, object]:
+    """Backward-compatible compute entry used by generic runners."""
+
+    return compute_visualization_gradcam(seed=seed, save_artifacts=False)
+
+
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+
+    data = compute_visualization_gradcam(pattern="方块", smooth_samples=2, optimization_steps=4, seed=7, save_artifacts=False)
+    return bool(data["figures"]) and 0 <= data["stats"]["predicted_class"] <= 9 and data["stats"]["confidence"] > 0
+
+
+if __name__ == "__main__":
+    if running_under_streamlit():
+        render()
+    else:
+        raise SystemExit(run_cli(compute_visualization_gradcam))

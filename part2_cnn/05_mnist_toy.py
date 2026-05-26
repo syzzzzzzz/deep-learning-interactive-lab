@@ -1,3 +1,22 @@
+"""MNIST 玩具实验：用轻量模拟和真实前向检查理解 CNN 分类训练闭环。"""
+
+from __future__ import annotations
+
+import io
+import sys
+from contextlib import redirect_stdout
+from pathlib import Path
+
+MODULE_TITLE = "MNIST 玩具实验"
+MODULE_SUMMARY = "用训练曲线、混淆矩阵、预测样例和逐层激活解释手写数字分类从输入到输出的完整流程。"
+MODULE_TAGS = ["CNN", "MNIST", "训练曲线", "混淆矩阵", "调试"]
+MODULE_RELATED_TOPICS = ["part2/03_classic_architectures", "part2/04_debug_panel", "part5/03_training_dynamics", "part5/data_training"]
+PRACTICE_TARGET = "切换模型、训练轮数、学习率和噪声强度，解释准确率、损失、混淆矩阵和激活图为什么变化。"
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 try:
     """
     自动生成自: part2_cnn\05_mnist_toy.md
@@ -9,6 +28,8 @@ try:
     import torch.nn.functional as F
     import numpy as np
     import matplotlib.pyplot as plt
+    from components.lesson_runtime import clamp_float, clamp_int, run_cli, running_under_streamlit
+    from components.resource_manager import clean_old_artifacts, get_artifact_path, safe_mpl_figure
 
     # ─────────────────────────────────────────────────────────
     # LeNet-5（1998）：第一个成功的 CNN
@@ -177,7 +198,7 @@ try:
                 out = model(x)
             print(f"{name:15s} {n_params:12,d} {str(tuple(x.shape)):15s} {str(tuple(out.shape)):10s}")
 
-    compare_architectures()
+    # compare_architectures()  # 协议化后由 compute_mnist_toy() 控制执行
 
     # ============================================================
     # 代码段 2
@@ -187,8 +208,12 @@ try:
     import torch.nn as nn
     import torch.optim as optim
     from torch.utils.data import DataLoader
-    import torchvision
-    import torchvision.transforms as transforms
+    try:
+        import torchvision
+        import torchvision.transforms as transforms
+    except Exception:
+        torchvision = None
+        transforms = None
     import numpy as np
     import matplotlib.pyplot as plt
     import time
@@ -592,13 +617,335 @@ try:
         return trainer
 
     # trainer = run_mnist_experiment()
-    print("MNIST 玩具已准备好！取消注释最后一行来运行。")
-    print("可以修改的参数：")
-    print("  model_name: 'LeNet5', 'MiniVGG', 'MiniResNet'")
-    print("  batch_size: 16, 32, 64, 128, 256")
-    print("  lr: 0.0001, 0.001, 0.01, 0.1")
-    print("  epochs: 1-100")
+    # print("MNIST 玩具已准备好！取消注释最后一行来运行。")
 except Exception as e:
     from components.error_boundary import render_module_error
 
     render_module_error("part2_cnn/05_mnist_toy.py", e)
+
+
+def _model_registry() -> dict[str, torch.nn.Module]:
+    return {
+        "LeNet5": LeNet5(),
+        "MiniVGG": MiniVGG(),
+        "MiniResNet": MiniResNet(),
+    }
+
+
+def _make_digit_like_images(n_samples: int, noise: float, seed: int) -> tuple[np.ndarray, np.ndarray]:
+    rng = np.random.default_rng(seed)
+    n_samples = clamp_int(n_samples, 10, 80, "样本数")
+    noise = clamp_float(noise, 0.0, 0.6, "噪声强度")
+    images = np.zeros((n_samples, 28, 28), dtype=np.float32)
+    labels = np.arange(n_samples, dtype=np.int64) % 10
+    yy, xx = np.mgrid[0:28, 0:28]
+    centers = {
+        0: [(14, 14, 8, 0.95), (14, 14, 4, -0.65)],
+        1: [(14, 8, 3, 0.9), (14, 15, 4, 0.75)],
+        2: [(9, 14, 5, 0.9), (19, 14, 6, 0.75)],
+        3: [(9, 15, 5, 0.9), (19, 15, 5, 0.85)],
+        4: [(13, 8, 4, 0.8), (13, 19, 4, 0.8), (18, 14, 5, 0.75)],
+        5: [(8, 13, 5, 0.8), (18, 14, 6, 0.85)],
+        6: [(16, 13, 8, 0.9), (12, 16, 4, -0.45)],
+        7: [(8, 14, 7, 0.85), (18, 18, 4, 0.65)],
+        8: [(10, 14, 5, 0.9), (19, 14, 5, 0.9), (14, 14, 3, -0.35)],
+        9: [(12, 14, 7, 0.9), (20, 12, 4, 0.55)],
+    }
+    for idx, label in enumerate(labels):
+        canvas = np.zeros((28, 28), dtype=np.float32)
+        for cy, cx, radius, value in centers[int(label)]:
+            blob = np.exp(-((yy - cy) ** 2 + (xx - cx) ** 2) / (2 * radius))
+            canvas += value * blob
+        canvas += rng.normal(0, noise, size=canvas.shape).astype(np.float32)
+        images[idx] = np.clip(canvas, 0, 1)
+    return images, labels
+
+
+def _simulate_mnist_training(model_name: str, epochs: int, learning_rate: float, noise: float, seed: int) -> dict[str, np.ndarray | float]:
+    rng = np.random.default_rng(seed + 101)
+    axis = np.arange(1, epochs + 1)
+    architecture_bonus = {"LeNet5": 0.00, "MiniVGG": 0.045, "MiniResNet": 0.065}[model_name]
+    lr_penalty = abs(np.log10(learning_rate) - np.log10(0.001)) * 0.055
+    noise_penalty = noise * 0.22
+    target_acc = np.clip(0.86 + architecture_bonus - lr_penalty - noise_penalty, 0.58, 0.985)
+    speed = np.clip(learning_rate * 1800, 0.25, 4.0)
+    train_acc = target_acc - 0.34 * np.exp(-axis / max(epochs, 1) * speed * 2.4)
+    test_acc = target_acc - 0.27 * np.exp(-axis / max(epochs, 1) * speed * 1.85)
+    if learning_rate > 0.015:
+        wobble = np.sin(axis * 0.9) * (learning_rate - 0.015) * 3.5
+        test_acc -= np.abs(wobble)
+    train_acc += rng.normal(0, 0.006, epochs)
+    test_acc += rng.normal(0, 0.008, epochs)
+    train_acc = np.clip(train_acc, 0.25, 0.995)
+    test_acc = np.clip(test_acc, 0.20, 0.99)
+    train_loss = np.clip(1.45 - train_acc + rng.normal(0, 0.006, epochs), 0.015, 1.8)
+    test_loss = np.clip(1.42 - test_acc + rng.normal(0, 0.008, epochs), 0.02, 1.8)
+    lr_curve = learning_rate * (0.5 * (1 + np.cos(np.linspace(0, np.pi, epochs))))
+    return {
+        "epochs": axis,
+        "train_acc": train_acc,
+        "test_acc": test_acc,
+        "train_loss": train_loss,
+        "test_loss": test_loss,
+        "lr_curve": lr_curve,
+        "final_test_acc": float(test_acc[-1]),
+        "final_test_loss": float(test_loss[-1]),
+    }
+
+
+def _plot_training_history(history: dict[str, np.ndarray | float], model_name: str) -> object:
+    with safe_mpl_figure(figsize=(11, 3.9)) as fig:
+        axes = fig.subplots(1, 3)
+        axes[0].plot(history["epochs"], history["train_loss"], "o-", color="#00f0ff", label="训练")
+        axes[0].plot(history["epochs"], history["test_loss"], "o-", color="#bf3f5b", label="测试")
+        axes[0].set_title("损失曲线", fontsize=10, fontweight="bold")
+        axes[0].set_xlabel("Epoch")
+        axes[0].grid(True, alpha=0.25)
+        axes[0].legend(fontsize=8)
+        axes[1].plot(history["epochs"], np.asarray(history["train_acc"]) * 100, "o-", color="#b000ff", label="训练")
+        axes[1].plot(history["epochs"], np.asarray(history["test_acc"]) * 100, "o-", color="#00ff88", label="测试")
+        axes[1].set_title("准确率曲线", fontsize=10, fontweight="bold")
+        axes[1].set_xlabel("Epoch")
+        axes[1].set_ylabel("%")
+        axes[1].grid(True, alpha=0.25)
+        axes[1].legend(fontsize=8)
+        axes[2].plot(history["epochs"], history["lr_curve"], "o-", color="#00ff88")
+        axes[2].set_title("余弦学习率", fontsize=10, fontweight="bold")
+        axes[2].set_xlabel("Epoch")
+        axes[2].grid(True, alpha=0.25)
+        fig.suptitle(f"{model_name} MNIST 教学训练曲线", fontsize=12, fontweight="bold")
+        fig.tight_layout()
+        return fig
+
+
+def _plot_prediction_grid(images: np.ndarray, labels: np.ndarray, final_acc: float, seed: int) -> tuple[object, dict[str, int]]:
+    rng = np.random.default_rng(seed + 202)
+    n_samples = min(20, len(images))
+    correct_count = int(round(n_samples * final_acc))
+    preds = labels[:n_samples].copy()
+    wrong_indices = rng.choice(n_samples, size=max(n_samples - correct_count, 0), replace=False)
+    for idx in wrong_indices:
+        preds[idx] = (preds[idx] + int(rng.integers(1, 10))) % 10
+    with safe_mpl_figure(figsize=(10, 4.2)) as fig:
+        axes = fig.subplots(2, 10)
+        axes = axes.flatten()
+        for i in range(n_samples):
+            axes[i].imshow(images[i], cmap="gray", vmin=0, vmax=1)
+            color = "#00ff88" if preds[i] == labels[i] else "#bf3f5b"
+            axes[i].set_title(f"预测:{preds[i]}\n真实:{labels[i]}", fontsize=7, color=color, fontweight="bold")
+            axes[i].axis("off")
+        for ax in axes[n_samples:]:
+            ax.axis("off")
+        fig.suptitle("预测样例：绿色代表正确，红色代表错误", fontsize=12, fontweight="bold")
+        fig.tight_layout()
+        return fig, {"shown_samples": n_samples, "shown_correct": int((preds == labels[:n_samples]).sum())}
+
+
+def _plot_confusion_matrix(final_acc: float, seed: int) -> tuple[object, np.ndarray]:
+    rng = np.random.default_rng(seed + 303)
+    matrix = np.zeros((10, 10), dtype=int)
+    per_class = 24
+    correct = int(round(per_class * final_acc))
+    for digit in range(10):
+        matrix[digit, digit] = correct
+        remaining = per_class - correct
+        for _ in range(max(remaining, 0)):
+            target = int((digit + rng.integers(1, 10)) % 10)
+            matrix[digit, target] += 1
+    with safe_mpl_figure(figsize=(6, 5.2)) as fig:
+        ax = fig.subplots(1, 1)
+        im = ax.imshow(matrix, cmap="Blues")
+        fig.colorbar(im, ax=ax, fraction=0.045, pad=0.03)
+        ax.set_xticks(range(10))
+        ax.set_yticks(range(10))
+        ax.set_xlabel("预测类别")
+        ax.set_ylabel("真实类别")
+        ax.set_title("混淆矩阵：看模型把哪个数字认错成哪个", fontsize=10, fontweight="bold")
+        for i in range(10):
+            for j in range(10):
+                if matrix[i, j] > 0:
+                    ax.text(j, i, str(matrix[i, j]), ha="center", va="center", fontsize=7)
+        fig.tight_layout()
+        return fig, matrix
+
+
+def _plot_activation_debug(model_name: str, image: np.ndarray) -> tuple[object, tuple[int, ...]]:
+    models = _model_registry()
+    model = models[model_name]
+    model.eval()
+    x = torch.from_numpy(image).float().unsqueeze(0).unsqueeze(0)
+    if model_name == "LeNet5":
+        x = F.interpolate(x, size=(32, 32))
+    activations: dict[str, torch.Tensor] = {}
+    hooks = []
+    for name, module in model.named_modules():
+        if isinstance(module, nn.Conv2d):
+            hooks.append(module.register_forward_hook(lambda _m, _inp, out, n=name: activations.update({n: out.detach().cpu()})))
+    with torch.no_grad():
+        logits = model(x)
+        probs = torch.softmax(logits, dim=1)[0].detach().cpu().numpy()
+    for hook in hooks:
+        hook.remove()
+    with safe_mpl_figure(figsize=(10, 4.5)) as fig:
+        axes = fig.subplots(2, 5)
+        axes = axes.flatten()
+        axes[0].imshow(image, cmap="gray", vmin=0, vmax=1)
+        axes[0].set_title("输入", fontsize=8, fontweight="bold")
+        axes[0].axis("off")
+        axes[1].bar(range(10), probs, color="#00f0ff")
+        axes[1].set_title("预测概率", fontsize=8, fontweight="bold")
+        axes[1].set_xticks(range(10))
+        for ax, (name, activation) in zip(axes[2:], list(activations.items())[:8]):
+            avg = activation[0].mean(0).numpy()
+            ax.imshow(avg, cmap="viridis")
+            ax.set_title(f"{name}\n{tuple(activation.shape[1:])}", fontsize=7)
+            ax.axis("off")
+        for ax in axes[2 + len(activations):]:
+            ax.axis("off")
+        fig.suptitle("模型调试面板：输入、概率和卷积层平均激活", fontsize=12, fontweight="bold")
+        fig.tight_layout()
+        return fig, tuple(logits.shape)
+
+
+def compute_mnist_toy(
+    model_name: str = "MiniResNet",
+    epochs: int = 8,
+    learning_rate: float = 0.001,
+    noise: float = 0.12,
+    sample_count: int = 40,
+    seed: int = 42,
+    save_artifacts: bool = False,
+) -> dict[str, object]:
+    """Compute a lightweight MNIST teaching experiment without downloading data."""
+
+    if model_name not in {"LeNet5", "MiniVGG", "MiniResNet"}:
+        raise ValueError("model_name 必须是 LeNet5、MiniVGG 或 MiniResNet")
+    epochs = clamp_int(epochs, 2, 80, "训练轮数")
+    learning_rate = clamp_float(learning_rate, 0.0001, 0.05, "学习率")
+    noise = clamp_float(noise, 0.0, 0.6, "噪声强度")
+    sample_count = clamp_int(sample_count, 10, 80, "样本数")
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    images, labels = _make_digit_like_images(sample_count, noise, seed)
+    history = _simulate_mnist_training(model_name, epochs, learning_rate, noise, seed)
+    training_fig = _plot_training_history(history, model_name)
+    prediction_fig, prediction_stats = _plot_prediction_grid(images, labels, float(history["final_test_acc"]), seed)
+    confusion_fig, matrix = _plot_confusion_matrix(float(history["final_test_acc"]), seed)
+    activation_fig, output_shape = _plot_activation_debug(model_name, images[0])
+    log_buffer = io.StringIO()
+    with redirect_stdout(log_buffer):
+        print("MNIST 玩具协议化计算")
+        print(f"模型={model_name}, epochs={epochs}, lr={learning_rate:.4f}, noise={noise:.2f}, sample_count={sample_count}")
+        print(f"最终测试准确率={history['final_test_acc']:.3f}, 最终测试损失={history['final_test_loss']:.3f}, 前向输出={output_shape}")
+        print(f"展示样例正确数={prediction_stats['shown_correct']}/{prediction_stats['shown_samples']}")
+        print("说明：本页默认使用轻量教学模拟，不下载 MNIST；真实训练框架仍保留在源码中，可在本地扩展运行。")
+    figures = [
+        ("mnist_toy_training_history.png", training_fig),
+        ("mnist_toy_predictions.png", prediction_fig),
+        ("mnist_toy_confusion_matrix.png", confusion_fig),
+        ("mnist_toy_activation_debug.png", activation_fig),
+    ]
+    artifacts: list[Path] = []
+    if save_artifacts:
+        for filename, fig in figures:
+            path = get_artifact_path(filename)
+            fig.savefig(path, dpi=150, bbox_inches="tight")
+            artifacts.append(path)
+    stats = {
+        "final_test_acc": float(history["final_test_acc"]),
+        "final_test_loss": float(history["final_test_loss"]),
+        "output_shape": output_shape,
+        "confusion_trace": int(np.trace(matrix)),
+        **prediction_stats,
+    }
+    return {"figures": figures, "artifacts": artifacts, "stats": stats, "history": history, "log": log_buffer.getvalue()}
+
+
+def _go_to_training_dynamics() -> None:
+    import streamlit as st
+
+    st.query_params["module"] = "part5_toolbox/03_training_dynamics"
+    st.rerun()
+
+
+def render() -> None:
+    """Render the MNIST toy teaching experiment."""
+
+    import streamlit as st
+    from components.error_boundary import render_module_error
+    from components.visual_system import render_loading_bar, render_training_dashboard_gauges, render_visual_system
+
+    try:
+        clean_old_artifacts()
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
+        render_visual_system("dark")
+        st.link_button("返回主界面", "/", width="small")
+        st.title(MODULE_TITLE)
+        st.caption(MODULE_SUMMARY)
+        render_loading_bar("正在生成 MNIST 教学训练闭环：曲线、混淆矩阵、预测样例和激活图")
+        with st.sidebar:
+            model_name = st.selectbox("模型", ["LeNet5", "MiniVGG", "MiniResNet"], index=2)
+            epochs = st.slider("训练轮数", 2, 80, 8, 1)
+            learning_rate = st.slider("学习率", 0.0001, 0.05, 0.001, 0.0001, format="%.4f")
+            noise = st.slider("噪声强度", 0.0, 0.6, 0.12, 0.02)
+            sample_count = st.slider("样本数", 10, 80, 40, 5)
+            seed = st.number_input("随机种子", 0, 9999, 42, 1)
+            if st.button("去实战：训练动态", width="stretch"):
+                _go_to_training_dynamics()
+        data = compute_mnist_toy(model_name, epochs, learning_rate, noise, sample_count, int(seed), save_artifacts=True)
+        stats = data["stats"]
+        render_training_dashboard_gauges()
+        st.markdown(
+            """
+            **零基础直觉：**MNIST 是深度学习里的“九九乘法表”：任务简单，但训练闭环完整。
+            你能在这里看到模型如何从图片得到概率、如何用损失改参数、如何用混淆矩阵发现它最容易把哪个数字认错。
+            """
+        )
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("测试准确率", f"{stats['final_test_acc']:.1%}")
+        c2.metric("测试损失", f"{stats['final_test_loss']:.3f}")
+        c3.metric("前向输出", str(stats["output_shape"]))
+        c4.metric("样例正确", f"{stats['shown_correct']}/{stats['shown_samples']}")
+        explainers = [
+            ("训练历史", "损失下降表示模型在减少错误；测试准确率同步上升才说明它不是只记住训练样本。"),
+            ("预测样例", "绿色代表预测正确，红色代表预测错误。噪声越大，数字边界越不清楚，错误会增加。"),
+            ("混淆矩阵", "对角线越亮越好；非对角线亮，表示模型常把某个真实数字误判成另一个数字。"),
+            ("调试面板", "输入图、概率条和卷积激活放在一起看，可以判断模型到底看到了哪些局部结构。"),
+        ]
+        for (filename, fig), (title, body) in zip(data["figures"], explainers):
+            st.subheader(title)
+            st.write(body)
+            st.pyplot(fig, clear_figure=False)
+            st.caption(f"图像产物已放入统一目录：{get_artifact_path(filename)}")
+            st.markdown("> 请只改一个参数，再观察曲线和混淆矩阵。思考：变化来自模型结构、学习率，还是输入噪声？")
+        with st.expander("控制台输出与工程说明", expanded=False):
+            st.markdown(
+                """
+                - 本页为了流畅教学默认不下载真实 MNIST，不跑重训练。
+                - 源码中仍保留 `MNISTTrainer`，可以作为真实训练扩展入口。
+                - 真训练时优先检查数据归一化、学习率、混淆矩阵和过拟合差距。
+                """
+            )
+            st.code(str(data["log"])[-12000:], language="text")
+    except Exception as exc:
+        render_module_error("part2_cnn/05_mnist_toy.py", exc)
+
+
+def compute(seed: int = 42) -> dict[str, object]:
+    """Backward-compatible compute entry used by generic runners."""
+
+    return compute_mnist_toy(seed=seed, save_artifacts=False)
+
+
+def smoke() -> bool:
+    """Lightweight self-check used by quality gates."""
+
+    data = compute_mnist_toy(model_name="LeNet5", epochs=2, sample_count=10, seed=7, save_artifacts=False)
+    return bool(data["figures"]) and data["stats"]["output_shape"] == (1, 10) and data["stats"]["final_test_acc"] > 0
+
+
+if __name__ == "__main__":
+    if running_under_streamlit():
+        render()
+    else:
+        raise SystemExit(run_cli(compute_mnist_toy))

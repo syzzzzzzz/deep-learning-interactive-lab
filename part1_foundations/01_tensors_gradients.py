@@ -414,8 +414,11 @@ def render_张量基础() -> None:
     from components.error_boundary import render_module_error
     from components.visual_system import (
         render_backprop_current_flow,
+        render_beginner_hint,
         render_gradient_descent_landscape,
         render_loading_bar,
+        render_motion_note,
+        render_shape_flow,
         render_visual_system,
     )
 
@@ -426,6 +429,24 @@ def render_张量基础() -> None:
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
         render_loading_bar("梯度动画加载：损失地形和反向传播电流会把抽象公式变成可观察路径")
+        render_beginner_hint(
+            "先把梯度想成下坡方向",
+            "损失越高表示模型越错；梯度告诉参数应该往哪个方向移动，才能让错误变小。",
+            action="左图看小球如何沿损失地形下降，右图看误差信号如何从输出层反向流回输入层。",
+        )
+        render_motion_note(
+            "这两个动效分别对应什么",
+            "损失地形解释“参数如何更新”；反向传播电流解释“每一层如何收到责任分配”。亮度突然变暗通常对应梯度消失。",
+        )
+        render_shape_flow(
+            [
+                ("输入 x", "B×2"),
+                ("隐藏层 h", "B×8"),
+                ("输出 y_hat", "B×1"),
+                ("损失 loss", "标量"),
+            ],
+            title="张量与梯度形状流",
+        )
         c1, c2 = st.columns(2)
         with c1:
             render_gradient_descent_landscape()

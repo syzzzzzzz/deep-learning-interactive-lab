@@ -25,6 +25,39 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+ROOT_RUNTIME_ARTIFACT_EXTENSIONS = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".csv",
+    ".pt",
+    ".pth",
+    ".ckpt",
+    ".log",
+}
+ROOT_RUNTIME_TEMP_DIRS = {
+    "__pycache__",
+    "tmp",
+    "temp",
+    "outputs",
+    "output",
+    "runs",
+}
+ROOT_RUNTIME_ALLOWED_DIRS = {
+    ".git",
+    ".streamlit_module_outputs",
+    ".streamlit",
+    ".venv",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".idea",
+    ".vscode",
+    "venv",
+    "env",
+}
+
 PLACEHOLDER_PATTERNS = [
     "【知识点名称】",
     "【参数名】",
@@ -51,7 +84,20 @@ LEGACY_PROTOCOL_FILES = [
     Path("part1_foundations/03_datasets_optimizers.py"),
     Path("part2_cnn/01_convolution_visual.py"),
     Path("part2_cnn/02_feature_maps.py"),
+    Path("part2_cnn/03_classic_architectures.py"),
+    Path("part2_cnn/04_debug_panel.py"),
+    Path("part2_cnn/05_mnist_toy.py"),
+    Path("part2_cnn/06_modern_architectures.py"),
+    Path("part2_cnn/07_advanced_convolution.py"),
+    Path("part2_cnn/08_visualization_gradcam.py"),
     Path("part3_rnn/01_rnn_intuition.py"),
+    Path("part3_rnn/02_hidden_states.py"),
+    Path("part3_rnn/03_sequence_toys.py"),
+    Path("part3_rnn/04_hyperparam_rnn.py"),
+    Path("part3_rnn/05_seq2seq_attention.py"),
+    Path("part3_rnn/06_text_classification.py"),
+    Path("part3_rnn/07_advanced_training.py"),
+    Path("part3_rnn/08_debug_problems.py"),
     Path("part4_transformer/01_attention_mechanism.py"),
     Path("part4_transformer/02_multihead_visual.py"),
     Path("part5_toolbox/05_dataset_toys.py"),
@@ -61,7 +107,20 @@ STRICT_LEGACY_PROTOCOL_FILES = [
     Path("part1_foundations/01_tensors_gradients.py"),
     Path("part2_cnn/01_convolution_visual.py"),
     Path("part2_cnn/02_feature_maps.py"),
+    Path("part2_cnn/03_classic_architectures.py"),
+    Path("part2_cnn/04_debug_panel.py"),
+    Path("part2_cnn/05_mnist_toy.py"),
+    Path("part2_cnn/06_modern_architectures.py"),
+    Path("part2_cnn/07_advanced_convolution.py"),
+    Path("part2_cnn/08_visualization_gradcam.py"),
     Path("part3_rnn/01_rnn_intuition.py"),
+    Path("part3_rnn/02_hidden_states.py"),
+    Path("part3_rnn/03_sequence_toys.py"),
+    Path("part3_rnn/04_hyperparam_rnn.py"),
+    Path("part3_rnn/05_seq2seq_attention.py"),
+    Path("part3_rnn/06_text_classification.py"),
+    Path("part3_rnn/07_advanced_training.py"),
+    Path("part3_rnn/08_debug_problems.py"),
     Path("part4_transformer/01_attention_mechanism.py"),
     Path("part4_transformer/02_multihead_visual.py"),
     Path("part5_toolbox/05_dataset_toys.py"),
@@ -246,6 +305,20 @@ EXPECTED_CONTENT_REFERENCES = {
         "render_attention_light_beams",
         "render_backprop_current_flow",
         "render_training_dashboard_gauges",
+        "render_tooltip_label",
+        "render_motion_note",
+        "render_neon_metric_card",
+        "render_concept_animation_shell",
+        "render_responsive_motion_grid",
+        "render_shape_flow",
+        "render_status_badge",
+        "render_beginner_hint",
+        "prefers-reduced-motion",
+        "@media (max-width: 760px)",
+        ":focus-visible",
+        "tooltip",
+        "loading",
+        "图表说明",
         "render_motion_gallery",
         "scroll-behavior: smooth",
     ],
@@ -354,15 +427,28 @@ EXPECTED_CONTENT_REFERENCES = {
     Path("part1_foundations/01_tensors_gradients.py"): [
         "render_gradient_descent_landscape",
         "render_backprop_current_flow",
+        "render_beginner_hint",
+        "render_motion_note",
+        "render_shape_flow",
     ],
     Path("part2_cnn/01_convolution_visual.py"): [
         "render_convolution_particle_flow",
+        "render_beginner_hint",
+        "render_motion_note",
+        "render_shape_flow",
     ],
     Path("part4_transformer/transformer_models.py"): [
         "render_attention_light_beams",
+        "render_beginner_hint",
+        "render_motion_note",
+        "render_shape_flow",
+        "render_tooltip_label",
     ],
     Path("part6_universal_framework/training_demo.py"): [
         "render_training_dashboard_gauges",
+        "render_beginner_hint",
+        "render_motion_note",
+        "render_neon_metric_card",
     ],
     Path("part7_interview/interview_quiz.py"): [
         "QUESTION_MODULE_MAP",
@@ -1217,6 +1303,70 @@ def check_matplotlib_close_after_show() -> None:
     print(f"[通过] Matplotlib 图未关闭检查：legacy_runner 统一关闭旧脚本图像，额外扫描 {len(scan_files)} 个非旧脚本文件")
 
 
+def check_root_runtime_artifacts_clean() -> None:
+    """Keep direct script products out of the repository root."""
+
+    failures: list[str] = []
+    for path in sorted(ROOT.iterdir(), key=lambda item: item.name.lower()):
+        if path.name in ROOT_RUNTIME_ALLOWED_DIRS:
+            continue
+        if path.is_dir() and path.name in ROOT_RUNTIME_TEMP_DIRS:
+            failures.append(f"{path.name}/")
+        elif path.is_file() and path.suffix.lower() in ROOT_RUNTIME_ARTIFACT_EXTENSIONS:
+            failures.append(path.name)
+
+    if failures:
+        visible = "\n".join(f"  - {item}" for item in failures[:160])
+        extra = "" if len(failures) <= 160 else f"\n  ... 另有 {len(failures) - 160} 个产物"
+        raise CheckFailure(
+            "根目录运行产物污染检查失败：发现脚本输出落在项目根目录。\n"
+            "请把图片、CSV、模型权重、日志、缓存和临时输出统一放入 "
+            ".streamlit_module_outputs/ 对应 run 目录。\n"
+            f"{visible}{extra}"
+        )
+    print("[通过] 根目录运行产物污染检查：根目录无图片、CSV、模型权重、日志、缓存或临时输出")
+
+
+def check_direct_script_artifact_redirection() -> None:
+    """Ensure direct legacy script runs are redirected into the shared artifact root."""
+
+    text = read_text(Path("sitecustomize.py"))
+    required_fragments = [
+        "ARTIFACT_ROOT",
+        "ROOT_ARTIFACT_RUN_DIR",
+        "ARTIFACT_DIR_ENV",
+        "DL_BOOK_ARTIFACT_DIR",
+        "sys.dont_write_bytecode = True",
+        "_cleanup_root_pycache",
+        "builtins.open = redirected_open",
+        "Path.open = redirected_path_open",
+        "Path.write_text = redirected_path_write_text",
+        "Path.write_bytes = redirected_path_write_bytes",
+        "plt.savefig = redirected_pyplot_savefig",
+        "Figure.savefig = redirected_figure_savefig",
+        "torch.save = redirected_torch_save",
+        "pd.DataFrame.to_csv = redirected_to_csv",
+        '".streamlit_module_outputs"',
+        '".csv"',
+        '".log"',
+    ]
+    failures = [fragment for fragment in required_fragments if fragment not in text]
+    runner_text = read_text(Path("legacy_runner.py"))
+    main_text = read_text(Path("main.py"))
+    if "DL_BOOK_ARTIFACT_DIR" not in runner_text:
+        failures.append("legacy_runner.py 缺少 DL_BOOK_ARTIFACT_DIR run 目录传递")
+    if "import sitecustomize" not in runner_text:
+        failures.append("legacy_runner.py 缺少显式导入 sitecustomize")
+    if "PYTHONDONTWRITEBYTECODE" not in main_text:
+        failures.append("main.py 子进程环境缺少 PYTHONDONTWRITEBYTECODE=1")
+    if failures:
+        raise CheckFailure(
+            "直接运行脚本产物重定向检查失败：sitecustomize.py 缺少关键保护。\n"
+            + "\n".join(f"  - {fragment}" for fragment in failures)
+        )
+    print("[通过] 直接运行脚本产物重定向检查：图片、CSV、模型权重、日志和 pycache 均有统一保护")
+
+
 def check_visual_system_integration() -> None:
     """Check that visual_system.py contains core neon colors, motion components,
     Font Awesome / Inter / JetBrains Mono assets, and that core pages import it."""
@@ -1258,9 +1408,38 @@ def check_visual_system_integration() -> None:
         if font not in text:
             failures.append(f"{vs_path}: 缺少字体 {font} 引用")
 
+    required_p1_components = [
+        "render_tooltip_label",
+        "render_motion_note",
+        "render_neon_metric_card",
+        "render_concept_animation_shell",
+        "render_responsive_motion_grid",
+        "render_shape_flow",
+        "render_status_badge",
+        "render_beginner_hint",
+    ]
+    for func_name in required_p1_components:
+        if f"def {func_name}" not in text:
+            failures.append(f"{vs_path}: P1 通用视觉组件 {func_name} 缺失")
+
+    required_css_fragments = [
+        "prefers-reduced-motion",
+        "@media (max-width: 760px)",
+        ":focus-visible",
+        ".vs-tooltip",
+        ".vs-loading",
+        ".vs-chart-note",
+        "图表说明",
+    ]
+    for fragment in required_css_fragments:
+        if fragment not in text:
+            failures.append(f"{vs_path}: 缺少视觉系统 CSS/说明约束 {fragment}")
+
     # --- Core pages must import render_visual_system ---
     VISUAL_SYSTEM_IMPORT_PAGES = [
         Path("main.py"),
+        Path("part2_cnn/03_classic_architectures.py"),
+        Path("part2_cnn/advanced_cnn.py"),
         Path("part4_transformer/transformer_models.py"),
         Path("part6_universal_framework/training_demo.py"),
     ]
@@ -1282,6 +1461,12 @@ def check_visual_system_integration() -> None:
         ],
         Path("part2_cnn/01_convolution_visual.py"): [
             "render_convolution_particle_flow",
+        ],
+        Path("part2_cnn/03_classic_architectures.py"): [
+            "render_cnn_layer_pipeline",
+        ],
+        Path("part2_cnn/advanced_cnn.py"): [
+            "render_advanced_conv_comparison",
         ],
     }
     for page_path, effects in MOTION_EFFECT_PAGES.items():
@@ -1317,6 +1502,8 @@ def run_checks(include_smoke: bool) -> None:
     check_back_to_home_entry()
     check_legacy_top_level_execution()
     check_matplotlib_close_after_show()
+    check_direct_script_artifact_redirection()
+    check_root_runtime_artifacts_clean()
     if include_smoke:
         check_strict_legacy_smoke()
         check_focus_smoke()

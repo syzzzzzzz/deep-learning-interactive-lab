@@ -18,7 +18,12 @@ import streamlit as st
 import torch
 import torch.nn.functional as F
 
-from components.visual_system import render_advanced_conv_comparison
+from components.visual_system import (
+    render_advanced_conv_comparison,
+    render_beginner_hint,
+    render_motion_note,
+    render_visual_system,
+)
 
 
 torch.set_num_threads(1)
@@ -110,6 +115,7 @@ st.markdown(
 )
 
 
+render_visual_system("light")
 render_advanced_conv_comparison()
 
 
@@ -561,6 +567,26 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True,
+)
+render_beginner_hint(
+    "先把高级卷积当成不同的取样方式",
+    "标准卷积、1x1、转置卷积、空洞卷积、深度可分离卷积和分组卷积，都在回答同一个问题：用多少参数、看多大范围、保留多少空间细节。",
+    action="先固定随机种子，只改一个参数；看输出形状、有效感受野和参数量哪一个先变。",
+)
+render_motion_note(
+    "动效在说明什么",
+    "上方高级卷积动画把不同卷积的扫描方式放在一起对比；亮块移动代表卷积窗口取样，通道变化代表参数连接方式改变。",
+)
+st.markdown(
+    """
+    **这是什么？** 这页把 CNN 里常见的高级组件拆开观察：不同卷积负责改变取样方式和连接方式，池化负责压缩空间信息，BatchNorm 负责稳定数值分布，Dropout 负责让模型训练时不要太依赖少数激活。
+
+    **生活类比：** 像用不同镜头看同一张照片：标准卷积是普通放大镜，1x1 卷积是在调色盘里混合颜色，空洞卷积是隔着格子看更大范围，转置卷积像把小图重新铺大，池化像做摘要，BN 像把不同批次的音量调到接近水平，Dropout 像训练时随机遮住一部分线索。
+
+    **一句话直觉：** 高级 CNN 层不是神秘技巧，而是在控制“看多大、算多少、保留多少细节、训练稳不稳”。
+
+    **图中每个元素代表什么：** 特征图里的每个小图是一张输入或输出通道；颜色越亮表示该位置响应越强；指标卡显示输入形状、输出形状、有效感受野和参数量；池化图中的数字是窗口汇总后的值；BN 直方图和柱状图分别表示归一化前后的分布、均值和标准差；Dropout 图中变暗或为零的位置表示被随机屏蔽的激活。
+    """
 )
 render_advanced_cnn_learning_map()
 

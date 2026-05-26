@@ -991,6 +991,7 @@ def os_environ_utf8() -> dict[str, str]:
 
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
     env["MPLBACKEND"] = "Agg"
     return env
 

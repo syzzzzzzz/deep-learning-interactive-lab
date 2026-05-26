@@ -1,13 +1,30 @@
-"""
-自动生成自: part3_rnn\05_seq2seq_attention.md
-可独立运行的 Python 源码
-"""
+"""Seq2Seq 与注意力：从固定上下文瓶颈到可解释对齐矩阵。"""
+
+from __future__ import annotations
+
+import io
+import sys
+from contextlib import redirect_stdout
+from pathlib import Path
+
+MODULE_TITLE = "Seq2Seq 与注意力"
+MODULE_SUMMARY = "用对齐热力图、长序列性能曲线和上下文瓶颈示意解释编码器-解码器为什么需要注意力。"
+MODULE_TAGS = ["RNN", "Seq2Seq", "注意力", "机器翻译", "对齐"]
+MODULE_RELATED_TOPICS = ["part3/03_sequence_toys", "part3/04_hyperparam_rnn", "part4/01_attention_mechanism", "part4/transformer_models"]
+PRACTICE_TARGET = "切换源句子、目标词和注意力锐度，解释每个输出词为什么应该看向不同输入位置。"
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 import matplotlib.pyplot as plt
+
+from components.lesson_runtime import clamp_float, clamp_int, run_cli, running_under_streamlit
+from components.resource_manager import clean_old_artifacts, get_artifact_path, safe_mpl_figure
 
 
 class Encoder(nn.Module):
@@ -351,7 +368,7 @@ def demo_attention_visualization():
 
     visualize_attention(attn, src, tgt)
 
-demo_attention_visualization()
+# demo_attention_visualization()  # 协议化后由 render()/compute_seq2seq_attention() 控制执行
 
 # ============================================================
 # 代码段 6
@@ -400,16 +417,306 @@ def compare_with_without_attention():
     plt.show()
 
 
+def _softmax_numpy(values: np.ndarray) -> np.ndarray:
+    shifted = values - np.max(values, axis=-1, keepdims=True)
+    exp = np.exp(shifted)
+    return exp / exp.sum(axis=-1, keepdims=True)
+
+
+def _sentence_pairs() -> dict[str, tuple[list[str], list[str], np.ndarray]]:
+    return {
+        "我 爱 深度 学习": (
+            ["我", "爱", "深", "度", "学", "习"],
+            ["I", "love", "deep", "learning"],
+            np.array(
+                [
+                    [3.4, 0.2, -0.5, -0.5, -0.6, -0.1],
+                    [0.1, 3.6, -0.4, -0.4, -0.2, -0.2],
+                    [-0.4, -0.4, 2.2, 2.1, 0.4, 0.1],
+                    [-0.4, -0.4, 0.0, 0.1, 2.0, 2.3],
+                ]
+            ),
+        ),
+        "机器 翻译 需要 上下文": (
+            ["机器", "翻译", "需要", "上下文"],
+            ["machine", "translation", "needs", "context"],
+            np.array(
+                [
+                    [3.2, 1.0, -0.2, -0.5],
+                    [0.7, 3.3, -0.3, -0.5],
+                    [-0.5, -0.2, 3.0, 0.4],
+                    [-0.4, -0.3, 0.3, 3.4],
+                ]
+            ),
+        ),
+        "今天 天气 很 适合 学习": (
+            ["今天", "天气", "很", "适合", "学习"],
+            ["today", "weather", "is", "good", "for", "study"],
+            np.array(
+                [
+                    [3.3, 0.2, -0.5, -0.4, -0.5],
+                    [0.0, 3.1, -0.2, -0.4, -0.5],
+                    [-0.2, 1.0, 1.6, 0.5, -0.3],
+                    [-0.5, -0.2, 0.8, 2.4, 0.2],
+                    [-0.5, -0.4, 0.1, 2.1, 0.7],
+                    [-0.5, -0.4, -0.2, 0.4, 3.2],
+                ]
+            ),
+        ),
+    }
+
+
+def _compute_alignment(pair_name: str, sharpness: float) -> tuple[list[str], list[str], np.ndarray]:
+    pairs = _sentence_pairs()
+    if pair_name not in pairs:
+        raise ValueError(f"未知句子: {pair_name}")
+    src_tokens, tgt_tokens, scores = pairs[pair_name]
+    sharpness = clamp_float(sharpness, 0.35, 3.0, "注意力锐度")
+    weights = _softmax_numpy(scores * sharpness)
+    return src_tokens, tgt_tokens, weights
+
+
+def _plot_alignment(weights: np.ndarray, src_tokens: list[str], tgt_tokens: list[str], selected_target: int) -> object:
+    with safe_mpl_figure(figsize=(9.5, 5.8)) as fig:
+        ax = fig.subplots(1, 1)
+        im = ax.imshow(weights, cmap="Blues", vmin=0, vmax=1)
+        fig.colorbar(im, ax=ax, label="注意力权重")
+        ax.set_xticks(range(len(src_tokens)))
+        ax.set_xticklabels(src_tokens, fontsize=10)
+        ax.set_yticks(range(len(tgt_tokens)))
+        ax.set_yticklabels(tgt_tokens, fontsize=10)
+        ax.axhline(selected_target - 0.5, color="#00f0ff", linewidth=2)
+        ax.axhline(selected_target + 0.5, color="#00f0ff", linewidth=2)
+        for i in range(len(tgt_tokens)):
+            for j in range(len(src_tokens)):
+                val = weights[i, j]
+                if val > 0.03:
+                    ax.text(j, i, f"{val:.2f}", ha="center", va="center", fontsize=8, color="white" if val > 0.55 else "black")
+        ax.set_xlabel("源序列：编码器记住的每个输入词")
+        ax.set_ylabel("目标序列：解码器正在生成的词")
+        ax.set_title("Seq2Seq 注意力对齐矩阵：一行解释一个输出词在看谁", fontsize=12, fontweight="bold")
+        fig.tight_layout()
+        return fig
+
+
+def _plot_length_comparison(max_length: int) -> tuple[object, dict[str, float]]:
+    lengths = np.array([5, 10, 20, 40, 80])
+    max_length = clamp_int(max_length, 10, 80, "最大序列长度")
+    visible = lengths <= max_length
+    visible_lengths = lengths[visible]
+    no_attention = 0.97 * np.exp(-visible_lengths / 96) - np.maximum(visible_lengths - 12, 0) / 150
+    bahdanau = 0.97 * np.exp(-visible_lengths / 260) - np.maximum(visible_lengths - 55, 0) / 500
+    luong = 0.96 * np.exp(-visible_lengths / 240) - np.maximum(visible_lengths - 60, 0) / 520
+    no_attention = np.clip(no_attention, 0.20, 0.98)
+    bahdanau = np.clip(bahdanau, 0.35, 0.98)
+    luong = np.clip(luong, 0.35, 0.98)
+    with safe_mpl_figure(figsize=(10, 4.3)) as fig:
+        ax1, ax2 = fig.subplots(1, 2)
+        ax1.plot(visible_lengths, no_attention, "o-", label="无注意力", color="#bf3f5b", linewidth=2)
+        ax1.plot(visible_lengths, bahdanau, "s-", label="Bahdanau 加性注意力", color="#00f0ff", linewidth=2)
+        ax1.plot(visible_lengths, luong, "^-", label="Luong 乘性注意力", color="#00ff88", linewidth=2)
+        ax1.set_title("输入越长，固定上下文越吃力", fontsize=10, fontweight="bold")
+        ax1.set_xlabel("输入序列长度")
+        ax1.set_ylabel("教学化质量分数")
+        ax1.set_ylim(0.15, 1.02)
+        ax1.grid(True, alpha=0.25)
+        ax1.legend(fontsize=8)
+        ax2.barh(["固定向量", "注意力读取"], [1, int(max_length)], color=["#bf3f5b", "#00ff88"], alpha=0.88)
+        ax2.set_title("上下文信息通道对比", fontsize=10, fontweight="bold")
+        ax2.set_xlabel("可访问的信息位置数")
+        ax2.grid(True, axis="x", alpha=0.25)
+        fig.tight_layout()
+        stats = {
+            "no_attention_last": float(no_attention[-1]),
+            "bahdanau_last": float(bahdanau[-1]),
+            "luong_last": float(luong[-1]),
+        }
+        return fig, stats
+
+
+def _plot_context_flow(src_tokens: list[str], tgt_tokens: list[str], weights: np.ndarray, selected_target: int) -> object:
+    selected = weights[selected_target]
+    with safe_mpl_figure(figsize=(10, 3.8)) as fig:
+        ax = fig.subplots(1, 1)
+        x_src = np.linspace(0.1, 0.9, len(src_tokens))
+        y_src = np.full(len(src_tokens), 0.72)
+        x_tgt = 0.5
+        y_tgt = 0.18
+        for x, y, token, weight in zip(x_src, y_src, src_tokens, selected):
+            ax.scatter([x], [y], s=900 * (0.35 + weight), color="#1f77b4", alpha=0.9)
+            ax.text(x, y, token, ha="center", va="center", color="white", fontsize=10, fontweight="bold")
+            ax.plot([x, x_tgt], [y - 0.04, y_tgt + 0.06], color="#00f0ff", linewidth=1.0 + 6 * weight, alpha=0.18 + 0.75 * weight)
+        ax.scatter([x_tgt], [y_tgt], s=1100, color="#b000ff", alpha=0.9)
+        ax.text(x_tgt, y_tgt, tgt_tokens[selected_target], ha="center", va="center", color="white", fontsize=11, fontweight="bold")
+        ax.text(0.5, 0.02, "线越亮、越粗，表示当前输出词从该输入词取走的信息越多", ha="center", fontsize=10)
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis("off")
+        ax.set_title("上下文读取路径：解码器不是只看最后一步，而是按权重回看所有输入", fontsize=12, fontweight="bold")
+        fig.tight_layout()
+        return fig
+
+
+def compute_seq2seq_attention(
+    pair_name: str = "我 爱 深度 学习",
+    target_index: int = 0,
+    sharpness: float = 1.2,
+    max_length: int = 80,
+    seed: int = 42,
+    save_artifacts: bool = False,
+) -> dict[str, object]:
+    """Compute Seq2Seq attention teaching visuals without import-time side effects."""
+
+    np.random.seed(seed)
+    src_tokens, tgt_tokens, weights = _compute_alignment(pair_name, sharpness)
+    target_index = clamp_int(int(target_index), 0, len(tgt_tokens) - 1, "目标词编号")
+    log_buffer = io.StringIO()
+    selected_weights = weights[target_index]
+    strongest_index = int(np.argmax(selected_weights))
+    entropy = float(-(selected_weights * np.log(selected_weights + 1e-12)).sum())
+    with redirect_stdout(log_buffer):
+        print("Seq2Seq 注意力协议化计算")
+        print(f"源序列: {' '.join(src_tokens)}")
+        print(f"目标词: {tgt_tokens[target_index]}")
+        print(f"最关注输入词: {src_tokens[strongest_index]}，权重={selected_weights[strongest_index]:.3f}")
+        print(f"注意力熵: {entropy:.3f}；熵越低代表越集中，熵越高代表同时参考多个词。")
+        print("公式: context_t = Σ_s attention(t,s) * encoder_output_s")
+    align_fig = _plot_alignment(weights, src_tokens, tgt_tokens, target_index)
+    flow_fig = _plot_context_flow(src_tokens, tgt_tokens, weights, target_index)
+    length_fig, length_stats = _plot_length_comparison(max_length)
+    figures = [
+        ("seq2seq_attention_alignment.png", align_fig),
+        ("seq2seq_attention_context_flow.png", flow_fig),
+        ("seq2seq_attention_length_comparison.png", length_fig),
+    ]
+    artifacts: list[Path] = []
+    if save_artifacts:
+        for filename, fig in figures:
+            path = get_artifact_path(filename)
+            fig.savefig(path, dpi=150, bbox_inches="tight")
+            artifacts.append(path)
+    stats = {
+        "selected_target": tgt_tokens[target_index],
+        "strongest_source": src_tokens[strongest_index],
+        "strongest_weight": float(selected_weights[strongest_index]),
+        "attention_entropy": entropy,
+        **length_stats,
+    }
+    return {
+        "figures": figures,
+        "artifacts": artifacts,
+        "stats": stats,
+        "weights": weights,
+        "src_tokens": src_tokens,
+        "tgt_tokens": tgt_tokens,
+        "log": log_buffer.getvalue(),
+    }
+
+
+def _go_to_transformer_attention() -> None:
+    import streamlit as st
+
+    st.query_params["module"] = "part4_transformer/01_attention_mechanism"
+    st.rerun()
+
+
 def render() -> None:
-    """Page entry point — content runs at module import time."""
-    pass
+    """Render the refactored Seq2Seq attention lesson."""
+
+    import streamlit as st
+    from components.error_boundary import render_module_error
+    from components.visual_system import render_attention_light_beams, render_loading_bar, render_visual_system
+
+    try:
+        clean_old_artifacts()
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
+        render_visual_system("dark")
+        st.link_button("返回主界面", "/", width="small")
+        st.title(MODULE_TITLE)
+        st.caption(MODULE_SUMMARY)
+        render_loading_bar("正在生成对齐矩阵、上下文读取路径和长序列对比")
+        pairs = _sentence_pairs()
+        with st.sidebar:
+            pair_name = st.selectbox("源句子", list(pairs.keys()))
+            target_tokens = pairs[pair_name][1]
+            target_word = st.selectbox("选择目标词", target_tokens)
+            target_index = target_tokens.index(target_word)
+            sharpness = st.slider("注意力锐度", 0.35, 3.0, 1.2, 0.05)
+            max_length = st.slider("最大序列长度", 10, 80, 80, 5)
+            seed = st.number_input("随机种子", 0, 9999, 42, 1)
+            if st.button("继续看：Transformer 注意力", width="stretch"):
+                _go_to_transformer_attention()
+
+        data = compute_seq2seq_attention(pair_name, target_index, sharpness, max_length, int(seed), save_artifacts=True)
+        stats = data["stats"]
+        render_attention_light_beams()
+        st.markdown(
+            """
+            **零基础直觉：**没有注意力的 Seq2Seq 像让一个人读完整篇文章后，只允许他用一句压缩笔记回答所有问题。
+            带注意力的 Seq2Seq 则允许他在回答每个词时重新回看原文。热力图中的一行就是一次“回看”：颜色越深，
+            表示当前输出词越依赖那个输入词。
+            """
+        )
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("当前目标词", str(stats["selected_target"]))
+        k2.metric("最关注输入词", str(stats["strongest_source"]))
+        k3.metric("最大权重", f"{stats['strongest_weight']:.2f}")
+        k4.metric("注意力熵", f"{stats['attention_entropy']:.2f}")
+        explainers = [
+            (
+                "对齐热力图",
+                "横轴是输入词，纵轴是输出词；每一行加起来等于 1。深色格子说明当前输出词主要从这个输入位置取信息。",
+            ),
+            (
+                "上下文读取路径",
+                "线条越粗越亮，代表当前目标词从对应源词拿走的信息越多。它把矩阵里的一行变成更像人能看懂的流向图。",
+            ),
+            (
+                "长序列瓶颈对比",
+                "无注意力模型只依赖固定长度上下文，输入越长越容易漏信息；注意力可以逐步回看所有输入位置，因此下降更慢。",
+            ),
+        ]
+        for (filename, fig), (title, body) in zip(data["figures"], explainers):
+            st.subheader(title)
+            st.write(body)
+            st.pyplot(fig, clear_figure=False)
+            st.caption(f"图像产物已放入统一目录：{get_artifact_path(filename)}")
+            st.markdown("> 请改变“选择目标词”或“注意力锐度”，观察热力图中哪一行改变最大。思考：翻译一个词时，模型为什么不应该总盯着同一个输入词？")
+        with st.expander("数学、误区与控制台输出", expanded=False):
+            st.markdown(
+                r"""
+                核心计算可以写成：
+
+                \[
+                \alpha_{t,s}=\mathrm{softmax}(\mathrm{score}(h_t,h_s)),\quad
+                c_t=\sum_s \alpha_{t,s}h_s
+                \]
+
+                **误区 1：注意力就是最终解释。** 正确理解：权重能提供线索，但不是完整因果解释。
+                **误区 2：越尖锐越好。** 正确理解：翻译复合词时常常需要同时看多个输入词。
+                **工程经验：**长序列任务先检查注意力是否塌缩到固定位置；如果塌缩，常见原因是学习率过大、mask 错误或位置处理不合理。
+                """
+            )
+            st.code(str(data["log"])[-12000:], language="text")
+    except Exception as exc:
+        render_module_error("part3_rnn/05_seq2seq_attention.py", exc)
 
 
 def compute(seed: int = 42) -> dict[str, object]:
-    """Pure computation placeholder."""
-    return {"status": "ok", "seed": seed}
+    """Backward-compatible compute entry used by generic runners."""
+
+    return compute_seq2seq_attention(seed=seed, save_artifacts=False)
 
 
 def smoke() -> bool:
     """Lightweight self-check used by quality gates."""
-    return True
+
+    data = compute_seq2seq_attention(target_index=1, sharpness=1.1, max_length=20, seed=7, save_artifacts=False)
+    return bool(data["figures"]) and data["stats"]["strongest_weight"] > 0 and data["weights"].shape[0] == len(data["tgt_tokens"])
+
+
+if __name__ == "__main__":
+    if running_under_streamlit():
+        render()
+    else:
+        raise SystemExit(run_cli(compute_seq2seq_attention))

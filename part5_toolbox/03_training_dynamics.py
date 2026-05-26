@@ -12,7 +12,37 @@ try:
     from collections import defaultdict
     from typing import Dict, List, Optional
     import streamlit as st
-    from components.visual_system import render_training_dynamics_panel, render_training_curve_scanner
+    from components.visual_system import (
+        render_beginner_hint,
+        render_motion_note,
+        render_training_curve_scanner,
+        render_training_dynamics_panel,
+        render_visual_system,
+    )
+
+    render_visual_system("dark")
+
+    render_beginner_hint(
+        "先看训练是否真的在动",
+        "训练动态页关注三件事：权重分布有没有漂移、激活有没有饱和、参数更新幅度是否和权重规模匹配。",
+        action="先看曲线方向和分布宽窄，再判断要不要改学习率、初始化、归一化或梯度裁剪。",
+    )
+    render_motion_note(
+        "动效在说明什么",
+        "训练面板的扫描光和仪表变化表示训练过程是连续时间序列；不要只看某一步，要看最近一段趋势是否稳定。",
+    )
+
+    st.markdown(
+        """
+        **这是什么？** 这页是在观察训练过程的内部动态：loss 有没有下降，权重分布有没有漂移，激活是否饱和，以及每一步参数更新幅度是否合适。
+
+        **生活类比：** 像给一辆正在行驶的车看仪表盘：速度表对应 loss 变化，发动机温度对应激活饱和，油门力度对应更新幅度，轮胎状态对应权重分布。只看终点成绩不够，过程指标能告诉你哪里开始不正常。
+
+        **一句话直觉：** 训练动态监控是在确认模型不是“看起来在跑”，而是真的以合适速度、合适方向学习。
+
+        **图中每个元素代表什么：** 权重分布图的曲线表示均值、标准差和百分位范围；激活饱和图表示每层有多少激活落在无效或饱和区域；更新幅度比图表示 lr * grad_norm / weight_norm，也就是这一步相对权重规模改了多少；训练曲线的横轴是步数，纵轴是 loss 或诊断指标，虚线通常表示经验警戒线。
+        """
+    )
 
     # ── 视觉系统：训练动态监控面板 ──
     render_training_dynamics_panel()

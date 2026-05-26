@@ -20,6 +20,7 @@ env/
 /*.jpg
 /*.jpeg
 /*.gif
+/*.csv
 /*.pt
 /*.pth
 /*.ckpt
@@ -29,4 +30,3 @@ env/
 Thumbs.db
 .idea/
 .vscode/
-

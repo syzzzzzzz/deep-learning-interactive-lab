@@ -65,6 +65,7 @@ def main() -> int:
     script_path = Path(sys.argv[2]).resolve()
     output_dir = Path(sys.argv[3]).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["DL_BOOK_ARTIFACT_DIR"] = str(output_dir)
 
     if not script_path.is_file():
         print(f"Script not found: {script_path}", file=sys.stderr)
@@ -74,6 +75,10 @@ def main() -> int:
         return 2
 
     sys.path.insert(0, str(base_dir))
+    try:
+        import sitecustomize  # noqa: F401 - installs project-wide artifact redirection hooks.
+    except Exception:
+        pass
     os.chdir(output_dir)
     configure_matplotlib(output_dir)
 

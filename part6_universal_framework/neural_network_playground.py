@@ -170,6 +170,74 @@ COMPONENT_REGISTRY: dict[str, dict[str, Any]] = {
         "pytorch_code": "nn.GELU()",
         "related_topic": "Transformer / 激活函数",
     },
+    "RNN": {
+        "name": "RNN",
+        "type": "sequence",
+        "params": {
+            "input_size": 64,
+            "hidden_size": 128,
+            "num_layers": 1,
+            "bidirectional": False,
+            "dropout": 0.0,
+            "return_sequences": True,
+        },
+        "input_rule": "输入必须是 (seq_len, input_size)，不包含 batch 维。",
+        "output_rule": "输出为 (seq_len, hidden_size * directions)，或只取末步时为 (hidden_size * directions,)。",
+        "description": "基础循环神经网络层，用于逐步读取序列特征。",
+        "pytorch_code": "nn.RNN(input_size, hidden_size, batch_first=True)",
+        "related_topic": "RNN / 序列建模",
+    },
+    "LSTM": {
+        "name": "LSTM",
+        "type": "sequence",
+        "params": {
+            "input_size": 64,
+            "hidden_size": 128,
+            "num_layers": 1,
+            "bidirectional": False,
+            "dropout": 0.0,
+            "return_sequences": True,
+        },
+        "input_rule": "输入必须是 (seq_len, input_size)，不包含 batch 维。",
+        "output_rule": "输出为 (seq_len, hidden_size * directions)，或只取末步时为 (hidden_size * directions,)。",
+        "description": "带门控记忆单元的循环层，适合更长依赖的序列表示。",
+        "pytorch_code": "nn.LSTM(input_size, hidden_size, batch_first=True)",
+        "related_topic": "LSTM / 序列建模",
+    },
+    "GRU": {
+        "name": "GRU",
+        "type": "sequence",
+        "params": {
+            "input_size": 64,
+            "hidden_size": 128,
+            "num_layers": 1,
+            "bidirectional": False,
+            "dropout": 0.0,
+            "return_sequences": True,
+        },
+        "input_rule": "输入必须是 (seq_len, input_size)，不包含 batch 维。",
+        "output_rule": "输出为 (seq_len, hidden_size * directions)，或只取末步时为 (hidden_size * directions,)。",
+        "description": "门控循环单元，比 LSTM 更轻量，常用于序列分类和预测。",
+        "pytorch_code": "nn.GRU(input_size, hidden_size, batch_first=True)",
+        "related_topic": "GRU / 序列建模",
+    },
+    "ConvBlock": {
+        "name": "ConvBlock",
+        "type": "block",
+        "params": {
+            "in_channels": 1,
+            "out_channels": 16,
+            "kernel_size": 3,
+            "stride": 1,
+            "padding": 1,
+            "use_batchnorm": True,
+        },
+        "input_rule": "输入必须是 (channels, height, width)，且 channels 等于 in_channels。",
+        "output_rule": "输出为 (out_channels, H_out, W_out)。",
+        "description": "Conv2d + 可选 BatchNorm2d + ReLU 的常用卷积块。",
+        "pytorch_code": "ConvBlock(in_channels, out_channels, kernel_size, stride, padding)",
+        "related_topic": "CNN / 卷积块",
+    },
     "ResidualBlock": {
         "name": "ResidualBlock",
         "type": "block",
@@ -179,6 +247,16 @@ COMPONENT_REGISTRY: dict[str, dict[str, Any]] = {
         "description": "残差 MLP 块，学习 F(x) 后再和输入 x 相加，缓解深层网络退化和梯度传播困难。",
         "pytorch_code": "ResidualMLPBlock(dim, hidden_dim, dropout)",
         "related_topic": "ResNet / 残差连接",
+    },
+    "Attention": {
+        "name": "Attention",
+        "type": "attention",
+        "params": {"embed_dim": 64, "num_heads": 4, "dropout": 0.1},
+        "input_rule": "输入必须是 (seq_len, embed_dim)，即 batch 后的 token 序列表示。",
+        "output_rule": "输出形状与输入相同。",
+        "description": "自注意力块，让每个 token 根据上下文重新汇聚信息。",
+        "pytorch_code": "SelfAttentionBlock(embed_dim, num_heads, dropout)",
+        "related_topic": "注意力 / Transformer",
     },
     "MultiheadAttention": {
         "name": "MultiheadAttention",
@@ -355,6 +433,63 @@ class PlaygroundSelfAttentionBlock(nn.Module):
         return x + self.dropout(attended)
 
 
+class PlaygroundConvBlock(nn.Module):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        stride: int = 1,
+        padding: int = 0,
+        use_batchnorm: bool = True,
+    ) -> None:
+        super().__init__()
+        layers: list[nn.Module] = [
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding)
+        ]
+        if use_batchnorm:
+            layers.append(nn.BatchNorm2d(out_channels))
+        layers.append(nn.ReLU())
+        self.net = nn.Sequential(*layers)
+        self.last_feature_maps: torch.Tensor | None = None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        output = self.net(x)
+        self.last_feature_maps = output.detach()
+        return output
+
+
+class PlaygroundRecurrentBlock(nn.Module):
+    def __init__(
+        self,
+        kind: str,
+        input_size: int,
+        hidden_size: int,
+        num_layers: int = 1,
+        bidirectional: bool = False,
+        dropout: float = 0.0,
+        return_sequences: bool = True,
+    ) -> None:
+        super().__init__()
+        recurrent_cls = {"RNN": nn.RNN, "LSTM": nn.LSTM, "GRU": nn.GRU}[kind]
+        effective_dropout = dropout if num_layers > 1 else 0.0
+        self.recurrent = recurrent_cls(
+            input_size,
+            hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=bidirectional,
+            dropout=effective_dropout,
+        )
+        self.return_sequences = return_sequences
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        output, _state = self.recurrent(x)
+        if self.return_sequences:
+            return output
+        return output[:, -1, :]
+
+
 class PlaygroundBuiltModel(nn.Module):
     def __init__(self, modules: list[nn.Module], layer_labels: list[str]) -> None:
         super().__init__()
@@ -370,6 +505,12 @@ class PlaygroundBuiltModel(nn.Module):
             x = module(x)
             if self.last_cnn_feature_maps is None and isinstance(module, nn.Conv2d):
                 self.last_cnn_feature_maps = x.detach()
+            if (
+                self.last_cnn_feature_maps is None
+                and isinstance(module, PlaygroundConvBlock)
+                and module.last_feature_maps is not None
+            ):
+                self.last_cnn_feature_maps = module.last_feature_maps
             if isinstance(module, PlaygroundSelfAttentionBlock) and module.last_attention_weights is not None:
                 self.last_attention_weights = module.last_attention_weights
         return x
@@ -461,6 +602,94 @@ def ensure_query_preset_loaded() -> None:
         load_preset(example)
 
 
+def _positive_int_param(params: dict[str, Any], name: str) -> int:
+    value = int(params[name])
+    if value <= 0:
+        raise ValueError(f"{name} 必须是正整数，当前是 {value}。")
+    return value
+
+
+def _dropout_param(params: dict[str, Any], name: str = "dropout") -> float:
+    value = float(params.get(name, 0.0))
+    if not 0.0 <= value <= 0.9:
+        raise ValueError(f"{name} 建议在 0.0 到 0.9 之间，当前是 {value}。")
+    return value
+
+
+def _conv2d_output_shape(component: str, params: dict[str, Any], current: tuple[int, ...]) -> tuple[int, int, int]:
+    if len(current) != 3:
+        raise ValueError(
+            f"{component} 需要 (channels, height, width) 输入；当前上一层输出是 {format_shape(current)}。"
+        )
+    channels, height, width = current
+    in_channels = _positive_int_param(params, "in_channels")
+    if channels != in_channels:
+        raise ValueError(
+            f"{component} 的 in_channels={in_channels}，但上一层输出通道数是 {channels}。"
+            "请修改 in_channels，或在前一层把通道数投影到匹配值。"
+        )
+    out_channels = _positive_int_param(params, "out_channels")
+    kernel = _positive_int_param(params, "kernel_size")
+    stride = _positive_int_param(params, "stride")
+    padding = int(params["padding"])
+    if padding < 0:
+        raise ValueError(f"{component} 的 padding 不能为负数，当前是 {padding}。")
+    h_out = math.floor((height + 2 * padding - kernel) / stride + 1)
+    w_out = math.floor((width + 2 * padding - kernel) / stride + 1)
+    if h_out <= 0 or w_out <= 0:
+        raise ValueError(
+            f"{component} 的 kernel_size={kernel}, stride={stride}, padding={padding} 会把 "
+            f"{height}x{width} 变成 {h_out}x{w_out}。请调小 kernel_size/stride，或增大 padding。"
+        )
+    return out_channels, h_out, w_out
+
+
+def _attention_shape(component: str, params: dict[str, Any], current: tuple[int, ...]) -> tuple[tuple[int, ...], str, str]:
+    if len(current) != 2:
+        raise ValueError(
+            f"{component} 需要 (seq_len, embed_dim) 输入；当前上一层输出是 {format_shape(current)}。"
+            "图像特征请先 reshape 成 token 序列，普通向量请先增加序列维。"
+        )
+    embed_dim = _positive_int_param(params, "embed_dim")
+    num_heads = _positive_int_param(params, "num_heads")
+    if current[-1] != embed_dim:
+        raise ValueError(
+            f"{component} 的 embed_dim={embed_dim} 必须等于上一层输出最后一维 {current[-1]}。"
+            "可在前面接 Linear 对齐 token 宽度。"
+        )
+    if embed_dim % num_heads != 0:
+        raise ValueError(f"{component} 要求 embed_dim={embed_dim} 能被 num_heads={num_heads} 整除。")
+    _dropout_param(params)
+    return current, "注意力重新混合 token 信息，序列长度和表示维度保持不变。", layer_code(component, params, current)
+
+
+def _recurrent_shape(component: str, params: dict[str, Any], current: tuple[int, ...]) -> tuple[tuple[int, ...], str, str]:
+    if len(current) != 2:
+        raise ValueError(
+            f"{component} 需要 (seq_len, input_size) 输入；当前上一层输出是 {format_shape(current)}。"
+            "如果来自图像，请先把空间位置整理为序列；如果是单个向量，请增加 seq_len 维。"
+        )
+    seq_len, feature_dim = current
+    input_size = _positive_int_param(params, "input_size")
+    hidden_size = _positive_int_param(params, "hidden_size")
+    num_layers = _positive_int_param(params, "num_layers")
+    dropout = _dropout_param(params)
+    if feature_dim != input_size:
+        raise ValueError(
+            f"{component} 的 input_size={input_size} 必须等于上一层输出最后一维 {feature_dim}。"
+            "可先用 Linear 调整每个时间步的特征维。"
+        )
+    directions = 2 if bool(params.get("bidirectional", False)) else 1
+    output_width = hidden_size * directions
+    return_sequences = bool(params.get("return_sequences", True))
+    if dropout > 0 and num_layers == 1:
+        message = "num_layers=1 时 PyTorch 会忽略循环层内部 dropout；输出宽度由 hidden_size 和方向数决定。"
+    else:
+        message = "循环层按时间步更新隐藏状态；输出宽度由 hidden_size 和方向数决定。"
+    output = (seq_len, output_width) if return_sequences else (output_width,)
+    return output, message, layer_code(component, params, current)
+
+
 def infer_layer_shape(component: str, params: dict[str, Any], current: tuple[int, ...]) -> tuple[tuple[int, ...], str, str]:
     if component == "Linear":
         expected = int(params["in_features"])
@@ -478,23 +707,14 @@ def infer_layer_shape(component: str, params: dict[str, Any], current: tuple[int
         return (*current[:-1], out_features), "序列长度保持不变，最后一维替换为 out_features。", layer_code(component, params, current)
 
     if component == "Conv2d":
-        if len(current) != 3:
-            raise ValueError(f"Conv2d 层需要 (channels, height, width) 输入，当前输入是 {format_shape(current)}。")
-        channels, height, width = current
-        in_channels = int(params["in_channels"])
-        if channels != in_channels:
-            raise ValueError(f"Conv2d 层的输入通道数 {in_channels} 与上一层输出通道数 {channels} 不匹配。")
-        kernel = int(params["kernel_size"])
-        stride = int(params["stride"])
-        padding = int(params["padding"])
-        h_out = math.floor((height + 2 * padding - kernel) / stride + 1)
-        w_out = math.floor((width + 2 * padding - kernel) / stride + 1)
-        if h_out <= 0 or w_out <= 0:
-            raise ValueError(
-                f"Conv2d 的 kernel_size={kernel}, stride={stride}, padding={padding} 会让空间尺寸变为 "
-                f"{h_out}x{w_out}，请调小卷积核或增大 padding。"
-            )
-        return (int(params["out_channels"]), h_out, w_out), "按卷积公式计算空间尺寸。", layer_code(component, params, current)
+        return _conv2d_output_shape(component, params, current), "按卷积公式计算空间尺寸。", layer_code(component, params, current)
+
+    if component == "ConvBlock":
+        return (
+            _conv2d_output_shape(component, params, current),
+            "Conv2d 改变通道和空间尺寸；BatchNorm/ReLU 不改变形状。",
+            layer_code(component, params, current),
+        )
 
     if component == "MaxPool2d":
         if len(current) != 3:
@@ -559,19 +779,11 @@ def infer_layer_shape(component: str, params: dict[str, Any], current: tuple[int
             raise ValueError("ResidualBlock 的 dropout 建议在 0.0 到 0.9 之间。")
         return current, "残差块输出与输入相加，因此形状必须保持不变。", layer_code(component, params, current)
 
-    if component == "MultiheadAttention":
-        if len(current) != 2:
-            raise ValueError(
-                f"MultiheadAttention 需要 (seq_len, embed_dim) 输入，当前是 {format_shape(current)}。"
-                "图像特征请先展平成序列，向量输入请增加序列维。"
-            )
-        embed_dim = int(params["embed_dim"])
-        num_heads = int(params["num_heads"])
-        if current[-1] != embed_dim:
-            raise ValueError(f"embed_dim={embed_dim} 必须等于输入最后一维 {current[-1]}。")
-        if embed_dim % num_heads != 0:
-            raise ValueError(f"embed_dim={embed_dim} 必须能被 num_heads={num_heads} 整除。")
-        return current, "自注意力重新混合 token 信息，但保持序列长度和维度不变。", layer_code(component, params, current)
+    if component in {"RNN", "LSTM", "GRU"}:
+        return _recurrent_shape(component, params, current)
+
+    if component in {"Attention", "MultiheadAttention"}:
+        return _attention_shape(component, params, current)
 
     if component == "TransformerEncoder":
         if len(current) != 2:
@@ -628,6 +840,12 @@ def layer_code(component: str, params: dict[str, Any], current_shape: tuple[int,
             f"nn.Conv2d({params['in_channels']}, {params['out_channels']}, "
             f"kernel_size={params['kernel_size']}, stride={params['stride']}, padding={params['padding']})"
         )
+    if component == "ConvBlock":
+        return (
+            f"ConvBlock({params['in_channels']}, {params['out_channels']}, "
+            f"kernel_size={params['kernel_size']}, stride={params['stride']}, padding={params['padding']}, "
+            f"use_batchnorm={param_repr(params.get('use_batchnorm', True))})"
+        )
     if component == "MaxPool2d":
         return f"nn.MaxPool2d(kernel_size={params['kernel_size']}, stride={params['stride']})"
     if component == "Dropout":
@@ -643,7 +861,15 @@ def layer_code(component: str, params: dict[str, Any], current_shape: tuple[int,
         return "nn.GELU()"
     if component == "ResidualBlock":
         return f"ResidualMLPBlock({params['dim']}, {params['hidden_dim']}, dropout={params['dropout']})"
-    if component == "MultiheadAttention":
+    if component in {"RNN", "LSTM", "GRU"}:
+        return (
+            f"RecurrentBlock({param_repr(component)}, {params['input_size']}, {params['hidden_size']}, "
+            f"num_layers={params['num_layers']}, "
+            f"bidirectional={param_repr(params.get('bidirectional', False))}, "
+            f"dropout={params.get('dropout', 0.0)}, "
+            f"return_sequences={param_repr(params.get('return_sequences', True))})"
+        )
+    if component in {"Attention", "MultiheadAttention"}:
         return f"SelfAttentionBlock({params['embed_dim']}, {params['num_heads']}, dropout={params['dropout']})"
     if component == "TransformerEncoder":
         return (
@@ -680,6 +906,24 @@ def generate_code(
     )
     used_components = {layer["component"] for layer in layers}
     helper_blocks: list[str] = []
+    if "ConvBlock" in used_components:
+        helper_blocks.append(
+            """
+class ConvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=0, use_batchnorm=True):
+        super().__init__()
+        layers = [
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding)
+        ]
+        if use_batchnorm:
+            layers.append(nn.BatchNorm2d(out_channels))
+        layers.append(nn.ReLU())
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.net(x)
+"""
+        )
     if "ResidualBlock" in used_components:
         helper_blocks.append(
             """
@@ -698,7 +942,41 @@ class ResidualMLPBlock(nn.Module):
         return x + self.net(x)
 """
         )
-    if "MultiheadAttention" in used_components:
+    if used_components & {"RNN", "LSTM", "GRU"}:
+        helper_blocks.append(
+            """
+class RecurrentBlock(nn.Module):
+    def __init__(
+        self,
+        kind,
+        input_size,
+        hidden_size,
+        num_layers=1,
+        bidirectional=False,
+        dropout=0.0,
+        return_sequences=True,
+    ):
+        super().__init__()
+        recurrent_cls = {"RNN": nn.RNN, "LSTM": nn.LSTM, "GRU": nn.GRU}[kind]
+        effective_dropout = dropout if num_layers > 1 else 0.0
+        self.recurrent = recurrent_cls(
+            input_size,
+            hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=bidirectional,
+            dropout=effective_dropout,
+        )
+        self.return_sequences = return_sequences
+
+    def forward(self, x):
+        output, _state = self.recurrent(x)
+        if self.return_sequences:
+            return output
+        return output[:, -1, :]
+"""
+        )
+    if used_components & {"Attention", "MultiheadAttention"}:
         helper_blocks.append(
             """
 class SelfAttentionBlock(nn.Module):
@@ -762,6 +1040,15 @@ def build_torch_layer(component: str, params: dict[str, Any], current_shape: tup
             stride=int(params["stride"]),
             padding=int(params["padding"]),
         )
+    if component == "ConvBlock":
+        return PlaygroundConvBlock(
+            int(params["in_channels"]),
+            int(params["out_channels"]),
+            kernel_size=int(params["kernel_size"]),
+            stride=int(params["stride"]),
+            padding=int(params["padding"]),
+            use_batchnorm=bool(params.get("use_batchnorm", True)),
+        )
     if component == "MaxPool2d":
         return nn.MaxPool2d(kernel_size=int(params["kernel_size"]), stride=int(params["stride"]))
     if component == "ReLU":
@@ -787,7 +1074,17 @@ def build_torch_layer(component: str, params: dict[str, Any], current_shape: tup
             int(params["hidden_dim"]),
             dropout=float(params["dropout"]),
         )
-    if component == "MultiheadAttention":
+    if component in {"RNN", "LSTM", "GRU"}:
+        return PlaygroundRecurrentBlock(
+            component,
+            int(params["input_size"]),
+            int(params["hidden_size"]),
+            num_layers=int(params["num_layers"]),
+            bidirectional=bool(params.get("bidirectional", False)),
+            dropout=float(params.get("dropout", 0.0)),
+            return_sequences=bool(params.get("return_sequences", True)),
+        )
+    if component in {"Attention", "MultiheadAttention"}:
         return PlaygroundSelfAttentionBlock(
             int(params["embed_dim"]),
             int(params["num_heads"]),
@@ -1082,7 +1379,7 @@ def run_playground_training(
     attention_heatmap = extract_attention_heatmap(model.last_attention_weights)
     attention_is_simulated = False
     components = {layer["component"] for layer in layers}
-    if attention_heatmap is None and components & {"MultiheadAttention", "TransformerEncoder"}:
+    if attention_heatmap is None and components & {"Attention", "MultiheadAttention", "TransformerEncoder"}:
         attention_heatmap = make_similarity_attention_heatmap(x)
         attention_is_simulated = attention_heatmap is not None
 

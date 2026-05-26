@@ -282,7 +282,14 @@ def render_卷积可视化() -> None:
 
     import streamlit as st
     from components.error_boundary import render_module_error
-    from components.visual_system import render_convolution_particle_flow, render_loading_bar, render_visual_system
+    from components.visual_system import (
+        render_beginner_hint,
+        render_convolution_particle_flow,
+        render_loading_bar,
+        render_motion_note,
+        render_shape_flow,
+        render_visual_system,
+    )
 
     try:
         clean_old_artifacts()
@@ -291,6 +298,24 @@ def render_卷积可视化() -> None:
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
         render_loading_bar("卷积演示加载：像素粒子、卷积核和输出特征图将同步出现")
+        render_beginner_hint(
+            "先看局部，再看整体",
+            "卷积不是一次看完整张图，而是用一个小窗口在图上滑动；每次只问一个局部区域“像不像我要找的模式”。",
+            action="观察粒子从输入格子穿过 3×3 卷积核后，右侧输出格子的亮度如何变化。",
+        )
+        render_motion_note(
+            "卷积粒子流的读法",
+            "左侧粒子表示输入像素，中间卷积核表示一组可学习权重，右侧亮块表示加权求和后的特征响应。",
+        )
+        render_shape_flow(
+            [
+                ("输入图像", "B×1×28×28"),
+                ("3×3 卷积", "B×8×26×26"),
+                ("池化", "B×8×13×13"),
+                ("分类器", "B×10"),
+            ],
+            title="卷积输出形状流",
+        )
         render_convolution_particle_flow()
         data = compute_卷积可视化(save_artifacts=True)
         st.subheader("手算卷积输出")

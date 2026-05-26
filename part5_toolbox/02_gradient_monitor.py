@@ -16,7 +16,14 @@ import streamlit as st
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-from components.visual_system import NEON_BLUE, NEON_GREEN, NEON_PURPLE, render_visual_system
+from components.visual_system import (
+    NEON_BLUE,
+    NEON_GREEN,
+    NEON_PURPLE,
+    render_beginner_hint,
+    render_motion_note,
+    render_visual_system,
+)
 
 
 def print_learning_guide():
@@ -407,6 +414,27 @@ st.markdown(
     </div>
     """,
     unsafe_allow_html=True,
+)
+render_beginner_hint(
+    "先把梯度当成每一层的更新信号",
+    "柱子太矮通常表示梯度消失，参数几乎学不动；柱子太高或闪烁很急通常表示梯度爆炸，训练可能不稳定。",
+    action="先切换四种模拟场景，记住正常、消失、爆炸的颜色和高度差异，再运行真实训练监控。",
+)
+render_motion_note(
+    "动效在说明什么",
+    "柱子的脉冲频率表示梯度健康程度：稳定轻微脉冲代表可训练，暗淡低矮代表信号衰减，高亮急闪代表更新幅度过大。",
+)
+
+st.markdown(
+    """
+    **这是什么？** 这页是在监控训练时每一层收到的梯度信号。梯度告诉参数下一步该往哪里改、改多大；梯度太小会学不动，梯度太大又会把训练推得不稳定。
+
+    **生活类比：** 把训练想成教练给每个队员发指令：声音太小，队员听不见；声音太大，队员乱跑；声音适中，队员才能稳定调整动作。
+
+    **一句话直觉：** 梯度监控就是看每一层有没有收到“大小合适的学习指令”。
+
+    **图中每个元素代表什么：** 每根柱子代表一层网络，柱子上方的数字是该层梯度范数；绿色表示正常范围，蓝色低矮表示梯度消失，红色高亮表示梯度爆炸；图例给出判断阈值；训练后的 loss 曲线表示损失随步数变化，诊断表里的均值、最大值和状态用于定位是哪一层出了问题。
+    """
 )
 
 # ── 学习导读 ──

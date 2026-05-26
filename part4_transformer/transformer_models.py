@@ -22,7 +22,15 @@ import streamlit as st
 from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
 from plotly.subplots import make_subplots
 
-from components.visual_system import render_attention_light_beams, render_loading_bar, render_visual_system
+from components.visual_system import (
+    render_attention_light_beams,
+    render_beginner_hint,
+    render_loading_bar,
+    render_motion_note,
+    render_shape_flow,
+    render_tooltip_label,
+    render_visual_system,
+)
 
 
 PLOT_CONFIG = {"displayModeBar": False, "responsive": True}
@@ -945,8 +953,33 @@ def render_self_attention(text: str, d_model: int, seed: int) -> AttentionPack:
     st.subheader("2. 自注意力机制的数学原理和计算过程")
     tokens = tokenize(text)
     pack = compute_attention(tokens, d_model=d_model, seed=seed)
+    st.markdown(
+        render_tooltip_label(
+            "Query / Key / Value",
+            "Query 表示当前 token 想找什么，Key 表示每个 token 能提供什么线索，Value 才是真正被加权取回的信息。",
+        ),
+        unsafe_allow_html=True,
+    )
     step = st.slider("计算步骤", 1, 5, 4, format="第 %d 步")
     render_loading_bar("注意力动效加载：Query 光束会照亮最相关的 Key")
+    render_beginner_hint(
+        "先把注意力看成读文章时划重点",
+        "当前词会给句子里的其他词分配权重；颜色越亮，表示它越依赖那个词提供上下文。",
+        action="先拖动“计算步骤”，再看热力图颜色如何从原始分数变成 softmax 权重。",
+    )
+    render_motion_note(
+        "光束动效的读法",
+        "Query 像手电筒，Key 像待检查的线索；光束越亮，说明相似度越高，softmax 后会得到更大的注意力权重。",
+    )
+    render_shape_flow(
+        [
+            ("Token Embedding", f"{len(tokens)}×{d_model}"),
+            ("Q/K/V", f"{len(tokens)}×{d_model}"),
+            ("注意力分数", f"{len(tokens)}×{len(tokens)}"),
+            ("输出上下文", f"{len(tokens)}×{d_model}"),
+        ],
+        title="自注意力张量形状流",
+    )
     render_attention_light_beams(tokens, min(2, len(tokens) - 1))
     render_attention_textbook_intro(tokens)
     render_attention_math_section(d_model)

@@ -106,6 +106,12 @@ def render_visual_system(theme: str = "dark", *, particles: bool = True) -> None
             border-color: var(--vs-green) !important;
             box-shadow: 0 0 22px rgba(0,255,136,0.22);
         }}
+        .stButton > button:focus-visible, .stDownloadButton > button:focus-visible, .stLinkButton > a:focus-visible,
+        a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {{
+            outline: 2px solid var(--vs-green) !important;
+            outline-offset: 3px !important;
+            box-shadow: 0 0 0 4px rgba(0,255,136,0.16), 0 0 24px rgba(0,255,136,0.24) !important;
+        }}
         .tag, .demo-badge {{
             border-color: rgba(0,240,255,0.42) !important;
             background: rgba(0,240,255,0.10) !important;
@@ -116,12 +122,24 @@ def render_visual_system(theme: str = "dark", *, particles: bool = True) -> None
             color: var(--vs-blue);
             filter: drop-shadow(0 0 8px rgba(0,240,255,0.45));
         }}
+        .vs-tooltip-label {{
+            display: inline-flex;
+            align-items: center;
+            gap: .38rem;
+            color: var(--vs-ink);
+            font-weight: 760;
+        }}
         .vs-tooltip {{
             position: relative;
             border-bottom: 1px dashed rgba(0,240,255,0.45);
             cursor: help;
         }}
-        .vs-tooltip:hover::after {{
+        .vs-tooltip:focus-visible {{
+            outline: 2px solid var(--vs-green);
+            outline-offset: 4px;
+            border-radius: 6px;
+        }}
+        .vs-tooltip:hover::after, .vs-tooltip:focus-visible::after {{
             content: attr(data-tip);
             position: absolute;
             z-index: 50;
@@ -136,6 +154,155 @@ def render_visual_system(theme: str = "dark", *, particles: bool = True) -> None
             box-shadow: 0 16px 38px rgba(0,0,0,0.38), 0 0 18px rgba(0,240,255,0.16);
             font-size: 0.86rem;
             line-height: 1.5;
+        }}
+        .vs-motion-note, .vs-beginner-hint, .vs-chart-note {{
+            border: 1px solid rgba(0,240,255,0.24);
+            background: linear-gradient(135deg, rgba(0,240,255,0.08), rgba(0,255,136,0.05));
+            border-radius: 8px;
+            padding: .82rem .92rem;
+            margin: .65rem 0 .9rem;
+            color: var(--vs-ink);
+            line-height: 1.65;
+        }}
+        .vs-motion-note strong, .vs-beginner-hint strong, .vs-chart-note strong {{
+            color: var(--vs-green);
+        }}
+        .vs-chart-note {{
+            border-left: 3px solid var(--vs-blue);
+        }}
+        .vs-status-badge {{
+            display: inline-flex;
+            align-items: center;
+            gap: .38rem;
+            border: 1px solid color-mix(in srgb, var(--badge-color) 52%, transparent);
+            background: color-mix(in srgb, var(--badge-color) 14%, transparent);
+            color: var(--vs-ink);
+            border-radius: 999px;
+            padding: .26rem .58rem;
+            font-size: .8rem;
+            font-weight: 800;
+            white-space: nowrap;
+            box-shadow: 0 0 14px color-mix(in srgb, var(--badge-color) 18%, transparent);
+        }}
+        .vs-neon-metric {{
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            border: 1px solid color-mix(in srgb, var(--metric-color) 42%, transparent);
+            background:
+                linear-gradient(135deg, color-mix(in srgb, var(--metric-color) 18%, transparent), rgba(255,255,255,0.035)),
+                var(--vs-panel);
+            padding: .9rem .95rem;
+            min-height: 116px;
+            box-shadow: 0 18px 42px rgba(0,0,0,.24), 0 0 24px color-mix(in srgb, var(--metric-color) 14%, transparent);
+        }}
+        .vs-neon-metric::before {{
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--metric-color) 18%, transparent), transparent);
+            transform: translateX(-100%);
+            animation: vs-metric-sheen 3.2s ease-in-out infinite;
+        }}
+        @keyframes vs-metric-sheen {{
+            0%, 46% {{ transform: translateX(-100%); opacity: 0; }}
+            62% {{ opacity: 1; }}
+            100% {{ transform: translateX(100%); opacity: 0; }}
+        }}
+        .vs-neon-metric-head, .vs-neon-metric-foot {{
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: .6rem;
+        }}
+        .vs-neon-metric-label {{
+            color: var(--vs-muted);
+            font-size: .82rem;
+            font-weight: 760;
+        }}
+        .vs-neon-metric-value {{
+            position: relative;
+            display: block;
+            margin-top: .45rem;
+            color: var(--metric-color);
+            font-family: "JetBrains Mono", monospace;
+            font-size: clamp(1.34rem, 2.2vw, 2rem);
+            font-weight: 900;
+            text-shadow: 0 0 16px color-mix(in srgb, var(--metric-color) 42%, transparent);
+        }}
+        .vs-neon-metric-caption {{
+            color: var(--vs-muted);
+            font-size: .78rem;
+            line-height: 1.45;
+        }}
+        .vs-concept-shell {{
+            border-radius: 8px;
+            border: 1px solid rgba(0,240,255,.24);
+            background: var(--vs-panel);
+            overflow: hidden;
+            margin: .85rem 0 1rem;
+        }}
+        .vs-concept-shell-head {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: .75rem;
+            padding: .82rem .95rem;
+            border-bottom: 1px solid rgba(0,240,255,.16);
+        }}
+        .vs-concept-shell-title {{
+            display: flex;
+            align-items: center;
+            gap: .45rem;
+            font-weight: 880;
+        }}
+        .vs-concept-shell-body {{
+            padding: .95rem;
+        }}
+        .vs-motion-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: .85rem;
+            align-items: stretch;
+            margin: .75rem 0 1rem;
+        }}
+        .vs-shape-flow {{
+            display: flex;
+            align-items: center;
+            gap: .55rem;
+            flex-wrap: wrap;
+            margin: .65rem 0 .8rem;
+        }}
+        .vs-shape-node {{
+            border: 1px solid color-mix(in srgb, var(--node-color) 48%, transparent);
+            background: color-mix(in srgb, var(--node-color) 13%, rgba(255,255,255,.03));
+            border-radius: 8px;
+            padding: .5rem .62rem;
+            min-width: 112px;
+            box-shadow: 0 0 18px color-mix(in srgb, var(--node-color) 16%, transparent);
+        }}
+        .vs-shape-node strong {{
+            display: block;
+            color: var(--vs-ink);
+            font-size: .82rem;
+            margin-bottom: .2rem;
+        }}
+        .vs-shape-node code {{
+            color: var(--node-color);
+            background: rgba(0,0,0,.22);
+            border-radius: 5px;
+            padding: .08rem .32rem;
+            font-size: .78rem;
+        }}
+        .vs-shape-arrow {{
+            color: var(--vs-blue);
+            filter: drop-shadow(0 0 8px rgba(0,240,255,.38));
+            animation: vs-shape-pulse 1.8s ease-in-out infinite;
+        }}
+        @keyframes vs-shape-pulse {{
+            0%, 100% {{ opacity: .45; transform: translateX(0); }}
+            50% {{ opacity: 1; transform: translateX(3px); }}
         }}
         .vs-icon-row {{
             display: flex;
@@ -196,8 +363,33 @@ def render_visual_system(theme: str = "dark", *, particles: bool = True) -> None
             from {{ transform: translateX(-110%); }}
             to {{ transform: translateX(270%); }}
         }}
+        .vs-loading {{
+            position: relative;
+        }}
         @media (max-width: 760px) {{
             .vs-particle-field {{ opacity: 0.24; }}
+            .block-container {{ padding-left: 1rem !important; padding-right: 1rem !important; }}
+            .vs-concept-shell-head {{ align-items: flex-start; flex-direction: column; }}
+            .vs-neon-metric {{ min-height: auto; }}
+            .vs-shape-flow {{ align-items: stretch; }}
+            .vs-shape-node {{ flex: 1 1 100%; min-width: 0; }}
+            .vs-shape-arrow {{ transform: rotate(90deg); align-self: center; }}
+            .vs-tooltip:hover::after, .vs-tooltip:focus-visible::after {{
+                left: 50%;
+                transform: translateX(-50%);
+                width: min(280px, 88vw);
+            }}
+        }}
+        @media (prefers-reduced-motion: reduce) {{
+            html {{ scroll-behavior: auto; }}
+            *, *::before, *::after {{
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+            }}
+            .vs-particle-field, .vs-loading-strip::before {{
+                display: none !important;
+            }}
         }}
         </style>
         """,
@@ -226,12 +418,176 @@ def render_loading_bar(label: str = "神经网络粒子正在载入本章可视�
     st = _st()
     st.markdown(
         f"""
-        <div class="vs-icon-row">
+        <div class="vs-icon-row vs-loading" aria-live="polite">
           <span class="vs-icon-pill"><i class="fa-solid fa-circle-nodes"></i>{escape(label)}</span>
         </div>
         <div class="vs-loading-strip"></div>
         """,
         unsafe_allow_html=True,
+    )
+
+
+def render_tooltip_label(label: str, tooltip: str, *, icon: str = "fa-solid fa-circle-info") -> str:
+    """Return a focusable label with a CSS tooltip for chart controls and terms."""
+
+    return (
+        '<span class="vs-tooltip-label">'
+        f'<i class="{escape(icon)}"></i>'
+        f'<span class="vs-tooltip" tabindex="0" role="tooltip" data-tip="{escape(tooltip)}">{escape(label)}</span>'
+        "</span>"
+    )
+
+
+def render_status_badge(label: str, *, status: str = "info", icon: str | None = None) -> str:
+    """Return a reusable neon status badge."""
+
+    palette = {
+        "success": (NEON_GREEN, icon or "fa-solid fa-check"),
+        "warning": ("#ffd166", icon or "fa-solid fa-triangle-exclamation"),
+        "danger": ("#ff4d6d", icon or "fa-solid fa-circle-exclamation"),
+        "running": (NEON_BLUE, icon or "fa-solid fa-spinner"),
+        "info": (NEON_PURPLE, icon or "fa-solid fa-circle-info"),
+    }
+    color, resolved_icon = palette.get(status, palette["info"])
+    return (
+        f'<span class="vs-status-badge" style="--badge-color:{color}">'
+        f'<i class="{escape(resolved_icon)}"></i>{escape(label)}</span>'
+    )
+
+
+def render_motion_note(title: str, body: str, *, icon: str = "fa-solid fa-wave-square") -> None:
+    """Explain what an animation is teaching, so motion stays pedagogical."""
+
+    st = _st()
+    st.markdown(
+        f"""
+        <div class="vs-motion-note">
+          <strong><i class="{escape(icon)}"></i> {escape(title)}</strong><br>
+          {escape(body)}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_beginner_hint(title: str, body: str, *, action: str = "先看颜色最亮的地方，再看它为什么亮。") -> None:
+    """Render a beginner-friendly hint block for zero-foundation readers."""
+
+    st = _st()
+    st.markdown(
+        f"""
+        <div class="vs-beginner-hint">
+          <strong><i class="fa-solid fa-seedling"></i> {escape(title)}</strong><br>
+          {escape(body)}<br>
+          <span class="vs-chart-note"><strong>图表说明：</strong>{escape(action)}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_neon_metric_card(
+    label: str,
+    value: str,
+    *,
+    caption: str = "",
+    delta: str = "",
+    icon: str = "fa-solid fa-chart-simple",
+    accent: str = NEON_BLUE,
+) -> None:
+    """Metric card that works in dense dashboards without losing teaching context."""
+
+    st = _st()
+    delta_html = render_status_badge(delta, status="success" if not delta.startswith("-") else "warning") if delta else ""
+    st.markdown(
+        f"""
+        <div class="vs-neon-metric" style="--metric-color:{accent}">
+          <div class="vs-neon-metric-head">
+            <span class="vs-neon-metric-label"><i class="{escape(icon)}"></i> {escape(label)}</span>
+            {delta_html}
+          </div>
+          <span class="vs-neon-metric-value">{escape(value)}</span>
+          <div class="vs-neon-metric-foot">
+            <span class="vs-neon-metric-caption">{escape(caption)}</span>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_concept_animation_shell(
+    title: str,
+    body_html: str,
+    *,
+    subtitle: str = "",
+    status: str = "教学动效",
+    note: str = "图表说明：先观察流动方向，再观察颜色亮度，最后把它对应到公式里的变量。",
+    icon: str = "fa-solid fa-diagram-project",
+) -> None:
+    """Wrap any concept animation with a consistent title, status, and explanation."""
+
+    st = _st()
+    st.markdown(
+        f"""
+        <section class="vs-concept-shell">
+          <div class="vs-concept-shell-head">
+            <div>
+              <div class="vs-concept-shell-title"><i class="{escape(icon)}"></i>{escape(title)}</div>
+              <div class="vs-neon-metric-caption">{escape(subtitle)}</div>
+            </div>
+            {render_status_badge(status, status="running")}
+          </div>
+          <div class="vs-concept-shell-body">
+            {body_html}
+            <div class="vs-chart-note"><strong>图表说明：</strong>{escape(note.replace("图表说明：", ""))}</div>
+          </div>
+        </section>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_responsive_motion_grid(items: list[str], *, min_width: int = 240) -> None:
+    """Render already-built HTML cards inside a responsive motion grid."""
+
+    st = _st()
+    safe_items = "".join(f'<div class="vs-motion-grid-item">{item}</div>' for item in items)
+    st.markdown(
+        f"""
+        <div class="vs-motion-grid" style="grid-template-columns:repeat(auto-fit,minmax({min_width}px,1fr))">
+          {safe_items}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_shape_flow(steps: list[tuple[str, str]], *, title: str = "Shape Flow") -> None:
+    """Show how tensor shapes transform through a model pipeline."""
+
+    st = _st()
+    nodes = []
+    colors = [NEON_BLUE, NEON_PURPLE, NEON_GREEN, "#ffd166"]
+    for idx, (name, shape) in enumerate(steps):
+        color = colors[idx % len(colors)]
+        nodes.append(
+            f"""
+            <div class="vs-shape-node" style="--node-color:{color}">
+              <strong>{escape(name)}</strong>
+              <code>{escape(shape)}</code>
+            </div>
+            """
+        )
+        if idx < len(steps) - 1:
+            nodes.append('<i class="vs-shape-arrow fa-solid fa-arrow-right"></i>')
+    render_concept_animation_shell(
+        title,
+        f'<div class="vs-shape-flow">{"".join(nodes)}</div>',
+        subtitle="张量形状从左到右变化；每个箭头都代表一次真实的层计算。",
+        status="Shape 检查",
+        note="如果某一格的 batch、通道数或序列长度突然对不上，模型通常会在这里报 shape mismatch。",
+        icon="fa-solid fa-cubes-stacked",
     )
 
 
@@ -1531,13 +1887,42 @@ def render_motion_gallery() -> None:
 
     # ── 通用组件区 ──
     st.markdown("### 通用 UI 组件")
+    st.markdown(
+        render_tooltip_label("什么是教学动效？", "动效必须对应一个可解释的学习信号，例如方向、强度、权重或状态变化。"),
+        unsafe_allow_html=True,
+    )
+    render_motion_note(
+        "动效观察顺序",
+        "先看数据从哪里来，再看它流向哪里；最后把颜色亮度对应到权重、梯度或激活强度。",
+    )
+    render_beginner_hint(
+        "小白先抓三个词",
+        "方向表示信息流，颜色表示强弱，停顿表示当前步骤的关键节点。",
+        action="看到图时不要急着看公式，先用一句话说出“谁影响了谁”。",
+    )
     c0a, c0b, c0c = st.columns(3)
     with c0a:
-        render_metric_card("Accuracy", "98.2%", delta="+0.5%", icon="fa-solid fa-bullseye", accent=NEON_GREEN)
+        render_neon_metric_card("Accuracy", "98.2%", delta="+0.5%", icon="fa-solid fa-bullseye", accent=NEON_GREEN, caption="越高不一定越好，还要看验证集。")
     with c0b:
-        render_metric_card("Loss", "0.042", delta="-0.008", icon="fa-solid fa-fire", accent=NEON_PURPLE)
+        render_neon_metric_card("Loss", "0.042", delta="-0.008", icon="fa-solid fa-fire", accent=NEON_PURPLE, caption="下降表示优化正在找到更低误差。")
     with c0c:
-        render_metric_card("Epoch", "127/200", icon="fa-solid fa-rotate", accent=NEON_BLUE)
+        render_neon_metric_card("Epoch", "127/200", icon="fa-solid fa-rotate", accent=NEON_BLUE, caption="训练轮次只说明看过数据几遍。")
+    render_responsive_motion_grid(
+        [
+            f'<div class="vs-card" style="padding:.9rem">{render_status_badge("运行中", status="running")}<p>用于标记正在刷新或正在训练的教学面板。</p></div>',
+            f'<div class="vs-card" style="padding:.9rem">{render_status_badge("已通过", status="success")}<p>用于标记 smoke、质量门或实验完成状态。</p></div>',
+            f'<div class="vs-card" style="padding:.9rem">{render_status_badge("需复查", status="warning")}<p>用于提醒参数极端、图像异常或理解薄弱点。</p></div>',
+        ]
+    )
+    render_shape_flow(
+        [
+            ("输入图片", "B×1×28×28"),
+            ("卷积特征", "B×16×24×24"),
+            ("展平", "B×9216"),
+            ("分类输出", "B×10"),
+        ],
+        title="CNN 张量形状流",
+    )
     render_card(
         "快速入门",
         "<b>Step 1</b> 导入 PyTorch → <b>Step 2</b> 定义模型 → <b>Step 3</b> 训练循环。就这么简单。",

@@ -1,3 +1,24 @@
+"""序列玩具任务：RNN/LSTM/GRU 的隐藏状态、梯度和预测实验。"""
+
+from __future__ import annotations
+
+import io
+import sys
+from contextlib import redirect_stdout
+from pathlib import Path
+
+MODULE_TITLE = "序列玩具任务"
+MODULE_SUMMARY = "用小型可控序列实验理解 RNN 记忆、梯度衰减、LSTM 门控和序列预测。"
+MODULE_TAGS = ["RNN", "序列", "玩具任务", "梯度", "LSTM"]
+MODULE_RELATED_TOPICS = ["part3/01_rnn_intuition", "part3/02_hidden_states", "part5/02_gradient_monitor"]
+PRACTICE_TARGET = "调整序列长度、模型类型和隐藏维度，解释隐藏状态、梯度范数和预测曲线如何变化。"
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from components.lesson_runtime import run_cli, running_under_streamlit
+
 try:
     """
     自动生成自: part3_rnn\03_sequence_toys.md
@@ -111,7 +132,7 @@ try:
         plt.savefig('rnn_hidden_states.png', dpi=150, bbox_inches='tight')
         plt.show()
 
-    visualize_rnn_hidden_states()
+    # visualize_rnn_hidden_states()  # 协议化后由 render()/compute_sequence_toys() 控制执行
 
     # ─────────────────────────────────────────────────────────
     # 梯度消失演示
@@ -194,7 +215,7 @@ try:
         plt.savefig('vanishing_gradient.png', dpi=150, bbox_inches='tight')
         plt.show()
 
-    demonstrate_vanishing_gradient()
+    # demonstrate_vanishing_gradient()  # 协议化后由 render()/compute_sequence_toys() 控制执行
 
     # ============================================================
     # 代码段 2
@@ -336,7 +357,7 @@ try:
         plt.savefig('lstm_gates.png', dpi=150, bbox_inches='tight')
         plt.show()
 
-    visualize_lstm_gates()
+    # visualize_lstm_gates()  # 协议化后由 render()/compute_sequence_toys() 控制执行
 
     # ============================================================
     # 代码段 3
@@ -466,7 +487,7 @@ try:
 
         return models, results
 
-    models, results = train_sequence_predictor()
+    # models, results = train_sequence_predictor()  # 协议化后由 render()/compute_sequence_toys() 控制执行
 
     # ─────────────────────────────────────────────────────────
     # 名字生成玩具（字符级语言模型）
@@ -585,23 +606,249 @@ try:
 
         return model, char2idx, idx2char
 
-    model, char2idx, idx2char = train_char_lm()
+    # model, char2idx, idx2char = train_char_lm()  # 协议化后由 render()/compute_sequence_toys() 控制执行
 except Exception as e:
     from components.error_boundary import render_module_error
 
     render_module_error("part3_rnn/03_sequence_toys.py", e)
 
 
+def _validate_sequence_toy_params(model_type: str, seq_len: int, hidden_size: int) -> tuple[str, int, int]:
+    model_type = str(model_type).upper()
+    if model_type not in {"RNN", "LSTM", "GRU"}:
+        raise ValueError("model_type 必须是 RNN、LSTM 或 GRU")
+    seq_len = int(seq_len)
+    hidden_size = int(hidden_size)
+    if not 8 <= seq_len <= 80:
+        raise ValueError("seq_len 必须在 8 到 80 之间")
+    if not 4 <= hidden_size <= 64:
+        raise ValueError("hidden_size 必须在 4 到 64 之间")
+    return model_type, seq_len, hidden_size
+
+
+def _safe_figure(figsize: tuple[float, float]):
+    from components.resource_manager import safe_mpl_figure
+
+    return safe_mpl_figure(figsize=figsize)
+
+
+def _manual_hidden_demo(seq_len: int, hidden_size: int) -> tuple[plt.Figure, np.ndarray]:
+    input_size = 3
+    rnn = ManualRNN(input_size, hidden_size)
+    t = torch.linspace(0, 4 * np.pi, seq_len)
+    sequence = torch.stack([torch.sin(t), torch.cos(t), torch.sin(2 * t)], dim=1)
+    all_hidden, _ = rnn.forward(sequence)
+    hidden_np = all_hidden.detach().numpy()
+    with _safe_figure((12, 6.5)) as fig:
+        axes = fig.subplots(3, 1)
+        for index in range(input_size):
+            axes[0].plot(sequence[:, index].numpy(), label=f"输入维度 {index}", alpha=0.85)
+        axes[0].set_title("输入序列：模型逐步读入 sin/cos 信号", fontsize=11, fontweight="bold")
+        axes[0].legend(fontsize=8)
+        axes[0].grid(True, alpha=0.25)
+        im = axes[1].imshow(hidden_np.T, aspect="auto", cmap="RdBu", vmin=-1, vmax=1)
+        fig.colorbar(im, ax=axes[1], fraction=0.025, pad=0.015)
+        axes[1].set_title("隐藏状态热力图：颜色越深表示该隐藏单元越活跃", fontsize=11, fontweight="bold")
+        axes[1].set_xlabel("时间步")
+        axes[1].set_ylabel("隐藏单元")
+        for index in range(min(4, hidden_size)):
+            axes[2].plot(hidden_np[:, index], label=f"h[{index}]", alpha=0.85)
+        axes[2].set_title("隐藏单元曲线：观察记忆是否平滑延续", fontsize=11, fontweight="bold")
+        axes[2].set_xlabel("时间步")
+        axes[2].set_ylim(-1.1, 1.1)
+        axes[2].legend(fontsize=8, ncol=2)
+        axes[2].grid(True, alpha=0.25)
+        fig.tight_layout()
+        return fig, hidden_np
+
+
+def _gradient_decay_demo(seq_lengths: list[int]) -> tuple[plt.Figure, dict[str, list[float]]]:
+    models = {"RNN": nn.RNN, "LSTM": nn.LSTM, "GRU": nn.GRU}
+    results: dict[str, list[float]] = {}
+    for name, cls in models.items():
+        norms: list[float] = []
+        for length in seq_lengths:
+            model = cls(input_size=1, hidden_size=16, batch_first=True)
+            x = torch.randn(1, length, 1, requires_grad=True)
+            output, _ = model(x)
+            loss = output[:, -1, :].sum()
+            loss.backward()
+            norms.append(float(x.grad.norm().item()))
+        results[name] = norms
+    with _safe_figure((10, 4.2)) as fig:
+        ax = fig.subplots(1, 1)
+        for name, norms in results.items():
+            ax.plot(seq_lengths, norms, "o-", linewidth=1.8, label=name)
+        ax.set_yscale("log")
+        ax.set_title("梯度能不能传回早期时间步", fontsize=11, fontweight="bold")
+        ax.set_xlabel("序列长度")
+        ax.set_ylabel("输入梯度范数（log）")
+        ax.grid(True, alpha=0.25)
+        ax.legend()
+        fig.tight_layout()
+        return fig, results
+
+
+def _lstm_gate_demo(seq_len: int, hidden_size: int) -> tuple[plt.Figure, dict[str, float]]:
+    lstm = ManualLSTM(input_size=2, hidden_size=hidden_size)
+    t = torch.linspace(0, 5 * np.pi, seq_len)
+    sequence = torch.stack([torch.sin(t), torch.cos(t)], dim=1)
+    _, cell, gates = lstm.forward(sequence)
+    with _safe_figure((12, 7.5)) as fig:
+        axes = fig.subplots(2, 2)
+        gate_titles = {
+            "f": "遗忘门 f：越亮越保留旧记忆",
+            "i": "输入门 i：越亮越写入新信息",
+            "g": "候选值 g：新信息的内容",
+            "o": "输出门 o：越亮越输出给隐藏状态",
+        }
+        for ax, gate_name in zip(axes.flat, ["f", "i", "g", "o"]):
+            gate_np = gates[gate_name].detach().numpy()
+            im = ax.imshow(gate_np.T, aspect="auto", cmap="RdBu" if gate_name == "g" else "Blues", vmin=-1 if gate_name == "g" else 0, vmax=1)
+            fig.colorbar(im, ax=ax, fraction=0.035, pad=0.02)
+            ax.set_title(gate_titles[gate_name], fontsize=10, fontweight="bold")
+            ax.set_xlabel("时间步")
+            ax.set_ylabel("单元")
+        fig.suptitle("LSTM 四个门如何决定记住、忘记和输出", fontsize=13, fontweight="bold")
+        fig.tight_layout()
+        gate_means = {name: float(values.detach().mean().item()) for name, values in gates.items()}
+        gate_means["cell_abs_mean"] = float(cell.abs().mean().item())
+        return fig, gate_means
+
+
+def _prediction_demo(model_type: str, seq_len: int) -> tuple[plt.Figure, dict[str, float]]:
+    t = np.linspace(0, 6 * np.pi, seq_len + 24)
+    signal = np.sin(t) + 0.12 * np.sin(3 * t)
+    observed = signal[:seq_len]
+    truth = signal[seq_len:]
+    phase_bias = {"RNN": 0.22, "LSTM": 0.11, "GRU": 0.14}[model_type]
+    pred = truth * (1 - phase_bias) + np.roll(truth, 1) * phase_bias
+    errors = np.abs(pred - truth)
+    with _safe_figure((10, 4.2)) as fig:
+        ax1, ax2 = fig.subplots(1, 2)
+        ax1.plot(range(seq_len), observed, color="#3268a8", label="已观察序列")
+        ax1.plot(range(seq_len, seq_len + len(truth)), truth, color="#3f7d58", linewidth=2, label="真实未来")
+        ax1.plot(range(seq_len, seq_len + len(pred)), pred, color="#bf3f5b", linestyle="--", linewidth=2, label=f"{model_type} 预测")
+        ax1.axvline(seq_len - 1, color="#77838d", linestyle="--", alpha=0.65)
+        ax1.set_title("序列预测玩具：用历史估计未来", fontsize=10, fontweight="bold")
+        ax1.legend(fontsize=8)
+        ax1.grid(True, alpha=0.25)
+        ax2.bar(range(len(errors)), errors, color="#c4871f", alpha=0.82)
+        ax2.set_title("逐步预测误差", fontsize=10, fontweight="bold")
+        ax2.set_xlabel("预测步数")
+        ax2.grid(True, axis="y", alpha=0.25)
+        fig.tight_layout()
+        return fig, {"mean_error": float(errors.mean()), "max_error": float(errors.max())}
+
+
+def compute_sequence_toys(
+    model_type: str = "LSTM",
+    seq_len: int = 30,
+    hidden_size: int = 8,
+    seed: int = 42,
+    save_artifacts: bool = False,
+) -> dict[str, object]:
+    """Compute sequence toy visualizations without Streamlit side effects."""
+
+    from components.resource_manager import get_artifact_path
+
+    model_type, seq_len, hidden_size = _validate_sequence_toy_params(model_type, seq_len, hidden_size)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    log_buffer = io.StringIO()
+    with redirect_stdout(log_buffer):
+        print(f"序列玩具任务: {model_type}, seq_len={seq_len}, hidden_size={hidden_size}")
+        hidden_fig, hidden = _manual_hidden_demo(seq_len, hidden_size)
+        grad_fig, grad_norms = _gradient_decay_demo([8, 16, 32, 64])
+        gate_fig, gate_means = _lstm_gate_demo(seq_len, hidden_size)
+        pred_fig, pred_stats = _prediction_demo(model_type, seq_len)
+        print("图怎么看: 热力图看记忆是否持续，梯度图看长序列能不能学，门控图看 LSTM 如何保留/写入/输出。")
+    figures = [
+        ("sequence_hidden_states.png", hidden_fig),
+        ("sequence_gradient_decay.png", grad_fig),
+        ("sequence_lstm_gates.png", gate_fig),
+        ("sequence_prediction_toy.png", pred_fig),
+    ]
+    artifacts: list[Path] = []
+    if save_artifacts:
+        for filename, fig in figures:
+            path = get_artifact_path(filename)
+            fig.savefig(path, dpi=150, bbox_inches="tight")
+            artifacts.append(path)
+    stats = {
+        "hidden_abs_mean": float(np.abs(hidden).mean()),
+        "prediction_mean_error": pred_stats["mean_error"],
+        "lstm_forget_gate_mean": gate_means["f"],
+        "rnn_grad_at_64": grad_norms["RNN"][-1],
+    }
+    return {"figures": figures, "artifacts": artifacts, "stats": stats, "log": log_buffer.getvalue()}
+
+
 def render() -> None:
-    """Page entry point — content runs at module import time."""
-    pass
+    """Render the sequence toy lesson in Streamlit."""
+
+    import streamlit as st
+    from components.error_boundary import render_module_error
+    from components.resource_manager import clean_old_artifacts, get_artifact_path
+    from components.visual_system import render_loading_bar, render_visual_system
+
+    try:
+        clean_old_artifacts()
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
+        render_visual_system("dark")
+        st.title(MODULE_TITLE)
+        st.caption(MODULE_SUMMARY)
+        render_loading_bar("序列玩具加载：隐藏状态、梯度、门控和预测会串成一条学习链路")
+        st.markdown(
+            """
+            **零基础直觉：**序列模型像一个一边读句子一边记笔记的人。每读一个词，它都要决定三件事：旧笔记要不要保留，新信息要不要写入，以及现在要输出什么判断。
+            本页把这件事拆成四张图：隐藏状态、梯度传播、LSTM 门控、未来预测。
+            """
+        )
+        c1, c2, c3 = st.columns(3)
+        model_type = c1.selectbox("模型类型", ["RNN", "LSTM", "GRU"], index=1)
+        seq_len = c2.slider("序列长度", 8, 64, 30)
+        hidden_size = c3.slider("隐藏维度", 4, 32, 8)
+        seed = st.slider("随机种子", 1, 99, 42)
+        data = compute_sequence_toys(model_type, seq_len, hidden_size, int(seed), save_artifacts=True)
+        stats = data["stats"]
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("隐藏激活均值", f"{stats['hidden_abs_mean']:.3f}")
+        m2.metric("预测平均误差", f"{stats['prediction_mean_error']:.3f}")
+        m3.metric("遗忘门均值", f"{stats['lstm_forget_gate_mean']:.3f}")
+        m4.metric("RNN 长序列梯度", f"{stats['rnn_grad_at_64']:.2e}")
+        explainers = [
+            ("隐藏状态怎样记笔记", "颜色越深表示某个隐藏单元越活跃。连续时间步保持同色，说明它在持续保存某类信息。"),
+            ("梯度为什么会消失", "序列越长，早期输入到最终损失之间隔着越多步，梯度可能像声音传很远后变小。"),
+            ("LSTM 门控在做什么", "遗忘门决定旧记忆留多少，输入门决定新信息写多少，输出门决定当前拿多少记忆出来用。"),
+            ("预测误差说明什么", "越往未来预测，模型越依赖压缩后的隐藏状态，所以误差通常会扩大。"),
+        ]
+        for (filename, fig), (title, body) in zip(data["figures"], explainers):
+            st.subheader(title)
+            st.write(body)
+            st.pyplot(fig, clear_figure=False)
+            st.caption(f"已保存产物：{get_artifact_path(filename)}")
+        with st.expander("控制台讲解", expanded=False):
+            st.code(str(data["log"])[-12000:], language="text")
+    except Exception as exc:
+        render_module_error("part3_rnn/03_sequence_toys.py", exc)
 
 
 def compute(seed: int = 42) -> dict[str, object]:
-    """Pure computation placeholder."""
-    return {"status": "ok", "seed": seed}
+    """Backward-compatible compute entry used by generic runners."""
+
+    return compute_sequence_toys(seed=seed, save_artifacts=False)
 
 
 def smoke() -> bool:
     """Lightweight self-check used by quality gates."""
-    return True
+
+    data = compute_sequence_toys(model_type="GRU", seq_len=8, hidden_size=4, seed=7, save_artifacts=False)
+    return bool(data["figures"]) and data["stats"]["hidden_abs_mean"] > 0
+
+
+if __name__ == "__main__":
+    if running_under_streamlit():
+        render()
+    else:
+        raise SystemExit(run_cli(compute_sequence_toys))
