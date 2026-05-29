@@ -51,22 +51,12 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 }, deviceScaleFactor: 1 });
 
   await capture(page, "#home", "home.png");
-  await capture(page, "#course/part4%2Ftransformer_models", "course-transformer.png", async (current) => {
-    await current.getByTestId("toc-animation").click();
-    await current.waitForTimeout(350);
-  });
   await capture(page, "#console/part4%2Ftransformer_models", "console-builder.png", async (current) => {
     await current.getByTestId("model-preset").selectOption("transformer_mini");
     await current.getByTestId("load-preset").click();
     await current.getByTestId("export-code").click();
     await current.waitForTimeout(350);
   });
-  await capture(page, "#console/part4%2Ftransformer_models", "shape-diagnostic.png", async (current) => {
-    await current.getByTestId("model-preset").selectOption("shape_error");
-    await current.getByTestId("load-preset").click();
-    await current.waitForTimeout(350);
-  });
-  await capture(page, "#course/part7%2Finterview_quiz", "interview-camp.png");
 
   await browser.close();
 } finally {

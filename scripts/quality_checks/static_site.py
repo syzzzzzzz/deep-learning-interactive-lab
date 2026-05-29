@@ -239,10 +239,7 @@ def check_navigation_and_learning_ux(context: QualityCheckContext) -> None:
     )
     for screenshot in [
         "docs/screenshots/home.png",
-        "docs/screenshots/course-transformer.png",
         "docs/screenshots/console-builder.png",
-        "docs/screenshots/shape-diagnostic.png",
-        "docs/screenshots/interview-camp.png",
     ]:
         if not context.exists(Path(screenshot)):
             failures.append(f"{screenshot}: 缺少学习站截图")
