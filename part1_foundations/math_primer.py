@@ -17,12 +17,55 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
+from components.visual_system import render_visual_system
+
 
 st.set_page_config(
     page_title="深度学习数学基础速查",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
+
+render_visual_system("light")
+if not st.query_params.get("module"):
+    st.html(
+        """
+        <style>
+        .home-float {
+            position: fixed;
+            right: 1.1rem;
+            top: 0.75rem;
+            z-index: 999999;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.42rem;
+            background: rgba(255,253,247,0.94);
+            color: #172026 !important;
+            border: 1px solid rgba(44,111,128,0.28);
+            border-radius: 8px;
+            padding: 0.48rem 0.72rem;
+            text-decoration: none !important;
+            font-size: 0.88rem;
+            font-weight: 800;
+            box-shadow: 0 10px 24px rgba(23,32,38,0.12);
+            backdrop-filter: blur(10px);
+        }
+        .home-float:hover {
+            background: #e7f0ea;
+            border-color: rgba(44,111,128,0.52);
+            color: #12343a !important;
+        }
+        @media (max-width: 760px) {
+            .home-float {
+                right: 0.65rem;
+                top: 0.55rem;
+                padding: 0.42rem 0.58rem;
+            }
+        }
+        </style>
+        <a class="home-float" href="/" target="_self" aria-label="返回主界面">← 返回主界面</a>
+        """
+    )
 
 
 INK = "#172026"

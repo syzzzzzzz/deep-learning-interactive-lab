@@ -45,7 +45,7 @@ plt.rcParams["axes.unicode_minus"] = False
 st.set_page_config(
     page_title="图神经网络入门",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(

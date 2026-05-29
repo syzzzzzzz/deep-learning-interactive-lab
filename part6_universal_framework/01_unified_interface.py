@@ -1,466 +1,95 @@
-"""
-自动生成自: part6_universal_framework\01_unified_interface.md
-可独立运行的 Python 源码
-"""
-
-import copy
-
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader, random_split
-import numpy as np
-from typing import Tuple, Optional, Callable, Dict, Any
-
-# ─────────────────────────────────────────────────────────
-# 通用数据集包装器
-# ─────────────────────────────────────────────────────────
-
-class TensorDatasetWrapper(Dataset):
-    """
-    将 numpy 数组或 torch 张量包装成 Dataset
-
-    支持：
-    - 自动类型转换
-    - 可选的数据增强（transform）
-    - 自动归一化
-
-    使用方法：
-        ds = TensorDatasetWrapper(X_np, y_np, normalize=True)
-        train_ds, val_ds = ds.split(val_ratio=0.2)
-        train_loader = DataLoader(train_ds, batch_size=32, shuffle=True)
-    """
-
-    def __init__(self, X, y,
-                 x_dtype=torch.float32,
-                 y_dtype=torch.float32,
-                 normalize: bool = False,
-                 transform: Optional[Callable] = None):
-        if isinstance(X, np.ndarray):
-            X = torch.from_numpy(X)
-        if isinstance(y, np.ndarray):
-            y = torch.from_numpy(y)
-
-        self.X = X.to(x_dtype)
-        self.y = y.to(y_dtype)
-        self.transform = transform
-
-        if normalize:
-            self.mean = self.X.mean(dim=0, keepdim=True)
-            self.std = self.X.std(dim=0, keepdim=True) + 1e-8
-            self.X = (self.X - self.mean) / self.std
-        else:
-            self.mean = None
-            self.std = None
-
-    def __len__(self):
-        return len(self.X)
-
-    def __getitem__(self, idx):
-        x = self.X[idx]
-        if self.transform:
-            x = self.transform(x)
-        return x, self.y[idx]
-
-    def split(self, val_ratio: float = 0.2, seed: int = 42):
-        """按比例分割为训练集和验证集"""
-        n_val = int(len(self) * val_ratio)
-        n_train = len(self) - n_val
-        generator = torch.Generator().manual_seed(seed)
-        return random_split(self, [n_train, n_val], generator=generator)
-
-    def get_loaders(self, batch_size: int = 32, val_ratio: float = 0.2,
-                    num_workers: int = 0, seed: int = 42):
-        """一步获取训练和验证 DataLoader"""
-        train_ds, val_ds = self.split(val_ratio, seed)
-        train_loader = DataLoader(train_ds, batch_size=batch_size,
-                                  shuffle=True, num_workers=num_workers)
-        val_loader = DataLoader(val_ds, batch_size=batch_size * 2,
-                                shuffle=False, num_workers=num_workers)
-        return train_loader, val_loader
-
-
-# ─────────────────────────────────────────────────────────
-# 统一模型接口（Mixin）
-# ─────────────────────────────────────────────────────────
-
-class TrainableMixin:
-    """
-    为任意 nn.Module 添加便捷训练方法的 Mixin
-
-    使用方法：
-        class MyModel(nn.Module, TrainableMixin):
-            ...
-
-        model = MyModel()
-        model.fit(train_loader, val_loader, epochs=50)
-        model.save('best.pt')
-        model.load('best.pt')
-    """
-
-    def fit(self, train_loader: DataLoader,
-            val_loader: Optional[DataLoader] = None,
-            epochs: int = 50,
-            lr: float = 1e-3,
-            criterion=None,
-            optimizer=None,
-            scheduler=None,
-            patience: int = 10,
-            grad_clip: float = 1.0,
-            device: str = 'auto',
-            verbose: bool = True) -> Dict[str, list]:
-        """
-        一键训练
-
-        返回训练历史字典：{'train_loss': [...], 'val_loss': [...], ...}
-        """
-        if device == 'auto':
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        device = torch.device(device)
-
-        self.to(device)
-
-        if criterion is None:
-            criterion = nn.CrossEntropyLoss()
-        if optimizer is None:
-            optimizer = torch.optim.Adam(self.parameters(), lr=lr)
-        if scheduler is None:
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer, T_max=epochs)
-
-        history = {'train_loss': [], 'val_loss': [], 'lr': []}
-        best_val_loss = float('inf')
-        patience_counter = 0
-        best_state = None
-
-        for epoch in range(epochs):
-            # 训练阶段
-            self.train()
-            train_losses = []
-            for x, y in train_loader:
-                x, y = x.to(device), y.to(device)
-                optimizer.zero_grad()
-                out = self(x)
-                loss = criterion(out, y)
-                loss.backward()
-                if grad_clip > 0:
-                    nn.utils.clip_grad_norm_(self.parameters(), grad_clip)
-                optimizer.step()
-                train_losses.append(loss.item())
-
-            train_loss = np.mean(train_losses)
-            history['train_loss'].append(train_loss)
-            history['lr'].append(optimizer.param_groups[0]['lr'])
-
-            # 验证阶段
-            if val_loader is not None:
-                self.eval()
-                val_losses = []
-                with torch.no_grad():
-                    for x, y in val_loader:
-                        x, y = x.to(device), y.to(device)
-                        out = self(x)
-                        loss = criterion(out, y)
-                        val_losses.append(loss.item())
-                val_loss = np.mean(val_losses)
-                history['val_loss'].append(val_loss)
-
-                # 早停
-                if val_loss < best_val_loss:
-                    best_val_loss = val_loss
-                    patience_counter = 0
-                    best_state = copy.deepcopy(self.state_dict())
-                else:
-                    patience_counter += 1
-
-                if verbose and (epoch + 1) % max(1, epochs // 10) == 0:
-                    print(f"Epoch {epoch+1:4d}/{epochs}  "
-                          f"train={train_loss:.4f}  val={val_loss:.4f}  "
-                          f"lr={optimizer.param_groups[0]['lr']:.2e}")
-
-                if patience_counter >= patience:
-                    if verbose:
-                        print(f"早停：{patience} 轮无改善，在 epoch {epoch+1} 停止")
-                    break
-            else:
-                if verbose and (epoch + 1) % max(1, epochs // 10) == 0:
-                    print(f"Epoch {epoch+1:4d}/{epochs}  train={train_loss:.4f}  "
-                          f"lr={optimizer.param_groups[0]['lr']:.2e}")
-
-            if scheduler is not None:
-                if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                    if val_loader is not None:
-                        scheduler.step(val_loss)
-                else:
-                    scheduler.step()
-
-        # 恢复最优权重
-        if best_state is not None:
-            self.load_state_dict(best_state)
-            if verbose:
-                print(f"已恢复最优模型（val_loss={best_val_loss:.4f}）")
-
-        return history
-
-    def save(self, path: str):
-        """保存模型权重"""
-        torch.save(self.state_dict(), path)
-        print(f"模型已保存到 {path}")
-
-    def load(self, path: str, device: str = 'cpu'):
-        """加载模型权重"""
-        self.load_state_dict(torch.load(path, map_location=device))
-        print(f"模型已从 {path} 加载")
-
-    def predict(self, x, device: str = 'auto', batch_size: int = 256):
-        """批量预测"""
-        if device == 'auto':
-            device = next(self.parameters()).device
-        else:
-            device = torch.device(device)
-        self.eval()
-        if isinstance(x, np.ndarray):
-            x = torch.from_numpy(x).float()
-        elif not torch.is_tensor(x):
-            x = torch.as_tensor(x, dtype=torch.float32)
-        if x.dim() == 1:
-            x = x.unsqueeze(0)
-        results = []
-        with torch.no_grad():
-            for i in range(0, len(x), batch_size):
-                batch = x[i:i+batch_size].to(device)
-                results.append(self(batch).cpu())
-        return torch.cat(results)
-
-    def count_params(self) -> int:
-        """统计可训练参数量"""
-        total = sum(p.numel() for p in self.parameters() if p.requires_grad)
-        print(f"可训练参数量: {total:,}  ({total/1e6:.2f}M)")
-        return total
-
-
-# ─────────────────────────────────────────────────────────
-# 预置常用模型（继承 TrainableMixin）
-# ─────────────────────────────────────────────────────────
-
-class MLP(nn.Module, TrainableMixin):
-    """
-    多层感知机（全连接网络）
-
-    使用方法：
-        model = MLP(input_dim=20, hidden_dims=[64, 64], output_dim=10)
-        history = model.fit(train_loader, val_loader, epochs=50)
-    """
-
-    def __init__(self, input_dim: int,
-                 hidden_dims: list,
-                 output_dim: int,
-                 activation: str = 'relu',
-                 dropout: float = 0.0,
-                 batch_norm: bool = False):
-        super().__init__()
-
-        act_map = {
-            'relu': nn.ReLU,
-            'gelu': nn.GELU,
-            'tanh': nn.Tanh,
-            'leaky_relu': nn.LeakyReLU,
-        }
-        Act = act_map.get(activation, nn.ReLU)
-
-        layers = []
-        dims = [input_dim] + hidden_dims
-        for i in range(len(dims) - 1):
-            layers.append(nn.Linear(dims[i], dims[i+1]))
-            if batch_norm:
-                layers.append(nn.BatchNorm1d(dims[i+1]))
-            layers.append(Act())
-            if dropout > 0:
-                layers.append(nn.Dropout(dropout))
-
-        layers.append(nn.Linear(dims[-1], output_dim))
-        self.net = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.net(x)
-
-
-class SimpleCNN(nn.Module, TrainableMixin):
-    """
-    简单 CNN（适用于图像分类）
-
-    使用方法：
-        model = SimpleCNN(in_channels=1, num_classes=10)
-        history = model.fit(train_loader, val_loader, epochs=20)
-    """
-
-    def __init__(self, in_channels: int = 1,
-                 num_classes: int = 10,
-                 base_channels: int = 32):
-        super().__init__()
-        c = base_channels
-        self.features = nn.Sequential(
-            nn.Conv2d(in_channels, c, 3, padding=1), nn.BatchNorm2d(c), nn.ReLU(),
-            nn.Conv2d(c, c, 3, padding=1), nn.BatchNorm2d(c), nn.ReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(c, c*2, 3, padding=1), nn.BatchNorm2d(c*2), nn.ReLU(),
-            nn.Conv2d(c*2, c*2, 3, padding=1), nn.BatchNorm2d(c*2), nn.ReLU(),
-            nn.AdaptiveAvgPool2d(4),
-        )
-        self.classifier = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(c*2*16, 256), nn.ReLU(), nn.Dropout(0.5),
-            nn.Linear(256, num_classes),
-        )
-
-    def forward(self, x):
-        return self.classifier(self.features(x))
-
-
-# ─────────────────────────────────────────────────────────
-# 完整演示
-# ─────────────────────────────────────────────────────────
-
-
-def print_learning_guide():
-    print("""
-学习导读：统一接口的目的不是把代码藏起来，而是给数据、模型、训练和推理划清边界。
-
-1. 这页代码分成三层
-   - TensorDatasetWrapper：负责把 numpy/torch 数据变成 Dataset，并处理 normalize、split、DataLoader。
-   - TrainableMixin：负责 fit/save/load/predict/count_params，也就是训练生命周期。
-   - MLP/SimpleCNN：只表达模型结构，不关心训练循环怎么写。
-
-2. 默认值怎么看
-   - batch_size=32 或 64 是小实验的稳妥起点，验证集 batch 可以更大，因为不需要反向传播。
-   - lr=1e-3 适合 Adam 的第一轮试验，patience=10 能避免验证集轻微抖动就过早停止。
-   - grad_clip=1.0 是防止偶发梯度爆炸的保险，不应掩盖长期学习率过高的问题。
-
-3. 训练曲线怎么看
-   - 左图训练损失和验证损失一起看：训练降、验证升是过拟合；两者都不降是欠拟合或学习率/数据问题。
-   - 右图学习率曲线来自 CosineAnnealing，后期逐步变小，是为了从快速探索进入稳定收敛。
-
-工程坑案例：
-   我见过一个团队把 normalize 写进 Dataset，但训练集、验证集各算各的均值方差，导致线上分布完全对不上。
-   正确做法是在训练集拟合统计量，然后复用到验证、测试和线上；统一接口必须清楚保存这些状态。
-
-进阶思考：
-   哪些逻辑应该放进 Mixin，哪些应该留给具体项目？如果任务从分类变成回归，你应该替换 criterion 和 metric，还是改 Dataset？
-""".strip())
-
-
-def demo_unified_interface():
-    """演示统一接口的使用"""
-    print_learning_guide()
-    torch.manual_seed(42)
-    np.random.seed(42)
-
-    print("=" * 60)
-    print("演示 1：MLP 分类（使用 TrainableMixin）")
-    print("=" * 60)
-
-    # 生成数据
-    X = np.random.randn(1000, 20).astype(np.float32)
-    y = (X[:, 0] + X[:, 1] > 0).astype(np.int64)
-
-    # 一步创建 DataLoader
-    ds = TensorDatasetWrapper(X, y, y_dtype=torch.long, normalize=True)
-    train_loader, val_loader = ds.get_loaders(batch_size=64, val_ratio=0.2)
-
-    # 创建模型
-    model = MLP(input_dim=20, hidden_dims=[64, 64, 32], output_dim=2,
-                activation='relu', dropout=0.2, batch_norm=True)
-    model.count_params()
-
-    # 一键训练
-    history = model.fit(
-        train_loader, val_loader,
-        epochs=50, lr=1e-3,
-        criterion=nn.CrossEntropyLoss(),
-        patience=10,
-        verbose=True,
+"""Unified interface legacy lesson, split into compute/render/smoke."""
+
+from __future__ import annotations
+
+from components.legacy_protocol import (
+    LegacyLessonSpec,
+    parameter_count_linear,
+    print_learning_guide as _print_learning_guide,
+    protocol_payload,
+    run_or_render,
+    save_figures,
+    small_bar_figure,
+    small_curve_figure,
+)
+
+
+MODULE_TITLE = "统一接口"
+MODULE_SUMMARY = "把数据、模型、训练、保存和推理整理成稳定边界，降低项目扩展成本。"
+MODULE_TAGS = ["统一框架", "接口设计", "训练工程", "复现"]
+MODULE_RELATED_TOPICS = ["part6_universal_framework/02_modular_structure", "part6_universal_framework/03_full_project", "part6_universal_framework/05_one_click_training", "part5/03_training_dynamics"]
+PRACTICE_TARGET = "part6_universal_framework/neural_network_playground"
+
+SPEC = LegacyLessonSpec(
+    title=MODULE_TITLE,
+    summary=MODULE_SUMMARY,
+    tags=tuple(MODULE_TAGS),
+    related_topics=tuple(MODULE_RELATED_TOPICS),
+    practice_target=PRACTICE_TARGET,
+    controls=(("batch_size", 64), ("lr", 0.001), ("patience", 10), ("随机种子", 42)),
+    observations=("统一接口的核心不是少写几行代码，而是让数据、模型、训练和推理职责可替换。",),
+    misconceptions=("工程坑案例：训练集和验证集各自 normalize，会造成线上分布对不上。",),
+    engineering=("工程用途：把 fit/save/load/predict/count_params 作为模型生命周期协议。",),
+)
+
+
+def print_learning_guide() -> None:
+    _print_learning_guide(
+        MODULE_TITLE,
+        [
+            "学习导读：统一接口要给数据、模型、训练和推理划清边界。",
+            "统一接口包含 TensorDatasetWrapper、TrainableMixin、MLP/SimpleCNN 三层职责。",
+            "工程坑案例：统计量必须由训练集拟合，再复用到验证、测试和线上。",
+            "进阶思考：分类变回归时，应替换 criterion/metric，而不是重写 Dataset。",
+        ],
     )
 
-    # 保存和加载
-    model.save('mlp_demo.pt')
-    model.load('mlp_demo.pt')
 
-    # 预测
-    X_test = torch.randn(10, 20)
-    preds = model.predict(X_test)
-    print(f"\n预测输出形状: {preds.shape}")
-    print(f"预测类别: {preds.argmax(dim=1).tolist()}")
+def compute_unified_interface(seed: int = 42, save_artifacts: bool = False, **_: object) -> dict[str, object]:
+    model_rows = [
+        {"指标": "TensorDatasetWrapper", "数值": 1, "解释": "负责类型转换、normalize、split 和 DataLoader。"},
+        {"指标": "TrainableMixin", "数值": 5, "解释": "fit/save/load/predict/count_params 统一训练生命周期。"},
+        {"指标": "MLP 参数量", "数值": parameter_count_linear(20, 64) + parameter_count_linear(64, 32) + parameter_count_linear(32, 2), "解释": "模型只描述结构，不关心训练循环。"},
+        {"指标": "推荐 lr", "数值": 0.001, "解释": "Adam 小实验的稳妥起点。"},
+    ]
+    curves = {"train_loss": [0.72, 0.48, 0.34, 0.25, 0.2], "val_loss": [0.76, 0.52, 0.39, 0.33, 0.34]}
+    figures = [
+        ("unified_interface_blocks.png", small_bar_figure(model_rows[:3], title="统一接口职责分层")),
+        ("unified_interface_curve.png", small_curve_figure(curves, title="统一 fit() 输出的训练曲线", ylabel="loss")),
+    ]
+    artifacts = save_figures(figures, save_artifacts)
+    return protocol_payload(
+        SPEC,
+        rows=model_rows,
+        notes=[
+            "Dataset 负责数据形态和统计状态，模型只负责 forward。",
+            "TrainableMixin 让任意 nn.Module 拥有一致的 fit/save/load/predict。",
+            "统一接口必须保存 normalize 统计量，否则复现和上线会漂移。",
+        ],
+        figures=figures,
+        artifacts=artifacts,
+        extra={"seed": seed},
+    )
 
-    # 绘制训练曲线
-    import matplotlib.pyplot as plt
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-    axes[0].plot(history['train_loss'], label='训练损失')
-    axes[0].plot(history['val_loss'], label='验证损失')
-    axes[0].set_title('损失曲线', fontsize=11)
-    axes[0].set_xlabel('Epoch')
-    axes[0].legend()
-    axes[0].grid(True, alpha=0.3)
 
-    axes[1].plot(history['lr'])
-    axes[1].set_title('学习率曲线（CosineAnnealing）', fontsize=11)
-    axes[1].set_xlabel('Epoch')
-    axes[1].set_ylabel('学习率')
-    axes[1].grid(True, alpha=0.3)
+def render() -> None:
+    import streamlit as st  # noqa: F401
 
-    plt.suptitle('统一接口训练演示', fontsize=13, fontweight='bold')
-    plt.tight_layout()
-    plt.savefig('unified_interface_demo.png', dpi=150, bbox_inches='tight')
-    plt.show()
+    from components.legacy_protocol import render_protocol_page
 
-    return model, history
+    render_protocol_page(spec=SPEC, compute=compute_unified_interface, module_path="part6_universal_framework/01_unified_interface.py")
+
+
+def compute(seed: int = 42, save_artifacts: bool = False, **kwargs: object) -> dict[str, object]:
+    return compute_unified_interface(seed=seed, save_artifacts=save_artifacts, **kwargs)
+
+
+def smoke() -> bool:
+    data = compute_unified_interface(save_artifacts=False)
+    return "统一接口" in data["log"] and bool(data["figures"])
+
 
 if __name__ == "__main__":
-    demo_unified_interface()
-
-# ============================================================
-# 代码段 2
-# ============================================================
-
-# ─────────────────────────────────────────────────────────
-# 复制这段模板，5分钟搭建新项目
-# ─────────────────────────────────────────────────────────
-
-import torch
-import torch.nn as nn
-import numpy as np
-
-# 1. 准备数据
-X_train = np.random.randn(800, 20).astype(np.float32)
-y_train = (X_train[:, 0] > 0).astype(np.int64)
-X_val   = np.random.randn(200, 20).astype(np.float32)
-y_val   = (X_val[:, 0] > 0).astype(np.int64)
-
-ds_train = TensorDatasetWrapper(X_train, y_train, y_dtype=torch.long, normalize=True)
-ds_val   = TensorDatasetWrapper(X_val,   y_val,   y_dtype=torch.long, normalize=True)
-train_loader = torch.utils.data.DataLoader(ds_train, batch_size=64, shuffle=True)
-val_loader   = torch.utils.data.DataLoader(ds_val,   batch_size=128)
-
-# 2. 定义模型（继承 TrainableMixin 获得 .fit() 等方法）
-class MyModel(nn.Module, TrainableMixin):
-    def __init__(self):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(20, 64), nn.ReLU(),
-            nn.Linear(64, 32), nn.ReLU(),
-            nn.Linear(32, 2),
-        )
-    def forward(self, x):
-        return self.net(x)
-
-# 3. 训练
-# 取消注释下面几行即可运行这个快速模板。
-# model = MyModel()
-# model.count_params()
-# history = model.fit(train_loader, val_loader, epochs=50, lr=1e-3, patience=10)
-
-# 4. 保存
-# model.save('my_model.pt')
-
-# 5. 推理
-# X_new = torch.randn(5, 20)
-# preds = model.predict(X_new)
-# print("预测结果:", preds.argmax(dim=1))
+    result = run_or_render(compute, render)
+    if result is not None:
+        raise SystemExit(result)

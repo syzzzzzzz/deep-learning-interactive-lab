@@ -32,10 +32,10 @@ PLAYGROUND_TARGET = "part6_universal_framework/neural_network_playground"
 st.set_page_config(
     page_title="经典 CNN 架构与高级应用",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
-render_visual_system("dark")
+render_visual_system("light")
 
 st.markdown(
     """

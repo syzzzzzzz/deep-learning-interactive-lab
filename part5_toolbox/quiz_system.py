@@ -25,7 +25,7 @@ QuestionType = Literal["choice", "true_false", "blank"]
 st.set_page_config(
     page_title="练习题与测验系统",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(
@@ -811,9 +811,9 @@ def render_summary() -> None:
 
     left, right = st.columns([0.58, 0.42])
     with left:
-        st.plotly_chart(plot_progress(history), use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(plot_progress(history), width="stretch", config={"displayModeBar": False})
     with right:
-        st.plotly_chart(plot_module_accuracy(stats), use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(plot_module_accuracy(stats), width="stretch", config={"displayModeBar": False})
 
     st.subheader("复习推荐")
     for item in weak_recommendations(stats):
@@ -823,7 +823,7 @@ def render_summary() -> None:
         with st.expander("答题历史明细", expanded=False):
             visible = details.copy()
             visible["是否正确"] = visible["是否正确"].map({True: "正确", False: "错误"})
-            st.dataframe(visible, use_container_width=True, hide_index=True)
+            st.dataframe(visible, width="stretch", hide_index=True)
 
 
 def main() -> None:
@@ -849,10 +849,10 @@ def main() -> None:
             default="混合题型",
         )
         st.divider()
-        if st.button("重新抽题", use_container_width=True):
+        if st.button("重新抽题", width="stretch"):
             start_new_quiz(module_names, question_count, mode)
             st.rerun()
-        if st.button("清空历史", use_container_width=True):
+        if st.button("清空历史", width="stretch"):
             st.session_state.quiz_history = []
             clear_current_submission()
             st.rerun()
@@ -878,7 +878,7 @@ def main() -> None:
 
         left, right = st.columns([0.25, 0.75])
         with left:
-            if st.button("提交答案", disabled=st.session_state.quiz_submitted, use_container_width=True):
+            if st.button("提交答案", disabled=st.session_state.quiz_submitted, width="stretch"):
                 submit_quiz(questions, answers)
                 st.rerun()
         with right:
@@ -900,7 +900,7 @@ def main() -> None:
             }
             for question in QUESTIONS
         ]
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
 
 if __name__ == "__main__":

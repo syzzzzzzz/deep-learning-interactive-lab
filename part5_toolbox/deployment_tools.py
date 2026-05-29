@@ -18,7 +18,7 @@ import streamlit as st
 st.set_page_config(
     page_title="模型压缩部署与工具框架",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(
@@ -254,7 +254,7 @@ def render_compression() -> None:
     m3.metric("精度变化", f"{combo.accuracy:.1f}%", f"{combo.accuracy - base.accuracy:.1f} pts")
     m4.metric("有效参数", f"{combo.active_params_m:.2f} M", f"{combo.active_params_m / base.active_params_m:.0%} of base")
 
-    st.plotly_chart(plot_compression(results), use_container_width=True)
+    st.plotly_chart(plot_compression(results), width="stretch")
     st.dataframe(compression_dataframe(results), width="stretch", hide_index=True)
 
     with st.expander("三种压缩技术的工程要点", expanded=True):

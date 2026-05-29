@@ -553,8 +553,8 @@ def render() -> None:
 
     try:
         clean_old_artifacts()
-        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
-        render_visual_system("dark")
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="auto")
+        render_visual_system("light")
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
         render_loading_bar("隐藏状态演示加载：热力图、状态轨迹和预测误差会一起说明“记忆”如何流动")

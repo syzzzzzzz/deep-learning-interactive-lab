@@ -258,7 +258,7 @@ QUESTION_BANK = (
 st.set_page_config(
     page_title="学习路径推荐与知识图谱",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
@@ -702,7 +702,7 @@ with st.sidebar:
     )
     st.session_state["completed_modules"] = set(selected_for_toggle)
     completed_modules = normalize_completed()
-    if st.button("清空进度", use_container_width=True):
+    if st.button("清空进度", width="stretch"):
         reset_progress()
         st.rerun()
     st.divider()
@@ -787,7 +787,7 @@ with tabs[2]:
             render_note("还需要先完成：" + "、".join(module.title for module in missing))
         else:
             render_note("前置条件已经满足，可以开始学习。")
-        if st.button("切换完成状态", use_container_width=True):
+        if st.button("切换完成状态", width="stretch"):
             updated = set(completed_modules)
             if selected_module_id in updated:
                 updated.remove(selected_module_id)
@@ -837,7 +837,7 @@ with tabs[3]:
         st.write("")
         c1, c2 = st.columns([0.35, 0.65])
         with c1:
-            if st.button("标记推荐模块为完成", use_container_width=True):
+            if st.button("标记推荐模块为完成", width="stretch"):
                 updated = set(completed_modules)
                 updated.add(recommendation.module_id)
                 st.session_state["completed_modules"] = updated

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>深度学习书库</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23fffdf8'/%3E%3Cpath d='M16 15h25c5 0 8 3 8 8v26H24c-5 0-8-3-8-8V15Z' fill='none' stroke='%232a2118' stroke-width='4'/%3E%3Cpath d='M24 25h17M24 34h17M24 43h12' stroke='%23b08a4f' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="assets/site.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#home" aria-label="返回首页">
+        <span>知序</span>
+        <small>Deep Learning Library</small>
+      </a>
+      <nav class="nav-links" aria-label="主导航">
+        <a href="#starter">从零开始</a>
+        <a href="#path">按路径学习</a>
+        <a href="#courses">课程目录</a>
+        <a href="#hardcore-labs">做实验</a>
+        <a href="#notes">复习索引</a>
+      </nav>
+      <button class="menu-button" type="button" data-open-menu aria-label="打开全站课程目录抽屉">打开全站目录</button>
+    </header>
+
+    <aside class="side-drawer" data-drawer aria-label="全站课程目录抽屉">
+      <div class="drawer-head">
+        <strong>全站课程目录</strong>
+        <button type="button" data-close-menu aria-label="关闭目录">关闭</button>
+      </div>
+      <div class="drawer-search">
+        <input id="drawer-search" type="search" placeholder="已知关键词搜索：CNN / 梯度 / Transformer" autocomplete="off" />
+      </div>
+      <div id="drawer-list" class="drawer-list"></div>
+    </aside>
+    <div class="drawer-scrim" data-close-menu></div>
+
+    <main id="app" class="app-shell" tabindex="-1"></main>
+
+    <template id="code-template">
+      <pre class="code-window"><code></code></pre>
+    </template>
+
+    <script src="assets/site.js" defer></script>
+  </body>
+</html>

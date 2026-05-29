@@ -1,6 +1,8 @@
 MODULE_TITLE = "数据集与优化器"
 MODULE_SUMMARY = "理解数据划分、批训练、SGD、Adam 和优化轨迹。"
 MODULE_TAGS = ["基础", "数据集", "优化器", "训练"]
+MODULE_RELATED_TOPICS = ["part1/01_tensors_gradients", "part1/02_activations_normalization", "part5/03_training_dynamics", "part5/04_hyperparam_search"]
+PRACTICE_TARGET = "调整优化器、学习率、batch size 和损失函数，观察优化轨迹、loss 曲线和泛化差距如何变化。"
 
 try:
     """

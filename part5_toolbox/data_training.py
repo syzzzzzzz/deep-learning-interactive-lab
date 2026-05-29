@@ -35,7 +35,7 @@ plt.rcParams["font.sans-serif"] = [
 st.set_page_config(
     page_title="数据预处理与训练技巧",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(

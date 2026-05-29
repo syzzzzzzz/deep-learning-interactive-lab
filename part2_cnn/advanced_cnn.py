@@ -31,7 +31,7 @@ torch.set_num_threads(1)
 st.set_page_config(
     page_title="CNN 深度拓展",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(

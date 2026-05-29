@@ -1,168 +1,89 @@
-try:
-    """
-    Transformer debugging snippets collected as safe, runnable helpers.
+"""Transformer debugging legacy lesson, split into compute/render/smoke."""
 
-    Intentionally broken lesson snippets are represented as comments in the source
-    material; this file exposes corrected utilities without top-level pseudo-code.
-    """
+from __future__ import annotations
 
-    import math
-
-    import matplotlib.pyplot as plt
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
+from components.legacy_protocol import (
+    LegacyLessonSpec,
+    print_learning_guide as _print_learning_guide,
+    protocol_payload,
+    run_or_render,
+    save_figures,
+    small_bar_figure,
+)
 
 
-    def scaled_dot_product_attention(Q, K, V, mask=None):
-        d_k = Q.size(-1)
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)
-        if mask is not None:
-            scores = scores.masked_fill(mask == 0, -1e9)
-        attn_weights = F.softmax(scores, dim=-1)
-        return torch.matmul(attn_weights, V), attn_weights
+MODULE_TITLE = "Transformer 调试问题集"
+MODULE_SUMMARY = "用结构化清单定位 mask、位置编码、梯度、学习率和生成退化问题。"
+MODULE_TAGS = ["Transformer", "调试", "Mask", "训练诊断"]
+MODULE_RELATED_TOPICS = ["part4/03_encoder_decoder", "part4/04_minimal_transformer", "part5/02_gradient_monitor", "part5/03_training_dynamics"]
+PRACTICE_TARGET = "part6_universal_framework/training_demo"
+
+SPEC = LegacyLessonSpec(
+    title=MODULE_TITLE,
+    summary=MODULE_SUMMARY,
+    tags=tuple(MODULE_TAGS),
+    related_topics=tuple(MODULE_RELATED_TOPICS),
+    practice_target=PRACTICE_TARGET,
+    controls=(("问题类型", ("mask", "nan", "重复生成", "梯度爆炸")), ("裁剪阈值", 1.0), ("随机种子", 42)),
+    observations=("Transformer 故障通常先从 shape/mask 检查开始，再看梯度、学习率和生成采样。",),
+    misconceptions=("常见误区：训练 loss 很低不代表生成正确，decoder 如果偷看未来会给出虚假好指标。",),
+    engineering=("工程用途：为每类故障准备最小复现、检测函数和修复动作。",),
+)
 
 
-    def create_causal_mask(seq_len, device=None):
-        device = device or "cpu"
-        mask = torch.tril(torch.ones(seq_len, seq_len, device=device))
-        return mask.unsqueeze(0).unsqueeze(0)
+def print_learning_guide() -> None:
+    _print_learning_guide(
+        MODULE_TITLE,
+        [
+            "学习导读：调试 Transformer 先查 mask 和 shape，再查数值稳定性。",
+            "工程坑案例：padding mask 方向反了，训练能跑但注意力全看 PAD。",
+            "进阶思考：重复生成时应该先调 temperature/top-p，还是先查训练数据？",
+        ],
+    )
 
 
-    def create_padding_mask(seq_lengths, max_len):
-        batch_size = len(seq_lengths)
-        device = seq_lengths.device
-        mask = torch.arange(max_len, device=device).expand(batch_size, max_len)
-        mask = mask < seq_lengths.unsqueeze(1)
-        return mask.unsqueeze(1).unsqueeze(2)
+def compute_debug_problems(seed: int = 42, save_artifacts: bool = False, **_: object) -> dict[str, object]:
+    cases = [
+        {"指标": "mask 维度错", "数值": 5, "解释": "检查形状是否能广播到 B x H x T x T。"},
+        {"指标": "NaN/Inf", "数值": 4, "解释": "检查 softmax 前分数、学习率和混合精度缩放。"},
+        {"指标": "梯度爆炸", "数值": 4, "解释": "看 grad_norm，加入裁剪并降低学习率。"},
+        {"指标": "重复生成", "数值": 3, "解释": "检查采样温度、top-p、重复惩罚和训练语料。"},
+        {"指标": "位置编码错位", "数值": 3, "解释": "检查 position id 是否从 0 开始且和 padding 对齐。"},
+    ]
+    figures = [("transformer_debug_severity.png", small_bar_figure(cases, title="Transformer 常见问题严重度"))]
+    artifacts = save_figures(figures, save_artifacts)
+    return protocol_payload(
+        SPEC,
+        rows=cases,
+        notes=[
+            "mask 错误会直接改变模型能看到的信息范围，是第一优先级。",
+            "NaN 多数来自过大学习率、未裁剪梯度或 softmax 前分数过大。",
+            "生成质量问题要同时看训练数据、采样参数和长度惩罚。",
+        ],
+        figures=figures,
+        artifacts=artifacts,
+        extra={"seed": seed},
+    )
 
 
-    class PositionalEncoding(nn.Module):
-        def __init__(self, d_model, max_len=5000):
-            super().__init__()
-            pe = torch.zeros(max_len, d_model)
-            position = torch.arange(0, max_len).unsqueeze(1).float()
-            div_term = torch.exp(torch.arange(0, d_model, 2).float() * -(math.log(10000.0) / d_model))
-            pe[:, 0::2] = torch.sin(position * div_term)
-            pe[:, 1::2] = torch.cos(position * div_term)
-            self.register_buffer("pe", pe)
+def render() -> None:
+    import streamlit as st  # noqa: F401
 
-        def forward(self, x):
-            seq_len = x.size(1)
-            return x + self.pe[:seq_len, :].unsqueeze(0)
+    from components.legacy_protocol import render_protocol_page
+
+    render_protocol_page(spec=SPEC, compute=compute_debug_problems, module_path="part4_transformer/06_debug_problems.py")
 
 
-    def multi_head_attention(Q, K, V):
-        d_k = Q.size(-1)
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(d_k)
-        attn = F.softmax(scores, dim=-1)
-        return torch.matmul(attn, V)
+def compute(seed: int = 42, save_artifacts: bool = False, **kwargs: object) -> dict[str, object]:
+    return compute_debug_problems(seed=seed, save_artifacts=save_artifacts, **kwargs)
 
 
-    class LabelSmoothingLoss(nn.Module):
-        def __init__(self, num_classes, smoothing=0.1):
-            super().__init__()
-            if num_classes <= 1:
-                raise ValueError("num_classes must be greater than 1")
-            self.num_classes = num_classes
-            self.smoothing = smoothing
-            self.confidence = 1.0 - smoothing
-
-        def forward(self, logits, targets):
-            log_probs = F.log_softmax(logits, dim=-1)
-            with torch.no_grad():
-                true_dist = torch.zeros_like(log_probs)
-                true_dist.fill_(self.smoothing / (self.num_classes - 1))
-                true_dist.scatter_(1, targets.unsqueeze(1), self.confidence)
-            return torch.mean(torch.sum(-true_dist * log_probs, dim=-1))
+def smoke() -> bool:
+    data = compute_debug_problems(save_artifacts=False)
+    return "mask" in data["log"] and bool(data["figures"])
 
 
-    class WarmupScheduler:
-        def __init__(self, optimizer, d_model, warmup_steps=4000):
-            self.optimizer = optimizer
-            self.d_model = d_model
-            self.warmup_steps = warmup_steps
-            self.step_num = 0
-
-        def step(self):
-            self.step_num += 1
-            lr = self.d_model ** (-0.5) * min(
-                self.step_num ** (-0.5),
-                self.step_num * self.warmup_steps ** (-1.5),
-            )
-            for param_group in self.optimizer.param_groups:
-                param_group["lr"] = lr
-            return lr
-
-
-    def beam_search(model, start_token, max_len, beam_size=5):
-        device = next(model.parameters()).device
-        beams = torch.full((beam_size, 1), start_token, dtype=torch.long, device=device)
-        beam_scores = torch.zeros(beam_size, device=device)
-        beam_scores[1:] = -float("inf")
-
-        for _ in range(max_len):
-            logits = model(beams)[:, -1, :]
-            log_probs = F.log_softmax(logits, dim=-1)
-            candidate_scores = (beam_scores.unsqueeze(1) + log_probs).reshape(-1)
-            top_scores, top_indices = torch.topk(candidate_scores, beam_size)
-            beam_indices = top_indices // logits.size(-1)
-            token_indices = top_indices % logits.size(-1)
-            beams = torch.cat([beams[beam_indices], token_indices.unsqueeze(1)], dim=1)
-            beam_scores = top_scores
-
-        return beams[beam_scores.argmax()]
-
-
-    def check_nan_inf(model):
-        issues = []
-        for name, param in model.named_parameters():
-            if param.grad is not None:
-                if torch.isnan(param.grad).any():
-                    issues.append((name, "grad_nan"))
-                if torch.isinf(param.grad).any():
-                    issues.append((name, "grad_inf"))
-            if torch.isnan(param).any():
-                issues.append((name, "param_nan"))
-            if torch.isinf(param).any():
-                issues.append((name, "param_inf"))
-        return issues
-
-
-    def plot_attention(attn_weights, tokens):
-        import seaborn as sns
-
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(attn_weights.detach().cpu().numpy(), xticklabels=tokens, yticklabels=tokens, cmap="Blues")
-        plt.xlabel("Key")
-        plt.ylabel("Query")
-        return plt.gcf()
-
-
-    def plot_grad_flow(named_parameters):
-        ave_grads = []
-        layers = []
-        for name, param in named_parameters:
-            if param.requires_grad and param.grad is not None:
-                layers.append(name)
-                ave_grads.append(param.grad.abs().mean().item())
-        plt.figure(figsize=(10, 4))
-        plt.plot(ave_grads)
-        plt.xticks(range(len(layers)), layers, rotation=90)
-        plt.ylabel("Average gradient")
-        plt.tight_layout()
-        return plt.gcf()
-
-
-    if __name__ == "__main__":
-        Q = torch.randn(2, 4, 8, 16)
-        K = torch.randn(2, 4, 8, 16)
-        V = torch.randn(2, 4, 8, 16)
-        out, attn = scaled_dot_product_attention(Q, K, V, create_causal_mask(8))
-        assert out.shape == Q.shape
-        assert attn.shape == (2, 4, 8, 8)
-        print("Transformer debug helpers smoke test passed.")
-except Exception as e:
-    from components.error_boundary import render_module_error
-
-    render_module_error("part4_transformer/06_debug_problems.py", e)
+if __name__ == "__main__":
+    result = run_or_render(compute, render)
+    if result is not None:
+        raise SystemExit(result)

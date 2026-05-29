@@ -26,7 +26,7 @@ torch.set_num_threads(1)
 st.set_page_config(
     page_title="RNN 与序列模型",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(

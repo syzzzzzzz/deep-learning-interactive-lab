@@ -189,7 +189,7 @@ def render_注意力演示() -> None:
 
     try:
         clean_old_artifacts()
-        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="auto")
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
         left, right = st.columns([0.7, 0.3])

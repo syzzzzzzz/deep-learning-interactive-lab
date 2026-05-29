@@ -7,6 +7,9 @@ env/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.codex-ref-llm-cookbook/
+node_modules/
+artifacts/
 
 # Streamlit 与本地运行输出
 .streamlit_module_outputs/
@@ -24,6 +27,8 @@ env/
 /*.pt
 /*.pth
 /*.ckpt
+test-results/
+playwright-report/
 
 # 系统与编辑器文件
 .DS_Store

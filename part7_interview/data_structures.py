@@ -20,7 +20,7 @@ from components.visual_system import render_visual_system
 
 T = TypeVar("T")
 
-st.set_page_config(page_title="数据结构与算法面试训练", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="数据结构与算法面试训练", layout="wide", initial_sidebar_state="auto")
 
 
 def css() -> str:
@@ -73,7 +73,7 @@ def safe_run(func: Callable[[], T]) -> T | None:
 
 
 def render_back_home() -> None:
-    if st.button("返回主界面", key="ds-back-home", use_container_width=True):
+    if st.button("返回主界面", key="ds-back-home", width="stretch"):
         st.query_params.clear()
         st.rerun()
 
@@ -185,7 +185,7 @@ def graph_order(kind: str) -> list[str]:
 
 
 def main() -> None:
-    render_visual_system("dark")
+    render_visual_system("light")
     st.markdown(css(), unsafe_allow_html=True)
     st.markdown(
         """
@@ -215,12 +215,12 @@ def main() -> None:
     with left:
         algorithm = st.selectbox("选择算法", ["冒泡排序", "快速排序"], key="ds-algorithm")
         ensure_sort_state(algorithm)
-        if st.button("单步执行", key="ds-step", use_container_width=True):
+        if st.button("单步执行", key="ds-step", width="stretch"):
             if algorithm == "冒泡排序":
                 bubble_step()
             else:
                 quick_step()
-        if st.button("重置数组", key="ds-reset", use_container_width=True):
+        if st.button("重置数组", key="ds-reset", width="stretch"):
             reset_sort_state(algorithm)
         complexity = {
             "冒泡排序": ("O(n^2)", "O(1)"),

@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from typing import Iterable
 from urllib.parse import quote
 
+from components.course_manifest import REGISTERED_MODULES
+
 
 @dataclass(frozen=True)
 class KnowledgeNode:
@@ -35,7 +37,7 @@ class ModuleSeed:
 
 
 # 顺序对齐主站 MODULES，也覆盖旧 Markdown 教材的章节骨架。
-MODULE_SEEDS: tuple[ModuleSeed, ...] = (
+LEGACY_MODULE_SEED_OVERRIDES: tuple[ModuleSeed, ...] = (
     ModuleSeed("part1/01_tensors_gradients", "part1/01_tensors_gradients", "张量与梯度", "用可视化理解张量、自动求导和梯度传播。", "入门", ("基础", "张量", "梯度")),
     ModuleSeed("part1/02_activations_normalization", "part1/02_activations_normalization", "激活与归一化", "比较常见激活函数、归一化方法和训练稳定性。", "入门", ("基础", "激活函数", "归一化")),
     ModuleSeed("part1/03_datasets_optimizers", "part1/03_datasets_optimizers", "数据集与优化器", "理解数据划分、批训练、SGD、Adam 和优化曲线。", "入门", ("基础", "数据", "优化")),
@@ -105,6 +107,33 @@ MODULE_SEEDS: tuple[ModuleSeed, ...] = (
     ModuleSeed("part7/interview_quiz", "part7/interview_quiz", "面试刷题模式", "随机出题、按方向难度筛选、错题本、面试官追问。", "核心", ("刷题", "面试", "错题本")),
 )
 
+
+def build_module_seeds_from_course_manifest(overrides: tuple[ModuleSeed, ...]) -> tuple[ModuleSeed, ...]:
+    """Derive graph node seeds from the canonical course manifest.
+
+    The old hand-written seeds are now treated only as optional text/difficulty
+    overrides. Routes, ordering, and node coverage come from course_manifest.
+    """
+
+    override_by_key = {seed.key: seed for seed in overrides}
+    seeds: list[ModuleSeed] = []
+    for module in REGISTERED_MODULES:
+        key = module.short_target
+        override = override_by_key.get(key)
+        seeds.append(
+            ModuleSeed(
+                key=key,
+                route=key,
+                title=override.title if override else module.title,
+                description=override.description if override else module.summary,
+                difficulty=override.difficulty if override else module.level,
+                tags=override.tags if override else module.tags,
+            )
+        )
+    return tuple(seeds)
+
+
+MODULE_SEEDS: tuple[ModuleSeed, ...] = build_module_seeds_from_course_manifest(LEGACY_MODULE_SEED_OVERRIDES)
 
 ALIASES: dict[str, str] = {
     "math_primer": "part1/math_primer",

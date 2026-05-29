@@ -20,7 +20,7 @@ from components.visual_system import render_visual_system
 
 T = TypeVar("T")
 
-st.set_page_config(page_title="计算机网络面试训练", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="计算机网络面试训练", layout="wide", initial_sidebar_state="auto")
 
 
 def css() -> str:
@@ -72,7 +72,7 @@ def safe_run(func: Callable[[], T]) -> T | None:
 
 
 def render_back_home() -> None:
-    if st.button("返回主界面", key="networking-back-home", use_container_width=True):
+    if st.button("返回主界面", key="networking-back-home", width="stretch"):
         st.query_params.clear()
         st.rerun()
 
@@ -146,7 +146,7 @@ def protocol_interaction() -> None:
 
 
 def main() -> None:
-    render_visual_system("dark")
+    render_visual_system("light")
     st.markdown(css(), unsafe_allow_html=True)
     st.markdown(
         """

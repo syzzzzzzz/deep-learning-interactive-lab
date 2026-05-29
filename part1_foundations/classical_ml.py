@@ -22,7 +22,7 @@ from sklearn.tree import DecisionTreeClassifier, plot_tree
 st.set_page_config(
     page_title="经典机器学习算法可视化",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 

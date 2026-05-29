@@ -36,7 +36,7 @@ from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 st.set_page_config(
     page_title="机器学习基础",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 

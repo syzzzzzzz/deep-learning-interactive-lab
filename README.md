@@ -1,121 +1,225 @@
 # 深度学习交互式学习网站
 
-这是一个面向初学者的深度学习交互式学习网站。项目使用 Streamlit、PyTorch、Matplotlib、Plotly 和 scikit-learn 构建，把深度学习中的数学基础、经典机器学习、卷积神经网络、循环神经网络、Transformer、工程工具箱和 CS 面试训练做成可视化、可调参、可逐步观察的网页实验室。
+[![Quality Gate](https://github.com/syzzzzzzz/deep-learning-interactive-lab/actions/workflows/quality.yml/badge.svg)](https://github.com/syzzzzzzz/deep-learning-interactive-lab/actions/workflows/quality.yml)
+[![Deploy GitHub Pages](https://github.com/syzzzzzzz/deep-learning-interactive-lab/actions/workflows/pages.yml/badge.svg)](https://github.com/syzzzzzzz/deep-learning-interactive-lab/actions/workflows/pages.yml)
 
-## 项目特色
+这是一个面向零基础学习者的深度学习交互式学习网站。它把张量、梯度、CNN、RNN、Transformer、训练调参、工程框架和 CS 面试基础做成可以阅读、调参、观察、复盘的学习产品。
 
-- **中文教材式讲解**：重点章节补充了从直觉、定义、数学原理、动手实验、常见误区到工程应用的完整说明。
-- **交互式可视化**：通过滑块、选择框、热力图、损失曲线、分类边界和动画观察模型行为。
-- **适合零基础学习**：每个图都配有读图提示，告诉你应该调什么参数、观察什么变化、思考什么问题。
-- **覆盖完整学习路径**：从张量、梯度、数学基础开始，逐步进入 CNN、RNN、Transformer 和项目化训练流程。
-- **CS 面试训练**：涵盖计算机网络、数据库、数据结构与算法、操作系统四大方向的交互式刷题和模拟面试。
-
-## 章节目录
-
-- `part1_foundations`：张量、梯度、数学基础、经典机器学习、神经网络入门
-- `part2_cnn`：卷积可视化、特征图、经典 CNN、MNIST、小型调试面板、迁移学习
-- `part3_rnn`：RNN 直觉、隐藏状态、序列任务、注意力与文本分类
-- `part4_transformer`：注意力机制、多头注意力、位置编码、Transformer、BERT 与 GPT 对比
-- `part5_toolbox`：特征可视化、梯度监控、训练动态、超参数搜索、数据集玩具实验
-- `part6_universal_framework`：统一接口、模块化结构、插件系统、一键训练、Streamlit 演示
-- `part7_interview`：计算机网络、数据库与 SQL、数据结构与算法、操作系统、深度学习、系统设计六大方向面试训练、交互式刷题与模拟面试
-
-## 环境要求
-
-建议使用 Python 3.10 或更高版本。当前开发环境使用 Python 3.12。
-
-## 安装依赖
-
-在项目根目录执行：
-
-```powershell
-python -m pip install -r requirements.txt
-```
-
-如果你的环境中同时存在多个 Python 版本，请使用实际的 Python 路径执行安装，例如：
-
-```powershell
-C:\Users\你的用户名\AppData\Local\Programs\Python\Python312\python.exe -m pip install -r requirements.txt
-```
-
-## 启动网站
-
-推荐使用主入口启动：
-
-```powershell
-python -m streamlit run main.py --server.address 127.0.0.1 --server.port 8501
-```
-
-启动成功后，在浏览器打开：
+在线体验地址：
 
 ```text
-http://127.0.0.1:8501
+https://syzzzzzzz.github.io/deep-learning-interactive-lab/
 ```
 
-也可以直接双击 Windows 批处理文件：
+如果 Pages 刚开启，第一次发布可能需要在 GitHub 仓库的 `Settings -> Pages` 中选择 `GitHub Actions` 作为发布来源。
 
-```text
-start_lab.bat
+## 项目定位
+
+这个项目不是普通脚本合集，而是一个完整的交互式教学平台雏形：
+
+- 给初学者：先看 3 分钟版，再看动画，再动手实验。
+- 给进阶学习者：阅读完整讲义、源码对照和工程解释。
+- 给面试官：展示课程系统设计、前端交互、Python 教学脚本、质量门、E2E 测试和部署工程。
+
+## 截图
+
+| 首页学习路径 | Transformer 课程页 |
+|---|---|
+| ![首页](docs/screenshots/home.png) | ![Transformer 课程页](docs/screenshots/course-transformer.png) |
+
+| 中央控制台 | Shape 诊断 |
+|---|---|
+| ![中央控制台](docs/screenshots/console-builder.png) | ![Shape 诊断](docs/screenshots/shape-diagnostic.png) |
+
+| CS 面试训练营 |
+|---|
+| ![CS 面试训练营](docs/screenshots/interview-camp.png) |
+
+截图由 Playwright 自动生成：
+
+```powershell
+npm run screenshots
 ```
 
-## 打开指定章节
+## 核心亮点
 
-主站支持通过 URL 参数直接进入章节，例如：
+- **课程学习闭环**：课程页包含本节主线、3 分钟版、概念动画、动手实验、完整讲义、源码对照、我已理解、加入复习、下一节。
+- **中央控制台**：支持模型预设、shape 诊断、JSON 保存/加载、PyTorch 代码导出。
+- **神经网络乐高工厂**：用模型构建器把 MLP、CNN、Transformer mini 组合成可解释结构。
+- **拖拽式节点画布**：把知识点拆成数据、模块、损失、优化和观测节点，用结构帮助学生理解模型流。
+- **训练事件总线**：一次调参事件同时更新 loss、梯度、特征/注意力和实验笔记。
+- **个人技术名片**：首页包含作品集入口、技术栈、代码墙、GitHub 链接和项目说明。
+- **硬核实验区**：包含模型可解释性、对抗样本、训练挑战、端到端案例。
+- **CS 八股文训练营**：覆盖网络、数据库、算法、操作系统、深度学习、系统设计和模拟面试。
+- **旧脚本协议化**：38 个历史教学脚本统一纳入 `compute / render / smoke` 协议。
+- **质量门与 E2E**：Python 全量质量门 + Playwright 桌面/移动端真实浏览器测试。
 
-```text
-http://127.0.0.1:8501/?module=part1_foundations%2Fmath_primer
-http://127.0.0.1:8501/?module=part1_foundations%2Fclassical_ml
-http://127.0.0.1:8501/?module=part4_transformer%2Ftransformer_models
-http://127.0.0.1:8501/?module=part7_interview%2Finterview_quiz
-http://127.0.0.1:8501/?module=part7_interview%2Fdeep_learning_interview
-```
+## 当前能力
 
-## 命令行运行器
+### 课程体系
 
-如果只想查看模块列表，可以执行：
+- `part1_foundations`：数学基础、张量、梯度、经典机器学习、神经网络基础
+- `part2_cnn`：卷积直觉、特征图、经典 CNN、现代 CNN、Grad-CAM、迁移学习
+- `part3_rnn`：RNN、隐藏状态、序列任务、Seq2Seq、文本分类、高级训练
+- `part4_transformer`：注意力机制、多头注意力、Encoder/Decoder、最小 Transformer、Flash Attention
+- `part5_toolbox`：特征可视化、梯度监控、训练动态、超参搜索、部署工具、测验系统
+- `part6_universal_framework`：统一接口、模块化结构、项目骨架、插件系统、中央控制台、学习路径
+- `part7_interview`：计算机网络、数据库 SQL、数据结构与算法、操作系统、系统设计、面试刷题
+
+### 中央控制台
+
+模型构建器当前支持：
+
+- `Embedding`
+- `MultiHeadAttention`
+- `LayerNorm`
+- `ResidualBlock`
+- `TransformerEncoder`
+- `Flatten`
+- `Dropout`
+- `Linear`
+
+预设模型：
+
+- `MLP baseline`
+- `CNN classifier`
+- `Transformer mini`
+- `Shape error demo`
+
+它可以展示每层输入/输出 shape，发现 `shape mismatch` 时给出修复建议，例如插入 `Linear/projection layer`。
+
+## 技术栈
+
+- 前端：HTML、CSS、JavaScript
+- 可视化：原生 SVG / DOM 动画、Matplotlib、Plotly
+- 教学脚本：Python、NumPy、PyTorch、Streamlit legacy
+- 自动化：GitHub Actions、Playwright
+- 质量门：Python AST 检查、内容检查、smoke test、浏览器 E2E
+- 部署：GitHub Pages
+
+## 本地启动
+
+推荐使用静态站入口：
 
 ```powershell
 python main.py
 ```
 
-运行单个模块：
+启动后打开终端打印的地址，例如：
+
+```text
+http://127.0.0.1:8000
+```
+
+指定端口：
+
+```powershell
+python main.py --port 4173
+```
+
+也可以直接使用 Python 静态服务：
+
+```powershell
+python -m http.server 8000 --bind 127.0.0.1
+```
+
+Windows 可以双击：
+
+```text
+start_lab.bat
+```
+
+## 常用命令
+
+安装 Python 依赖：
+
+```powershell
+python -m pip install -r requirements.txt
+```
+
+安装前端测试依赖：
+
+```powershell
+npm ci
+npx playwright install chromium
+```
+
+查看模块列表：
+
+```powershell
+python main.py --menu
+```
+
+运行单个旧教学模块：
 
 ```powershell
 python main.py part2_cnn/01_convolution_visual
 ```
 
-## 学习建议
+不要用 `streamlit run main.py` 启动主站。主站现在是静态 HTML 学习体验；Streamlit 只作为 legacy 调试入口保留。
 
-1. 先看 `数学基础速查`，理解向量、矩阵、导数、概率和梯度下降。
-2. 再看 `经典机器学习`，建立决策边界、过拟合、正则化和距离度量的直觉。
-3. 然后进入 CNN、RNN、Transformer，观察深度学习模型如何把这些基础概念组合成更强的结构。
-4. 每个页面都建议先调极端参数，再回到默认值，这样最容易看出参数真正控制了什么。
-5. 面试准备阶段，使用 `part7_interview` 的刷题模式按方向练习，结合 `面试刷题模式` 模拟真实面试节奏。
-
-## 维护备注
-
-- 本项目会生成运行时图片、日志和 Streamlit 临时输出，这些文件已通过 `.gitignore` 排除。
-- 根目录下的 `.png`、`.log`、`.pt` 通常是教学脚本运行产物，不建议提交到仓库。
-- 如果新增章节，请优先保持“图文绑定、可调参数、误区解释、工程意义”的教学风格。
-
-## 内容质量检查
+## 质量检查
 
 提交前建议运行：
 
 ```powershell
-python scripts/quality_check.py
+python -X utf8 scripts\quality_check.py
+npm run test:e2e
 ```
 
-这条命令会检查：
-
-- Python 文件能否编译，并把 `SyntaxWarning` 当作失败处理。
-- 教材内容是否残留模板占位符。
-- 首批重点页面中，互动文案引用的控件是否真实存在。
-- 主站重点路由是否已注册。
-- 注意力机制、经典机器学习、数学基础速查的关键渲染分支是否能跑通。
-
-如果只想快速做静态检查，可以执行：
+快速跳过 smoke：
 
 ```powershell
-python scripts/quality_check.py --skip-smoke
+python -X utf8 scripts\quality_check.py --skip-smoke
 ```
+
+当前质量门覆盖：
+
+- Python 编译和语法警告
+- 静态站 HTML/CSS/JS 结构
+- 课程目录 Source of Truth
+- 知识图谱路由
+- 旧脚本协议
+- 运行产物污染
+- 38 个旧脚本 smoke
+- 6 个重点页面渲染 smoke
+- Playwright 桌面和移动端课程闭环
+- Playwright 中央控制台模型构建器
+
+## GitHub Actions
+
+项目包含两个工作流：
+
+- `.github/workflows/quality.yml`：运行 Python 质量门和 Playwright E2E。
+- `.github/workflows/pages.yml`：质量门通过后打包静态站并发布到 GitHub Pages。
+
+当前工作流使用：
+
+- `actions/checkout@v6`
+- `actions/setup-python@v6`
+- `actions/setup-node@v6`
+- Node 24
+- Python 3.12
+- Playwright Chromium
+
+## 文档
+
+- [架构说明](docs/architecture.md)
+- [教学设计说明](docs/teaching_design.md)
+- [旧脚本协议审计](docs/legacy_protocol_audit.md)
+- [深模块架构 PRD](docs/prd_deep_module_architecture.md)
+
+## 后续路线图
+
+- 将中央控制台升级为更完整的拖拽连线模型编辑器。
+- 增加更多真实训练联动：CNN 特征图、注意力热力图、梯度流和参数更新动画。
+- 扩展 Playwright E2E 覆盖：首页搜索、八股文训练营、移动端长页面学习路径。
+- 增加线上访问监控和错误上报。
+- 继续统一旧脚本 runtime adapter，减少手写页面差异。
+
+## 维护约定
+
+- 根目录不能留下 `*.png`、`*.csv`、`*.pt`、`*.log`、`__pycache__` 等运行产物。
+- 新增章节优先更新 `components/course_manifest.py`，再让质量门派生路由和图谱。
+- 新增交互功能要补 Playwright E2E 或对应 Python 质量门。
+- 面向初学者的页面先解释图和控件，再展示源码。

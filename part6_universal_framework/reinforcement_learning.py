@@ -51,7 +51,7 @@ ARROWS = ("↑", "→", "↓", "←")
 st.set_page_config(
     page_title="强化学习入门",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
@@ -831,7 +831,7 @@ with tabs[2]:
     st.subheader("实时训练奖励曲线")
     live_col, text_col = st.columns([0.58, 0.42])
     with live_col:
-        if st.button("播放一次实时更新", use_container_width=True):
+        if st.button("播放一次实时更新", width="stretch"):
             plot_slot = st.empty()
             progress = st.progress(0)
             chunk_count = 18

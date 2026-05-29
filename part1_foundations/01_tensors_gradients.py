@@ -424,8 +424,8 @@ def render_张量基础() -> None:
 
     try:
         clean_old_artifacts()
-        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
-        render_visual_system("dark")
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="auto")
+        render_visual_system("light")
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
         render_loading_bar("梯度动画加载：损失地形和反向传播电流会把抽象公式变成可观察路径")

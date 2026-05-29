@@ -18,7 +18,7 @@ import streamlit as st
 st.set_page_config(
     page_title="神经网络基础",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 

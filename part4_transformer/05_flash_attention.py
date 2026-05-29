@@ -1,312 +1,108 @@
-try:
-    """
-    自动生成自: part4_transformer\05_flash_attention.md
-    可独立运行的 Python 源码
-    """
+"""FlashAttention legacy lesson, split into compute/render/smoke."""
 
-    import torch
-    import torch.nn.functional as F
+from __future__ import annotations
 
-    def standard_attention(Q, K, V):
-        """
-        标准注意力实现
-        Q, K, V: [batch, seq_len, d_model]
-        内存复杂度: O(N^2) 其中 N = seq_len
-        """
-        d_k = Q.size(-1)
-        # 计算注意力分数矩阵 [batch, N, N]
-        scores = torch.matmul(Q, K.transpose(-2, -1)) / (d_k ** 0.5)
-        # 问题：这里需要存储完整的 N×N 矩阵到 HBM（高带宽内存）
-        attn_weights = F.softmax(scores, dim=-1)  # [batch, N, N]
-        # 再次访问 HBM 读取 attn_weights
-        output = torch.matmul(attn_weights, V)  # [batch, N, d_model]
-        return output
+import numpy as np
 
-    # ============================================================
-    # 代码段 2
-    # ============================================================
+from components.legacy_protocol import (
+    LegacyLessonSpec,
+    attention_memory,
+    matrix_figure,
+    print_learning_guide as _print_learning_guide,
+    protocol_payload,
+    run_or_render,
+    save_figures,
+    small_bar_figure,
+)
 
-    def online_softmax_update(m_old, l_old, block_scores, block_values):
-        """
-        在线更新 softmax
-        m_old: 之前块的最大值
-        l_old: 之前块的归一化因子 (sum of exp)
-        block_scores: 当前块的注意力分数
-        """
-        m_new = torch.max(m_old, torch.max(block_scores, dim=-1, keepdim=True)[0])
 
-        # 重新缩放之前的结果
-        scale_old = torch.exp(m_old - m_new)
-        l_old_scaled = l_old * scale_old
+MODULE_TITLE = "Flash Attention"
+MODULE_SUMMARY = "理解标准注意力的 N x N 内存瓶颈，以及分块在线 softmax 如何减少显存访问。"
+MODULE_TAGS = ["Transformer", "FlashAttention", "性能", "注意力"]
+MODULE_RELATED_TOPICS = ["part4/01_attention_mechanism", "part4/02_multihead_visual", "part4/04_minimal_transformer", "part5/03_training_dynamics"]
+PRACTICE_TARGET = "part6_universal_framework/neural_network_playground"
 
-        # 计算当前块的贡献
-        exp_scores = torch.exp(block_scores - m_new)
-        l_new = l_old_scaled + torch.sum(exp_scores, dim=-1, keepdim=True)
+SPEC = LegacyLessonSpec(
+    title=MODULE_TITLE,
+    summary=MODULE_SUMMARY,
+    tags=tuple(MODULE_TAGS),
+    related_topics=tuple(MODULE_RELATED_TOPICS),
+    practice_target=PRACTICE_TARGET,
+    controls=(("序列长度", 512), ("head 数", 8), ("块大小", 64)),
+    observations=("FlashAttention 不是减少数学量级，而是减少 N x N 注意力矩阵反复写回高带宽显存。",),
+    misconceptions=("常见误区：FlashAttention 不是近似注意力，它通过分块和在线 softmax 保持数值等价。",),
+    engineering=("工程用途：长序列训练先估算 attention matrix 显存，再决定是否用 flash/scaled_dot_product_attention。",),
+)
 
-        return m_new, l_new, exp_scores
 
-    # ============================================================
-    # 代码段 3
-    # ============================================================
+def print_learning_guide() -> None:
+    _print_learning_guide(
+        MODULE_TITLE,
+        [
+            "学习导读：标准注意力的瓶颈常在 N x N 分数矩阵的读写。",
+            "工程坑案例：只看 FLOPs 会低估显存带宽和中间矩阵的代价。",
+            "进阶思考：为什么在线 softmax 需要同时维护最大值 m 和归一化因子 l？",
+        ],
+    )
 
-    import torch
-    import math
 
-    class FlashAttention:
-        def __init__(self, block_size_q=64, block_size_k=64):
-            """
-            block_size_q: Q 的分块大小
-            block_size_k: K, V 的分块大小
-            """
-            self.B_q = block_size_q
-            self.B_k = block_size_k
+def compute_flash_attention(seq_len: int = 512, heads: int = 8, block_size: int = 64, seed: int = 42, save_artifacts: bool = False, **_: object) -> dict[str, object]:
+    seq_len = max(16, min(int(seq_len), 4096))
+    heads = max(1, min(int(heads), 32))
+    block_size = max(8, min(int(block_size), seq_len))
+    full_mb = attention_memory(seq_len, heads, bytes_per_value=2)
+    block_mb = attention_memory(block_size, heads, bytes_per_value=2)
+    blocks = int(np.ceil(seq_len / block_size)) ** 2
+    tiled = np.zeros((min(seq_len, 64), min(seq_len, 64)))
+    b = max(1, min(block_size, 16))
+    order = 1
+    for i in range(0, tiled.shape[0], b):
+        for j in range(0, tiled.shape[1], b):
+            tiled[i : i + b, j : j + b] = order
+            order += 1
+    rows = [
+        {"指标": "标准注意力矩阵", "数值": round(full_mb, 2), "解释": "完整 scores/weights 的估算显存 MB，随 N^2 增长。"},
+        {"指标": "单块注意力矩阵", "数值": round(block_mb, 2), "解释": "分块后每次只处理 Bq x Bk 局部矩阵。"},
+        {"指标": "块访问次数", "数值": blocks, "解释": "块越小，峰值显存更低，但循环次数更多。"},
+        {"指标": "在线 softmax 状态", "数值": "m/l/O", "解释": "维护最大值、归一化因子和输出累加器，避免保存完整权重。"},
+    ]
+    figures = [
+        ("flash_tiling.png", matrix_figure(tiled, title="FlashAttention 分块访问顺序")),
+        ("flash_memory.png", small_bar_figure(rows[:2], title="标准 vs 分块峰值注意力矩阵 MB")),
+    ]
+    artifacts = save_figures(figures, save_artifacts)
+    return protocol_payload(
+        SPEC,
+        rows=rows,
+        notes=[
+            "标准注意力需要显式保存 N x N 权重矩阵。",
+            "分块计算让中间矩阵留在更快的片上缓存里。",
+            "块大小需要平衡峰值显存、并行度和循环开销。",
+        ],
+        figures=figures,
+        artifacts=artifacts,
+        extra={"full_mb": full_mb, "block_mb": block_mb, "seed": seed},
+    )
 
-        def forward(self, Q, K, V, mask=None):
-            """
-            Q, K, V: [batch, num_heads, seq_len, head_dim]
-            返回: [batch, num_heads, seq_len, head_dim]
-            """
-            batch, num_heads, N, d = Q.shape
-            scale = 1.0 / math.sqrt(d)
 
-            # 输出累加器
-            O = torch.zeros_like(Q)
-            # 每个 Q 块的统计量
-            l = torch.zeros(batch, num_heads, N, 1, device=Q.device)  # 归一化因子
-            m = torch.full((batch, num_heads, N, 1), -float('inf'), device=Q.device)  # 最大值
+def render() -> None:
+    import streamlit as st  # noqa: F401
 
-            # 外层循环：遍历 Q 的块
-            for i in range(0, N, self.B_q):
-                Q_block = Q[:, :, i:i+self.B_q, :]  # [batch, heads, B_q, d]
-                O_block = torch.zeros_like(Q_block)
-                l_block = torch.zeros(batch, num_heads, self.B_q, 1, device=Q.device)
-                m_block = torch.full((batch, num_heads, self.B_q, 1), -float('inf'), device=Q.device)
+    from components.legacy_protocol import render_protocol_page
 
-                # 内层循环：遍历 K, V 的块
-                for j in range(0, N, self.B_k):
-                    K_block = K[:, :, j:j+self.B_k, :]  # [batch, heads, B_k, d]
-                    V_block = V[:, :, j:j+self.B_k, :]  # [batch, heads, B_k, d]
+    render_protocol_page(spec=SPEC, compute=compute_flash_attention, module_path="part4_transformer/05_flash_attention.py")
 
-                    # 计算当前块的注意力分数
-                    S_block = torch.matmul(Q_block, K_block.transpose(-2, -1)) * scale
-                    # S_block: [batch, heads, B_q, B_k]
 
-                    # 应用 mask（如果有）
-                    if mask is not None:
-                        mask_block = mask[:, :, i:i+self.B_q, j:j+self.B_k]
-                        S_block = S_block.masked_fill(mask_block == 0, -float('inf'))
+def compute(seed: int = 42, save_artifacts: bool = False, **kwargs: object) -> dict[str, object]:
+    return compute_flash_attention(seed=seed, save_artifacts=save_artifacts, **kwargs)
 
-                    # 在线 softmax 更新
-                    m_new = torch.max(m_block, torch.max(S_block, dim=-1, keepdim=True)[0])
 
-                    # 重新缩放之前的累加结果
-                    scale_old = torch.exp(m_block - m_new)
-                    O_block = O_block * scale_old
-                    l_block = l_block * scale_old
+def smoke() -> bool:
+    data = compute_flash_attention(seq_len=128, heads=4, block_size=32, save_artifacts=False)
+    return data["full_mb"] > data["block_mb"] and bool(data["figures"])
 
-                    # 计算当前块的 softmax 和输出贡献
-                    P_block = torch.exp(S_block - m_new)  # [batch, heads, B_q, B_k]
-                    l_new = l_block + torch.sum(P_block, dim=-1, keepdim=True)
 
-                    # 累加当前块的输出
-                    O_block = O_block + torch.matmul(P_block, V_block)
-
-                    # 更新统计量
-                    m_block = m_new
-                    l_block = l_new
-
-                # 最终归一化
-                O[:, :, i:i+self.B_q, :] = O_block / l_block
-                l[:, :, i:i+self.B_q, :] = l_block
-                m[:, :, i:i+self.B_q, :] = m_block
-
-            return O
-
-    # 使用示例
-    def test_flash_attention():
-        batch, num_heads, seq_len, head_dim = 2, 8, 512, 64
-
-        Q = torch.randn(batch, num_heads, seq_len, head_dim)
-        K = torch.randn(batch, num_heads, seq_len, head_dim)
-        V = torch.randn(batch, num_heads, seq_len, head_dim)
-
-        # 标准注意力
-        flash_attn = FlashAttention(block_size_q=64, block_size_k=64)
-        output_flash = flash_attn.forward(Q, K, V)
-
-        # 验证正确性（与标准实现对比）
-        scale = 1.0 / math.sqrt(head_dim)
-        scores = torch.matmul(Q, K.transpose(-2, -1)) * scale
-        attn_weights = torch.softmax(scores, dim=-1)
-        output_standard = torch.matmul(attn_weights, V)
-
-        print(f"输出差异: {torch.max(torch.abs(output_flash - output_standard)).item():.6f}")
-        print(f"Flash 输出形状: {output_flash.shape}")
-
-    # ============================================================
-    # 代码段 4
-    # ============================================================
-
-    import time
-    import torch
-    import matplotlib.pyplot as plt
-
-    def benchmark_attention(seq_lengths, num_heads=8, head_dim=64):
-        """
-        对比标准注意力和 FlashAttention 的性能
-        """
-        results = {'standard': [], 'flash': [], 'memory_standard': [], 'memory_flash': []}
-
-        for N in seq_lengths:
-            Q = torch.randn(1, num_heads, N, head_dim, device='cuda')
-            K = torch.randn(1, num_heads, N, head_dim, device='cuda')
-            V = torch.randn(1, num_heads, N, head_dim, device='cuda')
-
-            # 标准注意力
-            torch.cuda.reset_peak_memory_stats()
-            start = time.time()
-            scale = 1.0 / math.sqrt(head_dim)
-            scores = torch.matmul(Q, K.transpose(-2, -1)) * scale
-            attn = torch.softmax(scores, dim=-1)
-            out_std = torch.matmul(attn, V)
-            torch.cuda.synchronize()
-            time_std = time.time() - start
-            mem_std = torch.cuda.max_memory_allocated() / 1024**2  # MB
-
-            # FlashAttention
-            torch.cuda.reset_peak_memory_stats()
-            flash_attn = FlashAttention(block_size_q=64, block_size_k=64)
-            start = time.time()
-            out_flash = flash_attn.forward(Q, K, V)
-            torch.cuda.synchronize()
-            time_flash = time.time() - start
-            mem_flash = torch.cuda.max_memory_allocated() / 1024**2  # MB
-
-            results['standard'].append(time_std * 1000)  # ms
-            results['flash'].append(time_flash * 1000)
-            results['memory_standard'].append(mem_std)
-            results['memory_flash'].append(mem_flash)
-
-            print(f"N={N}: 标准 {time_std*1000:.2f}ms ({mem_std:.1f}MB), "
-                  f"Flash {time_flash*1000:.2f}ms ({mem_flash:.1f}MB)")
-
-        return results
-
-    def plot_benchmark_results(seq_lengths, results):
-        """Plot benchmark results returned by benchmark_attention."""
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
-
-        ax1.plot(seq_lengths, results['standard'], 'o-', label='标准注意力')
-        ax1.plot(seq_lengths, results['flash'], 's-', label='FlashAttention')
-        ax1.set_xlabel('序列长度')
-        ax1.set_ylabel('时间 (ms)')
-        ax1.set_title('计算时间对比')
-        ax1.legend()
-        ax1.grid(True)
-
-        ax2.plot(seq_lengths, results['memory_standard'], 'o-', label='标准注意力')
-        ax2.plot(seq_lengths, results['memory_flash'], 's-', label='FlashAttention')
-        ax2.set_xlabel('序列长度')
-        ax2.set_ylabel('内存 (MB)')
-        ax2.set_title('内存使用对比')
-        ax2.legend()
-        ax2.grid(True)
-
-        plt.tight_layout()
-        plt.savefig('flash_attention_comparison.png', dpi=150)
-
-    # ============================================================
-    # 代码段 5
-    # ============================================================
-
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    def visualize_tiling_pattern(N=16, B_q=4, B_k=4):
-        """
-        可视化 FlashAttention 的分块访问模式
-        """
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-
-        # 标准注意力：一次性计算整个矩阵
-        full_matrix = np.ones((N, N))
-        axes[0].imshow(full_matrix, cmap='Blues', vmin=0, vmax=1)
-        axes[0].set_title('标准注意力\n一次性存储 N×N 矩阵', fontsize=12)
-        axes[0].set_xlabel('Key 位置')
-        axes[0].set_ylabel('Query 位置')
-
-        # FlashAttention：分块计算
-        tiled_matrix = np.zeros((N, N))
-        for i in range(0, N, B_q):
-            for j in range(0, N, B_k):
-                tiled_matrix[i:i+B_q, j:j+B_k] = (i // B_q + j // B_k) % 2 + 0.3
-
-        axes[1].imshow(tiled_matrix, cmap='Greens', vmin=0, vmax=1.5)
-        axes[1].set_title(f'FlashAttention 分块\n块大小 {B_q}×{B_k}', fontsize=12)
-        axes[1].set_xlabel('Key 位置')
-        axes[1].set_ylabel('Query 位置')
-
-        # 绘制网格线
-        for i in range(0, N, B_q):
-            axes[1].axhline(i - 0.5, color='black', linewidth=1)
-        for j in range(0, N, B_k):
-            axes[1].axvline(j - 0.5, color='black', linewidth=1)
-
-        # 计算顺序示意
-        order_matrix = np.zeros((N, N))
-        order = 1
-        for i in range(0, N, B_q):
-            for j in range(0, N, B_k):
-                order_matrix[i:i+B_q, j:j+B_k] = order
-                order += 1
-
-        im = axes[2].imshow(order_matrix, cmap='viridis')
-        axes[2].set_title('块的计算顺序', fontsize=12)
-        axes[2].set_xlabel('Key 位置')
-        axes[2].set_ylabel('Query 位置')
-        plt.colorbar(im, ax=axes[2], label='计算顺序')
-
-        plt.tight_layout()
-        plt.savefig('flash_attention_tiling.png', dpi=150)
-        plt.show()
-
-    if __name__ == '__main__':
-        test_flash_attention()
-        visualize_tiling_pattern(N=16, B_q=4, B_k=4)
-
-    # ============================================================
-    # 代码段 6
-    # ============================================================
-
-    # 在 PyTorch 中使用官方 FlashAttention
-    # pip install flash-attn
-
-    try:
-        from flash_attn import flash_attn_func
-    except ImportError:
-        flash_attn_func = None
-
-    def efficient_attention(q, k, v, causal=False):
-        """
-        q, k, v: [batch, seq_len, num_heads, head_dim]
-        注意：官方实现要求输入格式与标准 PyTorch 不同
-        """
-        if flash_attn_func is not None:
-            q, k, v = q.half(), k.half(), v.half()
-            output = flash_attn_func(
-                q, k, v,
-                dropout_p=0.0,
-                causal=causal,
-                softmax_scale=None  # 自动使用 1/sqrt(d)
-            )
-            return output.float()
-
-        q_t = q.transpose(1, 2)
-        k_t = k.transpose(1, 2)
-        v_t = v.transpose(1, 2)
-        out = F.scaled_dot_product_attention(q_t, k_t, v_t, is_causal=causal)
-        return out.transpose(1, 2)
-except Exception as e:
-    from components.error_boundary import render_module_error
-
-    render_module_error("part4_transformer/05_flash_attention.py", e)
+if __name__ == "__main__":
+    result = run_or_render(compute, render)
+    if result is not None:
+        raise SystemExit(result)

@@ -794,8 +794,8 @@ def render() -> None:
 
     try:
         clean_old_artifacts()
-        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
-        render_visual_system("dark")
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="auto")
+        render_visual_system("light")
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
         render_loading_bar("序列玩具加载：隐藏状态、梯度、门控和预测会串成一条学习链路")

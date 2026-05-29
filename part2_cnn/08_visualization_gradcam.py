@@ -746,9 +746,9 @@ def render() -> None:
 
     try:
         clean_old_artifacts()
-        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
-        render_visual_system("dark")
-        st.link_button("返回主界面", "/", width="small")
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="auto")
+        render_visual_system("light")
+        st.link_button("返回主界面", "/", width="content")
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
         render_loading_bar("正在生成 Grad-CAM、显著图、SmoothGrad、特征反转和 DeepDream")

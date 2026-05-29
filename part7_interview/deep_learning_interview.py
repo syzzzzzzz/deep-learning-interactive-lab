@@ -19,7 +19,7 @@ import streamlit as st
 
 T = TypeVar("T")
 
-st.set_page_config(page_title="深度学习面试训练", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="深度学习面试训练", layout="wide", initial_sidebar_state="auto")
 
 
 def css() -> str:
@@ -56,7 +56,7 @@ def safe_run(func: Callable[[], T]) -> T | None:
 
 
 def render_back_home() -> None:
-    if st.button("返回主界面", key="dl-back-home", use_container_width=True):
+    if st.button("返回主界面", key="dl-back-home", width="stretch"):
         st.query_params.clear()
         st.rerun()
 
@@ -116,7 +116,7 @@ def gradient_vanish_explode_demo() -> None:
         height=380,
         margin=dict(l=40, r=20, t=30, b=40),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     if activation in ("Sigmoid", "Tanh"):
         st.warning(f"**{activation}** 的导数最大值 {'≤0.25' if activation == 'Sigmoid' else '＜1'}，梯度逐层连乘后指数衰减，深层参数几乎无法更新。这就是**梯度消失**。")
@@ -197,7 +197,7 @@ def attention_complexity_demo() -> None:
         height=350,
         margin=dict(l=40, r=20, t=30, b=40),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     st.markdown("""
     <div class="note">
@@ -292,7 +292,7 @@ def loss_landscape_viz() -> None:
         yaxis_range=[0, max(losses) * 1.1 + 0.1],
         margin=dict(l=40, r=20, t=30, b=40),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     st.markdown(f"**当前学习率 {lr:.0e}**：{label}")
 
@@ -313,7 +313,7 @@ def model_deployment_pipeline() -> None:
     ]
 
     df = pd.DataFrame(techniques, columns=["技术", "效果", "注意事项"])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
 
 # ---------------------------------------------------------------------------

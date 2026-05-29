@@ -1,7 +1,7 @@
 """Import the old Markdown teaching book into this Streamlit project.
 
-The source project is expected to live next to this repository:
-    ../deep_learning_book
+The source project is expected to live inside this repository:
+    ./deep_learning_book
 
 The importer copies Markdown files into docs/legacy_book and writes a stable
 manifest used by the knowledge graph. It deliberately avoids absolute paths so
@@ -18,7 +18,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = ROOT.parent / "deep_learning_book"
+DEFAULT_SOURCE = ROOT / "deep_learning_book"
 DESTINATION = ROOT / "docs" / "legacy_book"
 
 FOLDER_TO_SHORT_PART = {

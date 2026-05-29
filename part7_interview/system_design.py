@@ -17,7 +17,7 @@ import streamlit as st
 
 T = TypeVar("T")
 
-st.set_page_config(page_title="系统设计面试训练", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="系统设计面试训练", layout="wide", initial_sidebar_state="auto")
 
 
 def css() -> str:
@@ -58,7 +58,7 @@ def safe_run(func: Callable[[], T]) -> T | None:
 
 
 def render_back_home() -> None:
-    if st.button("返回主界面", key="sd-back-home", use_container_width=True):
+    if st.button("返回主界面", key="sd-back-home", width="stretch"):
         st.query_params.clear()
         st.rerun()
 

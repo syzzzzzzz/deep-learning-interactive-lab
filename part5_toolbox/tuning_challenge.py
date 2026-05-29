@@ -113,7 +113,7 @@ def stable_noise(*parts: object, scale: float = 1.0) -> float:
 
 
 def page_style() -> None:
-    st.set_page_config(page_title="调参实战挑战", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="调参实战挑战", layout="wide", initial_sidebar_state="auto")
     st.markdown(
         """
         <style>
@@ -379,7 +379,7 @@ st.markdown(f'<div class="note"><strong>{e(scenario.name)}：</strong>{e(scenari
 
 left, right = st.columns([0.58, 0.42])
 with left:
-    st.plotly_chart(curve_chart(history), use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(curve_chart(history), width="stretch", config=PLOT_CONFIG)
 with right:
     st.subheader("诊断反馈")
     st.markdown(
@@ -393,7 +393,7 @@ with right:
         unsafe_allow_html=True,
     )
     st.write("")
-    if st.button("记录本轮实验", use_container_width=True):
+    if st.button("记录本轮实验", width="stretch"):
         rows = st.session_state.get("tuning_rows", [])
         rows.append(experiment_row(scenario, lr, batch_size, weight_decay, dropout, augmentation, model_size, epochs))
         st.session_state["tuning_rows"] = rows[-12:]
@@ -402,7 +402,7 @@ tabs = st.tabs(["搜索地形", "实验记录", "调参策略卡", "复盘问题
 
 with tabs[0]:
     st.subheader("学习率 x 权重衰减地形")
-    st.plotly_chart(search_landscape(scenario, batch_size, epochs), use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(search_landscape(scenario, batch_size, epochs), width="stretch", config=PLOT_CONFIG)
     st.markdown(
         '<div class="note">先做粗搜索找到可训练区域，再做局部搜索。网格图里大片低分区域通常比单个最高点更有价值，因为它告诉你哪些设置很脆弱。</div>',
         unsafe_allow_html=True,
@@ -413,7 +413,7 @@ with tabs[1]:
     rows = st.session_state.get("tuning_rows", [])
     if rows:
         df = pd.DataFrame(rows).sort_values("验证准确率", ascending=False)
-        st.dataframe(df, hide_index=True, use_container_width=True)
+        st.dataframe(df, hide_index=True, width="stretch")
         best = df.iloc[0]
         st.markdown(
             f'<div class="note">当前最好结果：验证准确率 {best["验证准确率"]:.2%}，配置为 lr={best["lr"]}、batch={best["batch"]}、decay={best["decay"]}。</div>',

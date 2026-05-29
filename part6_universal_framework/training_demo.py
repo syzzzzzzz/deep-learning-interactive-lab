@@ -459,20 +459,20 @@ def render_training_panel(config: TrainingConfig) -> None:
 
             loss_chart.plotly_chart(
                 make_line_chart(history.epochs, history.losses, "损失曲线", "CrossEntropy Loss", "#bf3f5b"),
-                use_container_width=True,
+                width="stretch",
                 config=PLOT_CONFIG,
             )
             accuracy_chart.plotly_chart(
                 make_line_chart(history.epochs, history.accuracies, "准确率曲线", "Accuracy", "#0f8b8d"),
-                use_container_width=True,
+                width="stretch",
                 config=PLOT_CONFIG,
             )
             lr_chart.plotly_chart(
                 make_line_chart(history.epochs, history.learning_rates, "学习率曲线（CosineAnnealingLR）", "Learning Rate", "#3268a8"),
-                use_container_width=True,
+                width="stretch",
                 config=PLOT_CONFIG,
             )
-            grad_chart.plotly_chart(make_grad_chart(history), use_container_width=True, config=PLOT_CONFIG)
+            grad_chart.plotly_chart(make_grad_chart(history), width="stretch", config=PLOT_CONFIG)
 
     progress.progress(1.0, text="训练完成")
     if final_history is None or final_stats is None or final_model is None:
@@ -495,9 +495,9 @@ def render_training_panel(config: TrainingConfig) -> None:
 
 
 def render_app() -> None:
-    st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="auto")
     render_style()
-    render_visual_system("dark")
+    render_visual_system("light")
     render_header()
     render_loading_bar("训练仪表盘加载：指标指针会随着训练状态给出直观信号")
     render_beginner_hint(
@@ -539,7 +539,7 @@ def render_app() -> None:
     x_tensor, y_tensor, features_2d = build_dataset(config.seed)
     overview_cols = st.columns([0.58, 0.42])
     with overview_cols[0]:
-        st.plotly_chart(make_dataset_chart(features_2d, y_tensor), use_container_width=True, config=PLOT_CONFIG)
+        st.plotly_chart(make_dataset_chart(features_2d, y_tensor), width="stretch", config=PLOT_CONFIG)
     with overview_cols[1]:
         st.subheader("演示设置")
         metric_cols = st.columns(2)

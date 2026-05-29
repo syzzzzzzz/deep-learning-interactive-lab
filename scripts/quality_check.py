@@ -14,49 +14,38 @@ import json
 import os
 import re
 import runpy
+import shutil
+import subprocess
 import sys
 import warnings
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+sys.dont_write_bytecode = True
 
-ROOT_RUNTIME_ARTIFACT_EXTENSIONS = {
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".csv",
-    ".pt",
-    ".pth",
-    ".ckpt",
-    ".log",
-}
-ROOT_RUNTIME_TEMP_DIRS = {
-    "__pycache__",
-    "tmp",
-    "temp",
-    "outputs",
-    "output",
-    "runs",
-}
-ROOT_RUNTIME_ALLOWED_DIRS = {
-    ".git",
-    ".streamlit_module_outputs",
-    ".streamlit",
-    ".venv",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".idea",
-    ".vscode",
-    "venv",
-    "env",
-}
+from scripts.quality_checks.common import QualityCheckContext, QualityCheckFailure
+from scripts.quality_checks.artifacts import (
+    check_artifact_runtime_behavior as check_artifact_runtime_behavior_domain,
+    check_direct_script_artifact_redirection as check_artifact_redirection_domain,
+    check_legacy_script_artifact_run as check_legacy_script_artifact_run_domain,
+)
+from scripts.quality_checks.artifacts import (
+    check_root_runtime_artifacts_clean as check_root_artifacts_domain,
+)
+from scripts.quality_checks.course_catalog import check_course_catalog_module
+from scripts.quality_checks.course_source import check_course_source_of_truth
+from scripts.quality_checks.legacy_page import check_legacy_page_module
+from scripts.quality_checks.legacy_runtime import check_legacy_runtime_module
+from scripts.quality_checks.local_runtime import check_local_runtime_module
+from scripts.quality_checks.playground_modules import check_playground_modules
+from scripts.quality_checks.static_site import check_navigation_and_learning_ux
+from scripts.quality_checks.streamlit_home import check_streamlit_home_module
+from scripts.quality_checks.streamlit_shell import check_streamlit_shell_module
+from scripts.quality_checks.visual_system_modules import check_visual_system_modules
 
 PLACEHOLDER_PATTERNS = [
     "【知识点名称】",
@@ -81,6 +70,7 @@ TEXT_SCAN_EXCLUDES = {
 
 LEGACY_PROTOCOL_FILES = [
     Path("part1_foundations/01_tensors_gradients.py"),
+    Path("part1_foundations/02_activations_normalization.py"),
     Path("part1_foundations/03_datasets_optimizers.py"),
     Path("part2_cnn/01_convolution_visual.py"),
     Path("part2_cnn/02_feature_maps.py"),
@@ -90,6 +80,7 @@ LEGACY_PROTOCOL_FILES = [
     Path("part2_cnn/06_modern_architectures.py"),
     Path("part2_cnn/07_advanced_convolution.py"),
     Path("part2_cnn/08_visualization_gradcam.py"),
+    Path("part2_cnn/09_transfer_learning.py"),
     Path("part3_rnn/01_rnn_intuition.py"),
     Path("part3_rnn/02_hidden_states.py"),
     Path("part3_rnn/03_sequence_toys.py"),
@@ -100,11 +91,28 @@ LEGACY_PROTOCOL_FILES = [
     Path("part3_rnn/08_debug_problems.py"),
     Path("part4_transformer/01_attention_mechanism.py"),
     Path("part4_transformer/02_multihead_visual.py"),
+    Path("part4_transformer/03_encoder_decoder.py"),
+    Path("part4_transformer/04_minimal_transformer.py"),
+    Path("part4_transformer/05_flash_attention.py"),
+    Path("part4_transformer/06_debug_problems.py"),
+    Path("part5_toolbox/01_feature_visualization.py"),
+    Path("part5_toolbox/02_gradient_monitor.py"),
+    Path("part5_toolbox/03_training_dynamics.py"),
+    Path("part5_toolbox/04_hyperparam_search.py"),
     Path("part5_toolbox/05_dataset_toys.py"),
+    Path("part6_universal_framework/01_unified_interface.py"),
+    Path("part6_universal_framework/02_modular_structure.py"),
+    Path("part6_universal_framework/03_full_project.py"),
+    Path("part6_universal_framework/04_plugin_system.py"),
+    Path("part6_universal_framework/05_one_click_training.py"),
+    Path("part6_universal_framework/06_streamlit_demo.py"),
+    Path("part6_universal_framework/07_project_template.py"),
 ]
 
 STRICT_LEGACY_PROTOCOL_FILES = [
     Path("part1_foundations/01_tensors_gradients.py"),
+    Path("part1_foundations/02_activations_normalization.py"),
+    Path("part1_foundations/03_datasets_optimizers.py"),
     Path("part2_cnn/01_convolution_visual.py"),
     Path("part2_cnn/02_feature_maps.py"),
     Path("part2_cnn/03_classic_architectures.py"),
@@ -113,6 +121,7 @@ STRICT_LEGACY_PROTOCOL_FILES = [
     Path("part2_cnn/06_modern_architectures.py"),
     Path("part2_cnn/07_advanced_convolution.py"),
     Path("part2_cnn/08_visualization_gradcam.py"),
+    Path("part2_cnn/09_transfer_learning.py"),
     Path("part3_rnn/01_rnn_intuition.py"),
     Path("part3_rnn/02_hidden_states.py"),
     Path("part3_rnn/03_sequence_toys.py"),
@@ -123,8 +132,25 @@ STRICT_LEGACY_PROTOCOL_FILES = [
     Path("part3_rnn/08_debug_problems.py"),
     Path("part4_transformer/01_attention_mechanism.py"),
     Path("part4_transformer/02_multihead_visual.py"),
+    Path("part4_transformer/03_encoder_decoder.py"),
+    Path("part4_transformer/04_minimal_transformer.py"),
+    Path("part4_transformer/05_flash_attention.py"),
+    Path("part4_transformer/06_debug_problems.py"),
+    Path("part5_toolbox/01_feature_visualization.py"),
+    Path("part5_toolbox/02_gradient_monitor.py"),
+    Path("part5_toolbox/03_training_dynamics.py"),
+    Path("part5_toolbox/04_hyperparam_search.py"),
     Path("part5_toolbox/05_dataset_toys.py"),
+    Path("part6_universal_framework/01_unified_interface.py"),
+    Path("part6_universal_framework/02_modular_structure.py"),
+    Path("part6_universal_framework/03_full_project.py"),
+    Path("part6_universal_framework/04_plugin_system.py"),
+    Path("part6_universal_framework/05_one_click_training.py"),
+    Path("part6_universal_framework/06_streamlit_demo.py"),
+    Path("part6_universal_framework/07_project_template.py"),
 ]
+
+LEGACY_PROTOCOL_DEFERRED_FILES = []
 
 FOCUS_ROUTES = [
     "part2_cnn/02_feature_maps",
@@ -271,12 +297,236 @@ EXPECTED_CONTENT_REFERENCES = {
         "part6_universal_framework/03_full_project",
         "part6_universal_framework/05_one_click_training",
         "part6_universal_framework/07_project_template",
-        "学习导读",
         "render_module_knowledge_nav",
         "render学习操作面板",
+    ],
+    Path("components/legacy_page.py"): [
+        "学习导读",
+    ],
+    Path("components/streamlit_home.py"): [
+        "柔和阅读界面",
+    ],
+    Path("components/streamlit_shell.py"): [
         "render_visual_system",
-        "render_motion_gallery",
-        "暗色模式",
+    ],
+    Path("index.html"): [
+        "assets/site.css",
+        "assets/site.js",
+        'id="app"',
+        "data-drawer",
+        "code-template",
+    ],
+    Path("assets/site.css"): [
+        "--accent: #b08a4f",
+        "--accent-dark: #2a2118",
+        "--border: #e6ded2",
+        "Noto Serif SC",
+        "Noto Sans SC",
+        "resize: vertical",
+        "overflow: auto",
+        "interactive-lab",
+        "concept-demo",
+        "demo-stage",
+        "lesson-deep-dive",
+        "dry-goods",
+        "dry-goods-grid",
+        "dry-goods-card",
+        "knowledge-point-index",
+        "zero-basics",
+        "zero-basics-grid",
+        "zero-basics-action",
+        "starter-section",
+        "student-route-card",
+        "course-learning-actions",
+        "course-console-cta",
+        "course-topline",
+        "mode-switcher",
+        "drawer-onboarding",
+        "console-purpose-strip",
+        "progress-dashboard",
+        "console-task-strip",
+        "deep-dive-details",
+        "three-minute-brief",
+        "source-guide",
+        "source-snippet",
+        "learning-plan-mini",
+        "zero-basics-case-strip",
+        "three-minute-brief",
+        "source-guide",
+        "source-snippet",
+        "learning-plan-mini",
+        "zero-basics-case-strip",
+        "lesson-outline",
+        "deep-dive-grid",
+        "lesson-code",
+        "knowledge-columns",
+        "practice-callout",
+        "lab-grid",
+        "central-console",
+        "console-topline",
+        "console-hero",
+        "console-context",
+        "console-grid",
+        "console-panel",
+        "console-dl",
+        "console-chip-list",
+        "console-steps",
+        "console-workbench",
+        "console-metrics",
+        "console-result",
+        "textarea[data-console-note]",
+        "portfolio-panel",
+        "tech-stack",
+        "code-wall",
+        "hardcore-labs",
+        "llm-cookbook-section",
+        "llm-roadmap-panel",
+        "llm-track-grid",
+        "llm-track-card",
+        "llm-detail-list",
+        "source-note",
+        "hardcore-workbench-grid",
+        "hardcore-lab-card",
+        "hardcore-control-grid",
+        "hardcore-stage",
+        "hardcore-metrics",
+        "hardcore-readout",
+        "xai-board",
+        "adversarial-board",
+        "challenge-board",
+        "case-board",
+        "node-canvas",
+        "canvas-node",
+        "canvas-edge-layer",
+        "canvas-readout",
+        "training-event-bus",
+        "event-log",
+        "event-subscriber",
+        "matrix-grid",
+        "attention-row",
+        "attention-chain",
+        "attention-score-row",
+        "attention-output-card",
+        "progress-meter",
+        "course-grid",
+        "side-drawer",
+        "@keyframes pageReveal",
+        "@keyframes revealSoftly",
+        "@keyframes tracePath",
+        "motion-reveal",
+        "motion-trace",
+        "matrixSettle",
+        "barFlow",
+        "flowDraw",
+        "scanWindow",
+        "nodeRise",
+        "memoryPulse",
+        "readoutPulse",
+        "prefers-reduced-motion",
+    ],
+    Path("assets/site.js"): [
+        "const PARTS",
+        "const MODULES",
+        "renderCourse",
+        "loadSource",
+        "DOMAIN_PROFILES",
+        "renderLessonBrief",
+        "renderDryGoods",
+        "renderKnowledgePointIndex",
+        "renderZeroBasics",
+        "renderConceptAnimation",
+        "renderKnowledgeSections",
+        "renderLessonDeepDiveShell",
+        "parseLegacyMarkdown",
+        "extractSourceTexts",
+        "parseSourceLessonNotes",
+        "renderSourceLessonNotes",
+        "loadLessonNotes",
+        "renderConceptStage",
+        "wireConceptDemos",
+        "renderInteractiveLab",
+        "wireInteractiveLab",
+        "renderMathGradientLab",
+        "renderCnnFeatureLab",
+        "renderAttentionLab",
+        "renderSequenceMemoryLab",
+        "renderTrainingDiagnosticsLab",
+        "renderArchitectureFlowLab",
+        "renderSystemsFlowLab",
+        "BEGINNER_BLUEPRINTS",
+        "DOMAIN_BLUEPRINTS",
+        "legacyMarkdownCandidates",
+        "deep_learning_book/",
+        "把刚才的动画讲明白",
+        "可点击学习目录",
+        "先看 3 分钟版",
+        "知识点硬核笔记",
+        "知识点全量索引",
+        "机制骨架",
+        "必看变量",
+        "源码抓手",
+        "data-knowledge-points",
+        "data-source-guide",
+        "renderTeachingSourceGuide",
+        "renderThreeMinuteBrief",
+        "moduleLearningPlan",
+        "scrollCourseTarget",
+        "readLearningMode",
+        "writeLearningMode",
+        "wireTagFilters",
+        "wireCourseModeSwitcher",
+        "data-learning-mode",
+        "data-tag-filter",
+        "drawer-onboarding",
+        "course-topline",
+        "course-console-cta",
+        "mode-switcher",
+        "console-purpose-strip",
+        "learning-plan-mini",
+        "zero-basics-case-strip",
+        "源码对照：只看和动画有关的几段",
+        "这是什么？",
+        "生活类比",
+        "一句话直觉",
+        "严谨定义",
+        "图中每个元素代表什么",
+        "颜色/亮度/方向/速度代表什么",
+        "用户应该调哪个参数",
+        "观察什么变化",
+        "为什么会这样",
+        "常见误区",
+        "工程用途",
+        "去中央控制台实战",
+        'data-lab="math-gradient"',
+        'data-lab="cnn-feature"',
+        'data-lab="attention"',
+        'data-lab="sequence-memory"',
+        'data-lab="training-diagnostics"',
+        'data-lab="architecture-flow"',
+        'data-lab="systems-flow"',
+        "hashchange",
+        "fetch(module.sourcePath)",
+        "drawer-search",
+        "kickRouteMotion",
+        "applyMotionReveal",
+        "data-demo-control",
+        "demo-stage",
+        "data-attention-mechanism",
+        "data-attention-scores",
+        "data-attention-output",
+        "Q·K 匹配分",
+        "softmax 权重",
+        "Value 贡献",
+        "注意力锐度",
+        "上下文噪声",
+        "Query token",
+        "data-lesson-notes",
+        "legacyMarkdownPath",
+        "pulseLabReadout",
+        "IntersectionObserver",
+        "motion-point",
+        "motion-trace",
+        "--cell-delay",
     ],
     Path("components/progress_tracker.py"): [
         "稍后复习",
@@ -292,10 +542,11 @@ EXPECTED_CONTENT_REFERENCES = {
         "recommend_today",
     ],
     Path("components/visual_system.py"): [
-        "NEON_BLUE",
-        "#00f0ff",
-        "#b000ff",
-        "#00ff88",
+        "BRAND_GOLD",
+        "#b08a4f",
+        "#2a2118",
+        "#e6ded2",
+        "#f7f3ec",
         "JetBrains Mono",
         "Inter",
         "font-awesome",
@@ -533,6 +784,9 @@ class CheckFailure(Exception):
     pass
 
 
+QUALITY_CONTEXT = QualityCheckContext(ROOT)
+
+
 def project_files(suffixes: tuple[str, ...]) -> list[Path]:
     ignored_parts = {
         ".git",
@@ -543,6 +797,7 @@ def project_files(suffixes: tuple[str, ...]) -> list[Path]:
         ".pytest_cache",
         ".mypy_cache",
         ".streamlit_module_outputs",
+        ".codex-ref-llm-cookbook",
         "legacy_book",
     }
     files: list[Path] = []
@@ -558,7 +813,26 @@ def project_files(suffixes: tuple[str, ...]) -> list[Path]:
 
 
 def read_text(rel_path: Path) -> str:
-    return (ROOT / rel_path).read_text(encoding="utf-8", errors="replace")
+    return QUALITY_CONTEXT.read_text(rel_path)
+
+
+def read_visual_system_text() -> str:
+    paths = [
+        Path("components/visual_system.py"),
+        Path("components/visual_tokens.py"),
+        Path("components/visual_runtime.py"),
+        Path("components/visual_primitives.py"),
+        Path("components/visual_effects.py"),
+        Path("components/visual_gallery.py"),
+    ]
+    return "\n".join(read_text(path) for path in paths if (ROOT / path).exists())
+
+
+def run_domain_check(check) -> None:
+    try:
+        check(QUALITY_CONTEXT)
+    except QualityCheckFailure as exc:
+        raise CheckFailure(str(exc)) from exc
 
 
 def parse_python(rel_path: Path) -> ast.Module:
@@ -693,6 +967,80 @@ def check_strict_legacy_module_protocol() -> None:
     print(f"[通过] 严格老脚本协议检查：{len(STRICT_LEGACY_PROTOCOL_FILES)} 个文件")
 
 
+def legacy_manifest_python_targets() -> list[Path]:
+    manifest_path = ROOT / "docs" / "legacy_book" / "manifest.json"
+    if not manifest_path.exists():
+        raise CheckFailure("旧教材协议审计失败：缺少 docs/legacy_book/manifest.json")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    lessons = manifest.get("lessons", {})
+    if not isinstance(lessons, dict):
+        raise CheckFailure("旧教材协议审计失败：manifest.json 的 lessons 不是对象")
+
+    targets: list[Path] = []
+    for route, payload in lessons.items():
+        if not isinstance(payload, dict):
+            raise CheckFailure(f"旧教材协议审计失败：{route} 的 manifest 记录不是对象")
+        source_path = payload.get("source_path")
+        if not isinstance(source_path, str) or not source_path.endswith(".md"):
+            raise CheckFailure(f"旧教材协议审计失败：{route} 缺少有效 source_path")
+        targets.append(Path(source_path).with_suffix(".py"))
+    return sorted(targets)
+
+
+def check_legacy_protocol_audit() -> None:
+    """Keep the old-book render/compute split status explicit and auditable."""
+
+    failures: list[str] = []
+    audit_path = ROOT / "docs" / "legacy_protocol_audit.md"
+    if not audit_path.exists():
+        failures.append("缺少 docs/legacy_protocol_audit.md")
+        audit_text = ""
+    else:
+        audit_text = audit_path.read_text(encoding="utf-8")
+
+    targets = legacy_manifest_python_targets()
+    target_set = set(targets)
+    strict_set = set(STRICT_LEGACY_PROTOCOL_FILES)
+    deferred_set = set(LEGACY_PROTOCOL_DEFERRED_FILES)
+    overlap = sorted(strict_set & deferred_set)
+    missing_from_audit = sorted(target_set - strict_set - deferred_set)
+    extra_in_audit = sorted((strict_set | deferred_set) - target_set)
+
+    if overlap:
+        failures.append("严格名单和待拆分名单存在重叠：\n" + "\n".join(str(path) for path in overlap))
+    if missing_from_audit:
+        failures.append("旧教材章节未被纳入协议审计：\n" + "\n".join(str(path) for path in missing_from_audit))
+    if extra_in_audit:
+        failures.append("协议审计名单包含非旧教材章节：\n" + "\n".join(str(path) for path in extra_in_audit))
+
+    expected_markers = [
+        f"legacy_lessons: {len(targets)}",
+        f"strict_protocolized: {len(strict_set)}",
+        f"deferred_legacy: {len(deferred_set)}",
+    ]
+    for marker in expected_markers:
+        if marker not in audit_text:
+            failures.append(f"docs/legacy_protocol_audit.md 缺少计数标记：{marker}")
+
+    for rel_path in sorted(strict_set):
+        if not (ROOT / rel_path).exists():
+            failures.append(f"{rel_path}: 严格协议文件不存在")
+        if str(rel_path).replace("\\", "/") not in audit_text:
+            failures.append(f"docs/legacy_protocol_audit.md 未列出严格协议文件：{rel_path}")
+    for rel_path in sorted(deferred_set):
+        if not (ROOT / rel_path).exists():
+            failures.append(f"{rel_path}: 待拆分旧脚本不存在")
+        if str(rel_path).replace("\\", "/") not in audit_text:
+            failures.append(f"docs/legacy_protocol_audit.md 未列出待拆分文件：{rel_path}")
+
+    if failures:
+        raise CheckFailure("旧教材 render/compute 协议审计失败：\n" + "\n".join(failures))
+    print(
+        "[通过] 旧教材 render/compute 协议审计："
+        f"{len(strict_set)} 个严格协议化，{len(deferred_set)} 个待拆分，覆盖 {len(targets)} 个旧教材章节"
+    )
+
+
 def streamlit_control_labels(text: str) -> set[str]:
     label_patterns = [
         r"st(?:\.sidebar)?\.(?:slider|selectbox|select_slider|segmented_control|radio|text_input|text_area|number_input|toggle|checkbox|multiselect)\(\s*([\"'])(.*?)\1",
@@ -722,12 +1070,455 @@ def check_expected_content() -> None:
     failures: list[str] = []
     for rel_path, expected_fragments in EXPECTED_CONTENT_REFERENCES.items():
         text = read_text(rel_path)
+        if rel_path == Path("part6_universal_framework/neural_network_playground.py"):
+            text += read_text(Path("components/playground_core.py"))
+            text += read_text(Path("components/playground_state.py"))
+            text += read_text(Path("components/playground_forms.py"))
+            text += read_text(Path("components/playground_training.py"))
+        if rel_path == Path("components/visual_system.py"):
+            text = read_visual_system_text()
         for fragment in expected_fragments:
             if fragment not in text:
                 failures.append(f"{rel_path}: 缺少工程教学内容片段：{fragment}")
     if failures:
         raise CheckFailure("工程教学内容检查失败：\n" + "\n".join(failures))
     print(f"[通过] 工程教学内容检查：{len(EXPECTED_CONTENT_REFERENCES)} 个页面")
+
+
+def check_static_html_site() -> None:
+    failures: list[str] = []
+    required_files = [
+        Path("index.html"),
+        Path("assets/site.css"),
+        Path("assets/site.js"),
+        Path("main.py"),
+        Path("README.md"),
+        Path("start_lab.bat"),
+    ]
+    for rel_path in required_files:
+        if not (ROOT / rel_path).exists():
+            failures.append(f"{rel_path}: 静态站文件不存在")
+
+    if failures:
+        raise CheckFailure("静态 HTML 站点检查失败：\n" + "\n".join(failures))
+
+    html_text = read_text(Path("index.html"))
+    css_text = read_text(Path("assets/site.css"))
+    js_text = read_text(Path("assets/site.js"))
+    main_text = read_text(Path("main.py"))
+    streamlit_home_text = read_text(Path("components/streamlit_home.py"))
+    local_runtime_text = read_text(Path("components/local_runtime.py"))
+    readme_text = read_text(Path("README.md"))
+    start_text = read_text(Path("start_lab.bat"))
+    workflow_text = read_text(Path(".github/workflows/quality.yml"))
+
+    required_html_fragments = [
+        '<main id="app"',
+        "assets/site.css",
+        "assets/site.js",
+        "data-drawer",
+        "data-open-menu",
+        "打开全站目录",
+        "全站课程目录抽屉",
+        'href="#home"',
+        'href="#starter"',
+        'href="#path"',
+        'href="#courses"',
+        'href="#hardcore-labs"',
+        'href="#notes"',
+    ]
+    for fragment in required_html_fragments:
+        if fragment not in html_text:
+            failures.append(f"index.html: 缺少静态站入口片段 {fragment}")
+
+    required_css_fragments = [
+        "--bg: #ffffff",
+        "--bg-soft: #f7f3ec",
+        "--text: #171411",
+        "--muted: #7c756c",
+        "--border: #e6ded2",
+        "--accent: #b08a4f",
+        "--accent-dark: #2a2118",
+        "Noto Serif SC",
+        "Noto Sans SC",
+        "resize: vertical",
+        "overflow: auto",
+        "interactive-lab",
+        "concept-demo",
+        "demo-stage",
+        "lesson-deep-dive",
+        "dry-goods",
+        "dry-goods-grid",
+        "dry-goods-card",
+        "knowledge-point-index",
+        "zero-basics",
+        "zero-basics-grid",
+        "zero-basics-action",
+        "starter-section",
+        "student-route-card",
+        "course-learning-actions",
+        "course-console-cta",
+        "course-topline",
+        "mode-switcher",
+        "drawer-onboarding",
+        "console-purpose-strip",
+        "progress-dashboard",
+        "console-task-strip",
+        "deep-dive-details",
+        "lesson-outline",
+        "deep-dive-grid",
+        "lesson-code",
+        "knowledge-columns",
+        "practice-callout",
+        "lab-grid",
+        "central-console",
+        "console-topline",
+        "console-hero",
+        "console-context",
+        "console-grid",
+        "console-panel",
+        "console-dl",
+        "console-chip-list",
+        "console-steps",
+        "console-workbench",
+        "console-metrics",
+        "console-result",
+        "textarea[data-console-note]",
+        "hardcore-workbench-grid",
+        "llm-cookbook-section",
+        "llm-roadmap-panel",
+        "llm-track-grid",
+        "llm-track-card",
+        "llm-detail-list",
+        "source-note",
+        "hardcore-lab-card",
+        "hardcore-control-grid",
+        "hardcore-stage",
+        "hardcore-metrics",
+        "hardcore-readout",
+        "xai-board",
+        "xai-cell",
+        "adversarial-compare",
+        "confidence-row",
+        "challenge-gauge",
+        "challenge-checklist",
+        "case-pipeline",
+        "artifact-checklist",
+        "matrix-grid",
+        "attention-row",
+        "progress-meter",
+        "@keyframes pageReveal",
+        "@keyframes revealSoftly",
+        "@keyframes tracePath",
+        "motion-reveal",
+        "motion-trace",
+        "matrixSettle",
+        "barFlow",
+        "flowDraw",
+        "scanWindow",
+        "nodeRise",
+        "memoryPulse",
+        "readoutPulse",
+        "prefers-reduced-motion",
+    ]
+    for fragment in required_css_fragments:
+        if fragment not in css_text:
+            failures.append(f"assets/site.css: 缺少高级学习视觉约束 {fragment}")
+
+    forbidden_fragments = [
+        "#00f0ff",
+        "#b000ff",
+        "#00ff88",
+        "rgba(0,240,255",
+        "rgba(176,0,255",
+        "rgba(0,255,136",
+    ]
+    for fragment in forbidden_fragments:
+        if fragment in css_text or fragment in js_text:
+            failures.append(f"静态站不应再使用旧霓虹色片段 {fragment}")
+
+    required_js_fragments = [
+        "const PARTS",
+        "const MODULES",
+        "function renderHome",
+        "function renderPortfolioSection",
+        "function renderHardcoreLabsSection",
+        "function renderHardcoreXaiLab",
+        "function renderHardcoreAdversarialLab",
+        "function renderHardcoreChallengeLab",
+        "function renderHardcoreCaseLab",
+        "function wireHardcoreLabs",
+        "LLM_COOKBOOK_TRACKS",
+        "function renderLLMDetailList",
+        "function renderLLMStudyOrder",
+        "function renderLLMCookbookBridge",
+        "datawhalechina/llm-cookbook",
+        "Prompt Engineering",
+        "RAG 问答",
+        "Agent & Tools",
+        "Evaluation & Debugging",
+        "核心直觉",
+        "常见失败",
+        "验收标准",
+        "落地检查",
+        "async function renderCourse",
+        "DOMAIN_PROFILES",
+        "function renderLessonBrief",
+        "function renderDryGoods",
+        "function renderKnowledgePointIndex",
+        "function renderZeroBasics",
+        "function renderConceptAnimation",
+        "function renderKnowledgeSections",
+        "function renderLessonDeepDiveShell",
+        "function parseLegacyMarkdown",
+        "function extractSourceTexts",
+        "function parseSourceLessonNotes",
+        "function renderSourceLessonNotes",
+        "async function loadLessonNotes",
+        "function renderConceptStage",
+        "function wireConceptDemos",
+        "function renderInteractiveLab",
+        "function wireInteractiveLab",
+        "function consoleHref",
+        "function renderCentralConsole",
+        "function wireCentralConsole",
+        "function renderNodeCanvas",
+        "function wireNodeCanvas",
+        "function renderTrainingEventBus",
+        "function buildTrainingEvent",
+        "function publishTrainingEvent",
+        "function updateCanvasEdges",
+        "function renderMathGradientLab",
+        "function renderCnnFeatureLab",
+        "function renderAttentionLab",
+        "function renderSequenceMemoryLab",
+        "function renderTrainingDiagnosticsLab",
+        "function renderArchitectureFlowLab",
+        "function renderSystemsFlowLab",
+        "BEGINNER_BLUEPRINTS",
+        "DOMAIN_BLUEPRINTS",
+        "MODULE_TEACHING_NOTES",
+        "知识点硬核笔记",
+        "知识点全量索引",
+        "机制骨架",
+        "必看变量",
+        "源码抓手",
+        "data-knowledge-points",
+        "data-source-guide",
+        "renderTeachingSourceGuide",
+        "renderThreeMinuteBrief",
+        "moduleLearningPlan",
+        "scrollCourseTarget",
+        "learning-plan-mini",
+        "zero-basics-case-strip",
+        "可点击学习目录",
+        "先看 3 分钟版",
+        "源码对照：只看和动画有关的几段",
+        "function legacyMarkdownCandidates",
+        "deep_learning_book/",
+        "把刚才的动画讲明白",
+        "这是什么？",
+        "生活类比",
+        "一句话直觉",
+        "严谨定义",
+        "图中每个元素代表什么",
+        "颜色/亮度/方向/速度代表什么",
+        "用户应该调哪个参数",
+        "观察什么变化",
+        "为什么会这样",
+        "常见误区",
+        "工程用途",
+        "去中央控制台实战",
+        'data-lab="math-gradient"',
+        'data-lab="cnn-feature"',
+        'data-lab="attention"',
+        'data-lab="sequence-memory"',
+        'data-lab="training-diagnostics"',
+        'data-lab="architecture-flow"',
+        'data-lab="systems-flow"',
+        "function route",
+        "#course/",
+        'hash.startsWith("#console/")',
+        "data-central-console",
+        "data-node-canvas",
+        "data-node",
+        "data-training-bus",
+        "data-event-log",
+        "data-console-result",
+        "data-console-note",
+        "个人技术名片",
+        "硬核实验区",
+        "模型可解释性实验室",
+        "对抗样本演示",
+        "小型深度学习挑战",
+        "端到端案例",
+        "data-hardcore-lab",
+        "data-hardcore-control",
+        "data-hardcore-readout",
+        "新手引导",
+        "学习导航",
+        "第 1 步：先动一个参数",
+        "data-course-scroll",
+        "data-mark-understood",
+        "data-mark-review",
+        "data-learning-mode",
+        "data-tag-filter",
+        "drawer-onboarding",
+        "course-topline",
+        "course-console-cta",
+        "mode-switcher",
+        "console-purpose-strip",
+        "readLearningMode",
+        "writeLearningMode",
+        "wireTagFilters",
+        "wireCourseModeSwitcher",
+        "scrollToHashTarget",
+        "返回首页",
+        "window.addEventListener(\"hashchange\", route)",
+        "fetch(module.sourcePath)",
+        "kickRouteMotion",
+        "applyMotionReveal",
+        "data-demo-control",
+        "demo-stage",
+        "data-lesson-notes",
+        "legacyMarkdownPath",
+        "pulseLabReadout",
+        "IntersectionObserver",
+        "motion-point",
+        "motion-trace",
+        "--cell-delay",
+    ]
+    for fragment in required_js_fragments:
+        if fragment not in js_text:
+            failures.append(f"assets/site.js: 缺少前端路由/课程功能 {fragment}")
+
+    for fragment in ("renderLessonCheckLab", 'data-lab="lesson-check"'):
+        if fragment in js_text:
+            failures.append(f"assets/site.js: 不应再保留旧的空学习检查 fallback {fragment}")
+    for fragment in ("Course File", "Personal Learning System", "Central Practice Console"):
+        if fragment in html_text or fragment in js_text:
+            failures.append(f"静态站仍有开发者/旧导航文案残留：{fragment}")
+    for fragment in (
+        "return values.slice(",
+        "return headings.slice(",
+        "parsed.outline.length <",
+        ".slice(0, 8)",
+    ):
+        if fragment in js_text:
+            failures.append(f"assets/site.js: 知识点内容仍有旧截断逻辑 {fragment}")
+
+    if "python -m http.server %PORT% --bind 127.0.0.1" not in start_text:
+        failures.append("start_lab.bat: 默认启动命令仍未切换到静态 HTML 服务")
+    if "set \"PORTS=8000 8001 8002 8003 4173 5173 5500\"" not in start_text:
+        failures.append("start_lab.bat: 缺少备用端口池")
+    if "s.bind(('127.0.0.1',int(sys.argv[1])))" not in start_text:
+        failures.append("start_lab.bat: 缺少真实端口绑定探测")
+    if "goto :serve" not in start_text:
+        failures.append("start_lab.bat: 缺少端口成功后启动服务的降级逻辑")
+    if "streamlit run" in start_text.lower():
+        failures.append("start_lab.bat: 默认启动脚本仍包含 Streamlit 启动命令")
+    if "run_static_site(args.port)" not in main_text:
+        failures.append("main.py: 无参数默认入口没有启动静态 HTML 站")
+    if "run_streamlit_app(Path(__file__).resolve())" in main_text:
+        failures.append("main.py: 默认入口仍会启动 Streamlit 主页")
+    if "DEFAULT_STATIC_PORTS = (8000, 8001, 8002, 8003, 4173, 5173, 5500)" not in local_runtime_text:
+        failures.append("components/local_runtime.py: 缺少与 start_lab.bat 一致的静态站端口池")
+    if "def render_streamlit_migration_notice" not in streamlit_home_text or "主站不在 Streamlit 里了" not in streamlit_home_text:
+        failures.append("components/streamlit_home.py: streamlit run main.py 没有明确的静态站迁移提示")
+    if "if not deps.query_module:" not in streamlit_home_text or "render_streamlit_migration_notice()" not in streamlit_home_text:
+        failures.append("components/streamlit_home.py: Streamlit 无模块参数入口没有被迁移提示挡住")
+    if "query_module=get_query_module()" not in main_text:
+        failures.append("main.py: Streamlit 首页壳层未传入 query_module")
+    if "python main.py --menu" not in readme_text:
+        failures.append("README.md: 模块列表命令仍可能误导用户使用默认入口")
+    if "不要用 `streamlit run main.py` 启动主站" not in readme_text:
+        failures.append("README.md: 缺少 Streamlit 不再是主站入口的说明")
+    if "个人技术名片" not in readme_text or "硬核实验区" not in readme_text:
+        failures.append("README.md: 缺少 #10 名片区/硬核实验区说明")
+    if "拖拽式节点画布" not in readme_text or "训练事件总线" not in readme_text:
+        failures.append("README.md: 缺少 #10 中央控制台节点画布/事件总线说明")
+    if "Node 24" not in readme_text:
+        failures.append("README.md: 缺少 GitHub Actions Node 24 兼容说明")
+    if "actions/checkout@v6" not in workflow_text:
+        failures.append(".github/workflows/quality.yml: checkout 仍未升级到 Node 24 兼容的 v6")
+    if "actions/setup-python@v6" not in workflow_text:
+        failures.append(".github/workflows/quality.yml: setup-python 仍未升级到 Node 24 兼容的 v6")
+    deprecated_streamlit_width_pattern = re.compile(r"\buse_container_width\s*=")
+    for rel_path in project_files((".py",)):
+        if rel_path == Path("scripts/quality_check.py"):
+            continue
+        for line_no, line in enumerate(read_text(rel_path).splitlines(), start=1):
+            if deprecated_streamlit_width_pattern.search(line):
+                failures.append(f"{rel_path}:{line_no}: Streamlit 未来弃用项 use_container_width 尚未清理")
+
+    node = shutil.which("node")
+    if node:
+        completed = subprocess.run(
+            [node, "--check", str(ROOT / "assets" / "site.js")],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+        if completed.returncode != 0:
+            failures.append("assets/site.js: node --check 失败\n" + completed.stderr.strip())
+
+    if failures:
+        raise CheckFailure("静态 HTML 站点检查失败：\n" + "\n".join(failures))
+    print("[通过] 静态 HTML 站点检查：首页、CSS、JS 路由、原生交互实验、返回入口、启动脚本和配色约束均正常")
+
+
+def check_zero_basics_teaching_notes() -> None:
+    js_text = read_text(Path("assets/site.js"))
+    failures: list[str] = []
+    modules_match = re.search(r"const MODULES = \[(.*?)\]\.map", js_text, re.S)
+    if not modules_match:
+        raise CheckFailure("零基础十二问覆盖检查失败：assets/site.js 缺少 MODULES 清单")
+
+    module_ids = [
+        f"{match.group(1)}/{match.group(2)}"
+        for match in re.finditer(
+            r'\["(part\d+)",\s*"[^"]+",\s*"[^"]+",\s*"([^"]+)"',
+            modules_match.group(1),
+        )
+    ]
+    note_ids = set(re.findall(r'"(part\d+/[^"]+)":\s*\{', js_text))
+    missing = [module_id for module_id in module_ids if module_id not in note_ids]
+    if missing:
+        failures.append("缺少 MODULE_TEACHING_NOTES 人工答案种子：" + "、".join(missing))
+
+    required_fields = [
+        "what",
+        "analogy",
+        "intuition",
+        "variable",
+        "elements",
+        "controls",
+        "observe",
+        "why",
+        "misconception",
+        "engineering",
+        "consoleTask",
+    ]
+    for module_id in module_ids:
+        block_match = re.search(rf'"{re.escape(module_id)}":\s*\{{(.*?)\n\s*\}},', js_text, re.S)
+        if not block_match:
+            continue
+        block = block_match.group(1)
+        for field in required_fields:
+            if not re.search(rf"\b{field}\s*:", block):
+                failures.append(f"{module_id}: MODULE_TEACHING_NOTES 缺少字段 {field}")
+
+    if "const note = MODULE_TEACHING_NOTES[module.id] || {}" not in js_text:
+        failures.append("renderZeroBasics 没有优先读取 MODULE_TEACHING_NOTES")
+    if 'if (module.partKey === "part1") return "foundation";' not in js_text:
+        failures.append("lessonDomain 没有把第一部分基础章节固定为 foundation，可能被训练关键词误分类")
+
+    if failures:
+        raise CheckFailure("零基础十二问覆盖检查失败：\n" + "\n".join(failures))
+    print(f"[通过] 零基础十二问覆盖检查：{len(module_ids)} 个模块均有人工答案种子")
 
 
 def check_playground_codegen() -> None:
@@ -872,6 +1663,15 @@ def load_module_without_main(rel_path: Path) -> dict[str, object]:
         return runpy.run_path(str(ROOT / rel_path), run_name="__quality_check__")
 
 
+def runpy_no_bytecode(path: Path, run_name: str = "<run_path>") -> dict[str, object]:
+    previous = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        return runpy.run_path(str(path), run_name=run_name)
+    finally:
+        sys.dont_write_bytecode = previous
+
+
 def call_smoke_function(namespace: dict[str, object], name: str) -> None:
     func = namespace[name]
     if name == "render_overview":
@@ -981,7 +1781,7 @@ def check_strict_legacy_smoke() -> None:
 
 
 def check_main_routes() -> None:
-    namespace = runpy.run_path(str(ROOT / "main.py"))
+    namespace = runpy_no_bytecode(ROOT / "main.py")
     routes = namespace["route_map"]()
     missing = [route for route in FOCUS_ROUTES if route not in routes]
     if missing:
@@ -996,8 +1796,8 @@ def route_from_knowledge_url(url: str) -> str:
 
 
 def check_knowledge_graph_routes() -> None:
-    main_namespace = runpy.run_path(str(ROOT / "main.py"))
-    graph_namespace = runpy.run_path(str(ROOT / "components" / "knowledge_graph.py"))
+    main_namespace = runpy_no_bytecode(ROOT / "main.py")
+    graph_namespace = runpy_no_bytecode(ROOT / "components" / "knowledge_graph.py")
     routes = main_namespace["route_map"]()
     modules = main_namespace["MODULES"]
     graph = graph_namespace["KNOWLEDGE_GRAPH"]
@@ -1213,18 +2013,32 @@ def check_bagu_routes_placeholder() -> None:
     print("[通过] 八股文训练营检查：题库、自动评分、模拟面试、错题持久化和专项入口均已覆盖")
 
 
-def check_back_to_home_entry() -> None:
-    text = read_text(Path("main.py"))
+def check_static_navigation_entry() -> None:
+    html_text = read_text(Path("index.html"))
+    js_text = read_text(Path("assets/site.js"))
+    css_text = read_text(Path("assets/site.css"))
     failures: list[str] = []
-    if "def render_home_button" not in text:
-        failures.append("main.py: 缺少统一返回主界面入口 render_home_button()")
-    if "render_legacy_module_page" not in text or "render_home_button()" not in text:
-        failures.append("main.py: 老脚本页面缺少统一返回主界面入口调用")
-    if "runpy.run_path" in text and text.count("render_home_button()") < 3:
-        failures.append("main.py: Streamlit 路由外壳缺少返回主界面入口调用")
+
+    if 'class="brand" href="#home"' not in html_text:
+        failures.append("index.html: 品牌入口没有指向 #home")
+    if 'href="#courses"' not in html_text or 'href="#path"' not in html_text:
+        failures.append("index.html: 顶部导航缺少课程/路径锚点")
+    if "返回首页" not in js_text:
+        failures.append("assets/site.js: 课程页缺少可见的返回首页入口")
+    if "hash.startsWith(\"#course/\")" not in js_text:
+        failures.append("assets/site.js: 缺少 #course/ hash 路由处理")
+    if "hash.startsWith(\"#console/\")" not in js_text:
+        failures.append("assets/site.js: 缺少 #console/ 中央控制台路由处理")
+    if "decodeURIComponent(location.hash" not in js_text:
+        failures.append("assets/site.js: 路由没有解码 hash，中文/斜杠路由可能失效")
+    if ".side-drawer.is-open" not in css_text:
+        failures.append("assets/site.css: 目录抽屉缺少打开状态样式")
+    if ".code-window" not in css_text or "resize: vertical" not in css_text:
+        failures.append("assets/site.css: 源码窗口缺少可拉伸样式")
+
     if failures:
-        raise CheckFailure("返回主界面入口检查失败：\n" + "\n".join(failures))
-    print("[通过] 返回主界面入口检查：main.py 已为路由页面提供统一返回入口")
+        raise CheckFailure("静态站导航入口检查失败：\n" + "\n".join(failures))
+    print("[通过] 静态站导航入口检查：顶部导航、返回首页、目录抽屉和课程路由均正常")
 
 
 def call_name(node: ast.AST) -> str:
@@ -1303,88 +2117,33 @@ def check_matplotlib_close_after_show() -> None:
     print(f"[通过] Matplotlib 图未关闭检查：legacy_runner 统一关闭旧脚本图像，额外扫描 {len(scan_files)} 个非旧脚本文件")
 
 
-def check_root_runtime_artifacts_clean() -> None:
-    """Keep direct script products out of the repository root."""
-
-    failures: list[str] = []
-    for path in sorted(ROOT.iterdir(), key=lambda item: item.name.lower()):
-        if path.name in ROOT_RUNTIME_ALLOWED_DIRS:
-            continue
-        if path.is_dir() and path.name in ROOT_RUNTIME_TEMP_DIRS:
-            failures.append(f"{path.name}/")
-        elif path.is_file() and path.suffix.lower() in ROOT_RUNTIME_ARTIFACT_EXTENSIONS:
-            failures.append(path.name)
-
-    if failures:
-        visible = "\n".join(f"  - {item}" for item in failures[:160])
-        extra = "" if len(failures) <= 160 else f"\n  ... 另有 {len(failures) - 160} 个产物"
-        raise CheckFailure(
-            "根目录运行产物污染检查失败：发现脚本输出落在项目根目录。\n"
-            "请把图片、CSV、模型权重、日志、缓存和临时输出统一放入 "
-            ".streamlit_module_outputs/ 对应 run 目录。\n"
-            f"{visible}{extra}"
-        )
-    print("[通过] 根目录运行产物污染检查：根目录无图片、CSV、模型权重、日志、缓存或临时输出")
-
-
-def check_direct_script_artifact_redirection() -> None:
-    """Ensure direct legacy script runs are redirected into the shared artifact root."""
-
-    text = read_text(Path("sitecustomize.py"))
-    required_fragments = [
-        "ARTIFACT_ROOT",
-        "ROOT_ARTIFACT_RUN_DIR",
-        "ARTIFACT_DIR_ENV",
-        "DL_BOOK_ARTIFACT_DIR",
-        "sys.dont_write_bytecode = True",
-        "_cleanup_root_pycache",
-        "builtins.open = redirected_open",
-        "Path.open = redirected_path_open",
-        "Path.write_text = redirected_path_write_text",
-        "Path.write_bytes = redirected_path_write_bytes",
-        "plt.savefig = redirected_pyplot_savefig",
-        "Figure.savefig = redirected_figure_savefig",
-        "torch.save = redirected_torch_save",
-        "pd.DataFrame.to_csv = redirected_to_csv",
-        '".streamlit_module_outputs"',
-        '".csv"',
-        '".log"',
-    ]
-    failures = [fragment for fragment in required_fragments if fragment not in text]
-    runner_text = read_text(Path("legacy_runner.py"))
-    main_text = read_text(Path("main.py"))
-    if "DL_BOOK_ARTIFACT_DIR" not in runner_text:
-        failures.append("legacy_runner.py 缺少 DL_BOOK_ARTIFACT_DIR run 目录传递")
-    if "import sitecustomize" not in runner_text:
-        failures.append("legacy_runner.py 缺少显式导入 sitecustomize")
-    if "PYTHONDONTWRITEBYTECODE" not in main_text:
-        failures.append("main.py 子进程环境缺少 PYTHONDONTWRITEBYTECODE=1")
-    if failures:
-        raise CheckFailure(
-            "直接运行脚本产物重定向检查失败：sitecustomize.py 缺少关键保护。\n"
-            + "\n".join(f"  - {fragment}" for fragment in failures)
-        )
-    print("[通过] 直接运行脚本产物重定向检查：图片、CSV、模型权重、日志和 pycache 均有统一保护")
-
-
 def check_visual_system_integration() -> None:
-    """Check that visual_system.py contains core neon colors, motion components,
-    Font Awesome / Inter / JetBrains Mono assets, and that core pages import it."""
+    """Check that visual_system.py keeps the shared teaching components on the
+    restrained premium palette while legacy Streamlit pages still import it."""
     failures: list[str] = []
 
     vs_path = Path("components/visual_system.py")
     if not (ROOT / vs_path).exists():
         raise CheckFailure("视觉系统集成检查失败：components/visual_system.py 不存在")
 
-    text = read_text(vs_path)
+    text = read_visual_system_text()
 
-    # --- Core neon colour variables ---
-    required_neon = {"NEON_BLUE": "#00f0ff", "NEON_PURPLE": "#b000ff", "NEON_GREEN": "#00ff88"}
-    for var_name, hex_val in required_neon.items():
+    # --- Premium learning palette ---
+    required_palette = {
+        "BRAND_GOLD": "#b08a4f",
+        "BRAND_INK": "#2a2118",
+        "BRAND_BORDER": "#e6ded2",
+        "BRAND_SOFT": "#f7f3ec",
+    }
+    for var_name, hex_val in required_palette.items():
         if var_name not in text:
-            failures.append(f"{vs_path}: 缺少核心霓虹色变量 {var_name}")
+            failures.append(f"{vs_path}: 缺少高级学习视觉变量 {var_name}")
         if hex_val not in text:
-            failures.append(f"{vs_path}: 缺少霓虹色值 {hex_val}")
+            failures.append(f"{vs_path}: 缺少高级学习配色 {hex_val}")
+    forbidden_neon_values = ["#00f0ff", "#b000ff", "#00ff88"]
+    for hex_val in forbidden_neon_values:
+        if hex_val in text:
+            failures.append(f"{vs_path}: 不应继续使用旧霓虹色值 {hex_val}")
 
     # --- Core motion / effect components (must never be deleted) ---
     required_motion_components = [
@@ -1437,7 +2196,8 @@ def check_visual_system_integration() -> None:
 
     # --- Core pages must import render_visual_system ---
     VISUAL_SYSTEM_IMPORT_PAGES = [
-        Path("main.py"),
+        Path("components/streamlit_shell.py"),
+        Path("components/legacy_page.py"),
         Path("part2_cnn/03_classic_architectures.py"),
         Path("part2_cnn/advanced_cnn.py"),
         Path("part4_transformer/transformer_models.py"),
@@ -1480,7 +2240,7 @@ def check_visual_system_integration() -> None:
 
     if failures:
         raise CheckFailure("视觉系统集成检查失败：\n" + "\n".join(failures))
-    print(f"[通过] 视觉系统集成检查：核心霓虹色、动效组件、字体资产、页面接入均正常")
+    print("[通过] 视觉系统集成检查：高级学习配色、动效组件、字体资产、页面接入均正常")
 
 
 def run_checks(include_smoke: bool) -> None:
@@ -1489,8 +2249,11 @@ def run_checks(include_smoke: bool) -> None:
     check_bracket_placeholders()
     check_legacy_module_protocol_metadata()
     check_strict_legacy_module_protocol()
+    check_legacy_protocol_audit()
     check_expected_controls()
     check_expected_content()
+    check_static_html_site()
+    check_zero_basics_teaching_notes()
     check_visual_system_integration()
     check_playground_codegen()
     check_playground_training_linkage()
@@ -1499,11 +2262,22 @@ def run_checks(include_smoke: bool) -> None:
     check_legacy_book_import()
     check_learning_progress_system()
     check_bagu_routes_placeholder()
-    check_back_to_home_entry()
+    run_domain_check(check_course_catalog_module)
+    run_domain_check(check_course_source_of_truth)
+    run_domain_check(check_legacy_page_module)
+    run_domain_check(check_legacy_runtime_module)
+    run_domain_check(check_local_runtime_module)
+    run_domain_check(check_streamlit_home_module)
+    run_domain_check(check_streamlit_shell_module)
+    run_domain_check(check_playground_modules)
+    run_domain_check(check_visual_system_modules)
+    run_domain_check(check_navigation_and_learning_ux)
     check_legacy_top_level_execution()
     check_matplotlib_close_after_show()
-    check_direct_script_artifact_redirection()
-    check_root_runtime_artifacts_clean()
+    run_domain_check(check_artifact_redirection_domain)
+    run_domain_check(check_artifact_runtime_behavior_domain)
+    run_domain_check(check_legacy_script_artifact_run_domain)
+    run_domain_check(check_root_artifacts_domain)
     if include_smoke:
         check_strict_legacy_smoke()
         check_focus_smoke()

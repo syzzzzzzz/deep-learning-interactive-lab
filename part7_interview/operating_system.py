@@ -21,7 +21,7 @@ from components.visual_system import render_visual_system
 
 T = TypeVar("T")
 
-st.set_page_config(page_title="操作系统面试训练", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="操作系统面试训练", layout="wide", initial_sidebar_state="auto")
 
 
 @dataclass(frozen=True)
@@ -81,7 +81,7 @@ def safe_run(func: Callable[[], T]) -> T | None:
 
 
 def render_back_home() -> None:
-    if st.button("返回主界面", key="os-back-home", use_container_width=True):
+    if st.button("返回主界面", key="os-back-home", width="stretch"):
         st.query_params.clear()
         st.rerun()
 
@@ -214,7 +214,7 @@ def _rr_html(timeline: list[tuple[str, int, int]], quantum: int) -> str:
 
 
 def main() -> None:
-    render_visual_system("dark")
+    render_visual_system("light")
     st.markdown(css(), unsafe_allow_html=True)
     st.markdown(
         """

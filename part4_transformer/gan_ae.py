@@ -42,7 +42,7 @@ plt.rcParams["axes.unicode_minus"] = False
 st.set_page_config(
     page_title="GAN、自编码器与 VAE",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(

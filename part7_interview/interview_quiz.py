@@ -27,7 +27,7 @@ T = TypeVar("T")
 
 from components.visual_system import render_training_dashboard_gauges, render_visual_system
 
-st.set_page_config(page_title="CS 面试刷题模式", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="CS 面试刷题模式", layout="wide", initial_sidebar_state="auto")
 
 
 @dataclass(frozen=True)
@@ -172,7 +172,7 @@ def safe_run(func: Callable[[], T]) -> T | None:
 
 
 def render_back_home() -> None:
-    if st.button("返回主界面", key="quiz-back-home", use_container_width=True):
+    if st.button("返回主界面", key="quiz-back-home", width="stretch"):
         st.query_params.clear()
         st.rerun()
 
@@ -371,7 +371,7 @@ def render_score_card(score: dict[str, object]) -> None:
         {"维度": name, "得分": score["dimension_scores"].get(name, 0), "满分": full, "评分依据": desc}
         for name, desc, full in SCORING_DIMENSIONS
     ]
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
     matched = "、".join(score.get("matched", [])) or "暂无明显命中"
     missing = "、".join(score.get("missing", [])) or "暂无明显遗漏"
     st.caption(f"命中要点：{matched}")
@@ -441,7 +441,7 @@ def render_question_bank_overview() -> None:
         plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(side="bottom"),
     )
-    st.plotly_chart(fig_heatmap, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig_heatmap, width="stretch", config={"displayModeBar": False})
 
     # 方向汇总条形图 + 难度汇总
     col_chart, col_stats = st.columns([0.6, 0.4])
@@ -466,7 +466,7 @@ def render_question_bank_overview() -> None:
             xaxis_title="题数",
             showlegend=False,
         )
-        st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(fig_bar, width="stretch", config={"displayModeBar": False})
 
     with col_stats:
         total = len(QUESTIONS)
@@ -560,7 +560,7 @@ def render_radar_chart() -> None:
         margin=dict(l=60, r=60, t=30, b=60),
         paper_bgcolor="rgba(0,0,0,0)",
     )
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
 
     # 分数详情
     cols = st.columns(len(radar_dims))
@@ -642,7 +642,7 @@ def render_practice_analysis() -> None:
         xaxis_title="题数",
         yaxis_title="方向",
     )
-    st.plotly_chart(fig_direction, use_container_width=True, config=chart_config)
+    st.plotly_chart(fig_direction, width="stretch", config=chart_config)
 
     difficulty_order = ["基础", "高频", "进阶", "大厂追问"]
     difficulty_summary = (
@@ -680,7 +680,7 @@ def render_practice_analysis() -> None:
         xaxis=dict(range=[0, 100], ticksuffix="%"),
         showlegend=False,
     )
-    st.plotly_chart(fig_difficulty, use_container_width=True, config=chart_config)
+    st.plotly_chart(fig_difficulty, width="stretch", config=chart_config)
 
     time_df = df.reset_index().rename(columns={"index": "题序"})
     time_df["题序"] = time_df["题序"] + 1
@@ -701,7 +701,7 @@ def render_practice_analysis() -> None:
         yaxis_title="用时（秒）",
         showlegend=False,
     )
-    st.plotly_chart(fig_time, use_container_width=True, config=chart_config)
+    st.plotly_chart(fig_time, width="stretch", config=chart_config)
 
     answered_directions = direction_summary[direction_summary["总数"] > 0].copy()
     answered_directions["正确率"] = answered_directions["答对"] / answered_directions["总数"] * 100
@@ -750,7 +750,7 @@ def render_simulation_panel() -> None:
     index = st.session_state.get("interview_simulation_index", 0)
     scores = st.session_state.get("interview_simulation_scores", [])
     cols = st.columns(3)
-    if cols[0].button("开始模拟面试", key="simulation-start", use_container_width=True):
+    if cols[0].button("开始模拟面试", key="simulation-start", width="stretch"):
         start_simulation(role)
         st.rerun()
     cols[1].metric("当前轮次", f"{min(index + 1, len(candidates))} / {len(candidates)}")
@@ -785,7 +785,7 @@ def advance_simulation_if_needed(item: QuizItem, score: dict[str, object]) -> bo
 
 
 def main() -> None:
-    render_visual_system("dark")
+    render_visual_system("light")
     render_training_dashboard_gauges()
     ensure_state()
     st.markdown(css(), unsafe_allow_html=True)
@@ -799,7 +799,7 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
-    st.link_button("← 返回主界面", "/", width="small")
+    st.link_button("← 返回主界面", "/", width="content")
     st.markdown("")
 
     render_simulation_panel()
@@ -828,9 +828,9 @@ def main() -> None:
             st.metric("平均用时", format_elapsed(avg_time))
             st.caption(f"共作答 {len(answer_times)} 次")
 
-        if st.button("随机出题", key="quiz-random", use_container_width=True):
+        if st.button("随机出题", key="quiz-random", width="stretch"):
             pick_question(candidates)
-        if st.button("清空错题本", key="quiz-clear", use_container_width=True):
+        if st.button("清空错题本", key="quiz-clear", width="stretch"):
             st.session_state["interview_wrong_book"] = []
             st.session_state["interview_later_book"] = []
             st.session_state["interview_answered_count"] = 0
@@ -869,7 +869,7 @@ def main() -> None:
                     placeholder="写出你的理解，尽量覆盖关键点、边界条件和工程取舍...",
                 )
                 st.session_state["interview_user_answer"] = user_answer
-                if st.button("提交并查看标准答案", key="quiz-show-answer", use_container_width=True):
+                if st.button("提交并查看标准答案", key="quiz-show-answer", width="stretch"):
                     st.session_state["interview_user_answer_visible"] = True
                     score = score_user_answer(item, user_answer)
                     st.session_state["interview_auto_score"] = score
@@ -923,7 +923,7 @@ def main() -> None:
 
             c1, c2, c3 = st.columns(3)
             with c1:
-                if st.button("我答对了", key="quiz-right", use_container_width=True):
+                if st.button("我答对了", key="quiz-right", width="stretch"):
                     st.session_state["interview_answered_count"] = st.session_state.get("interview_answered_count", 0) + 1
                     st.session_state["interview_correct_count"] = st.session_state.get("interview_correct_count", 0) + 1
                     record_interview_result(item, True)
@@ -933,7 +933,7 @@ def main() -> None:
                         pick_question(candidates)
                     st.rerun()
             with c2:
-                if st.button("我答错了", key="quiz-wrong", use_container_width=True):
+                if st.button("我答错了", key="quiz-wrong", width="stretch"):
                     st.session_state["interview_answered_count"] = st.session_state.get("interview_answered_count", 0) + 1
                     record_interview_result(item, False)
                     add_unique("interview_wrong_book", item)
@@ -943,7 +943,7 @@ def main() -> None:
                         pick_question(candidates)
                     st.rerun()
             with c3:
-                if st.button("稍后复习", key="quiz-later", use_container_width=True):
+                if st.button("稍后复习", key="quiz-later", width="stretch"):
                     add_unique("interview_later_book", item)
                     score = st.session_state.get("interview_auto_score") or score_user_answer(item, st.session_state.get("interview_user_answer", ""))
                     persist_interview_record(item, "稍后复习", st.session_state.get("interview_user_answer", ""), score)
@@ -957,12 +957,12 @@ def main() -> None:
     tabs = st.tabs([f"答错 {len(wrong)}", f"稍后复习 {len(later)}"])
     with tabs[0]:
         if wrong:
-            st.dataframe(pd.DataFrame(wrong), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(wrong), width="stretch", hide_index=True)
         else:
             st.info("本轮还没有答错题。")
     with tabs[1]:
         if later:
-            st.dataframe(pd.DataFrame(later), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(later), width="stretch", hide_index=True)
         else:
             st.info("本轮还没有标记稍后复习。")
 

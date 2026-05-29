@@ -22,7 +22,7 @@ import streamlit as st
 st.set_page_config(
     page_title="深度学习术语词典",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 
@@ -829,7 +829,7 @@ def main() -> None:
 
     with tab_search:
         if view_mode == "表格":
-            st.dataframe(term_dataframe(filtered_terms), use_container_width=True, hide_index=True)
+            st.dataframe(term_dataframe(filtered_terms), width="stretch", hide_index=True)
         elif view_mode == "术语链":
             options = [f"{term.english} · {term.chinese}" for term in filtered_terms] or [
                 f"{term.english} · {term.chinese}" for term in TERMS
@@ -863,7 +863,7 @@ def main() -> None:
         )
         st.dataframe(
             term_dataframe(sorted((term for term in TERMS if term.initial == selected_initial), key=lambda item: item.english)),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -874,7 +874,7 @@ def main() -> None:
             key=lambda item: (item.category, item.english),
         )
         st.caption(f"{module_choice} 中讲解或使用了 {len(module_terms)} 个术语。")
-        st.dataframe(term_dataframe(module_terms), use_container_width=True, hide_index=True)
+        st.dataframe(term_dataframe(module_terms), width="stretch", hide_index=True)
 
 
 if __name__ == "__main__":

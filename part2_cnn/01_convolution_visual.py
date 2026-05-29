@@ -293,8 +293,8 @@ def render_卷积可视化() -> None:
 
     try:
         clean_old_artifacts()
-        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
-        render_visual_system("dark")
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="auto")
+        render_visual_system("light")
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
         render_loading_bar("卷积演示加载：像素粒子、卷积核和输出特征图将同步出现")

@@ -105,7 +105,7 @@ MULTIMODAL_ROWS = [
 st.set_page_config(
     page_title="前沿方向：LLM、AGI 与 AI 安全",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(
@@ -377,14 +377,14 @@ with col_plot:
         "工程复杂度": 5 if topic.name in {"多模态大模型", "AI 安全与对齐", "AI 智能体与工具使用"} else 4,
         "交互复杂度": 4 if "智能体" in topic.name else (5 if "推理模型" in topic.name else 2),
     }
-    st.plotly_chart(capability_radar(radar_values), use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(capability_radar(radar_values), width="stretch", config=PLOT_CONFIG)
 
 tabs = st.tabs(["多模态概览", "少标注学习", "XAI", "安全与对齐", "智能体与推理"])
 
 with tabs[0]:
     st.subheader("CLIP、BLIP、GPT-4V 的位置")
     df = pd.DataFrame(MULTIMODAL_ROWS, columns=["模型", "训练/能力重点", "核心机制", "典型任务"])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
     st.markdown(
         '<div class="note">CLIP 更像语义对齐底座，BLIP 更偏视觉语言预训练任务组合，GPT-4V 代表把视觉输入接入通用语言推理系统。</div>',
         unsafe_allow_html=True,
@@ -402,7 +402,7 @@ with tabs[1]:
             ]
         )
     with col_b:
-        st.plotly_chart(plot_learning_modes(), use_container_width=True, config=PLOT_CONFIG)
+        st.plotly_chart(plot_learning_modes(), width="stretch", config=PLOT_CONFIG)
 
 with tabs[2]:
     st.subheader("可解释性 AI 的几类问题")
@@ -432,7 +432,7 @@ with tabs[3]:
             ]
         )
     with col_b:
-        st.plotly_chart(plot_alignment_loop(), use_container_width=True, config=PLOT_CONFIG)
+        st.plotly_chart(plot_alignment_loop(), width="stretch", config=PLOT_CONFIG)
 
 with tabs[4]:
     st.subheader("智能体架构与推理模型")
@@ -477,4 +477,4 @@ with tabs[4]:
         ],
         columns=["模式", "适用场景", "推理成本", "延迟", "可靠性风险"],
     )
-    st.dataframe(agent_df, use_container_width=True, hide_index=True)
+    st.dataframe(agent_df, width="stretch", hide_index=True)

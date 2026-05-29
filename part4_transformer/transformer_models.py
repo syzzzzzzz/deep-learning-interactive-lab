@@ -66,7 +66,7 @@ class AttentionPack:
 st.set_page_config(
     page_title="Transformer 架构教学",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(
@@ -185,7 +185,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-render_visual_system("dark")
+render_visual_system("light")
 
 
 def softmax(x: np.ndarray, axis: int = -1) -> np.ndarray:
@@ -983,7 +983,7 @@ def render_self_attention(text: str, d_model: int, seed: int) -> AttentionPack:
     render_attention_light_beams(tokens, min(2, len(tokens) - 1))
     render_attention_textbook_intro(tokens)
     render_attention_math_section(d_model)
-    st.plotly_chart(plot_attention_step(pack, step), use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(plot_attention_step(pack, step), width="stretch", config=PLOT_CONFIG)
     col1, col2, col3 = st.columns(3)
     col1.metric("tokens", len(tokens))
     col2.metric("d_model", d_model)
@@ -1007,7 +1007,7 @@ def render_multihead(pack: AttentionPack, sharpness: float) -> None:
             """
         )
     )
-    st.plotly_chart(plot_multihead(pack.tokens, sharpness), use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(plot_multihead(pack.tokens, sharpness), width="stretch", config=PLOT_CONFIG)
 
 
 def render_positional() -> None:
@@ -1023,7 +1023,7 @@ def render_positional() -> None:
             unsafe_allow_html=True,
         )
     with col2:
-        st.plotly_chart(plot_positional_encoding(seq_len, d_model, dims), use_container_width=True, config=PLOT_CONFIG)
+        st.plotly_chart(plot_positional_encoding(seq_len, d_model, dims), width="stretch", config=PLOT_CONFIG)
 
 
 def render_residual_norm(seed: int) -> None:
@@ -1037,7 +1037,7 @@ def render_residual_norm(seed: int) -> None:
             unsafe_allow_html=True,
         )
     with col2:
-        st.plotly_chart(plot_residual_norm(depth, d_model, seed), use_container_width=True, config=PLOT_CONFIG)
+        st.plotly_chart(plot_residual_norm(depth, d_model, seed), width="stretch", config=PLOT_CONFIG)
 
 
 def render_text_heatmap(pack: AttentionPack) -> None:
@@ -1057,7 +1057,7 @@ def render_text_heatmap(pack: AttentionPack) -> None:
             """
         )
     )
-    st.plotly_chart(plot_text_attention(pack, query_index), use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(plot_text_attention(pack, query_index), width="stretch", config=PLOT_CONFIG)
     strongest = np.argsort(pack.weights[query_index])[::-1][:3]
     summary = "、".join(f"{pack.tokens[i]}({pack.weights[query_index, i]:.2f})" for i in strongest)
     st.markdown(
@@ -1069,7 +1069,7 @@ def render_text_heatmap(pack: AttentionPack) -> None:
 def render_bert_gpt() -> None:
     st.subheader("7. BERT vs GPT 的架构对比")
     st.pyplot(plot_bert_gpt_architecture(), clear_figure=True)
-    st.plotly_chart(plot_bert_gpt_masks(8), use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(plot_bert_gpt_masks(8), width="stretch", config=PLOT_CONFIG)
     fig = go.Figure(
         data=[
             go.Table(
@@ -1094,7 +1094,7 @@ def render_bert_gpt() -> None:
         ]
     )
     fig.update_layout(height=290, margin=dict(l=10, r=10, t=10, b=10), font=PLOT_FONT)
-    st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(fig, width="stretch", config=PLOT_CONFIG)
 
 
 def main() -> None:

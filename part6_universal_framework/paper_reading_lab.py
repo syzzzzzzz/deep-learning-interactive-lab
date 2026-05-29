@@ -216,7 +216,7 @@ def paper_by_key(key: str) -> Paper:
 
 
 def page_style() -> None:
-    st.set_page_config(page_title="经典论文解读实验室", layout="wide", initial_sidebar_state="expanded")
+    st.set_page_config(page_title="经典论文解读实验室", layout="wide", initial_sidebar_state="auto")
     st.markdown(
         """
         <style>
@@ -493,13 +493,13 @@ with left:
         st.markdown("**最小复现任务**")
         render_cards(list(paper.implement))
 with right:
-    st.plotly_chart(idea_graph(paper), use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(idea_graph(paper), width="stretch", config=PLOT_CONFIG)
 
 tabs = st.tabs(["论文时间线", "Transformer 成本实验", "阅读模板", "实现提示"])
 
 with tabs[0]:
     st.subheader("经典论文时间线")
-    st.plotly_chart(timeline_chart(), use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(timeline_chart(), width="stretch", config=PLOT_CONFIG)
     st.dataframe(
         pd.DataFrame(
             {
@@ -510,7 +510,7 @@ with tabs[0]:
             }
         ),
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
     )
 
 with tabs[1]:
@@ -520,7 +520,7 @@ with tabs[1]:
     m1.metric("注意力矩阵单元", f"{attn_m:.1f}M")
     m2.metric("QKV 参数量", f"{qkv_m:.1f}M")
     m3.metric("近似计算量", f"{ops_g:.1f}GOp")
-    st.plotly_chart(cost_chart(seq_len, d_model, heads, layers), use_container_width=True, config=PLOT_CONFIG)
+    st.plotly_chart(cost_chart(seq_len, d_model, heads, layers), width="stretch", config=PLOT_CONFIG)
     st.markdown(
         '<div class="note">序列长度翻倍时，注意力矩阵按平方增长。Flash Attention 等方法的价值，不只是算得快，更是减少中间矩阵读写造成的显存压力。</div>',
         unsafe_allow_html=True,

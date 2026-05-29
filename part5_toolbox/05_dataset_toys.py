@@ -148,8 +148,8 @@ def render() -> None:
 
     try:
         clean_old_artifacts()
-        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
-        st.link_button("返回主界面", "/", width="small")
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="auto")
+        st.link_button("返回主界面", "/", width="content")
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
         st.info("玩具数据集的价值不是“数据简单”，而是可以精确控制难度：先看模型能不能学会最小问题，再把经验迁移到真实项目。")

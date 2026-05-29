@@ -41,7 +41,7 @@ plt.rcParams["font.sans-serif"] = [
 st.set_page_config(
     page_title="深度学习实战案例库",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown(

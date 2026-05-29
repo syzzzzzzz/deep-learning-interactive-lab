@@ -163,8 +163,8 @@ def render() -> None:
 
     try:
         clean_old_artifacts()
-        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="expanded")
-        st.link_button("返回主界面", "/", width="small")
+        st.set_page_config(page_title=MODULE_TITLE, layout="wide", initial_sidebar_state="auto")
+        st.link_button("返回主界面", "/", width="content")
         st.title(MODULE_TITLE)
         st.caption(MODULE_SUMMARY)
         st.info("多头注意力不是简单重复算很多遍；不同 head 可以在不同子空间里学习不同关系，例如邻近、指代、句法或全局锚点。")
