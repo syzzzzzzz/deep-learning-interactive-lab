@@ -3,7 +3,7 @@
 [![Quality Gate](https://github.com/syzzzzzzz/deep-learning-interactive-lab/actions/workflows/quality.yml/badge.svg)](https://github.com/syzzzzzzz/deep-learning-interactive-lab/actions/workflows/quality.yml)
 [![Deploy GitHub Pages](https://github.com/syzzzzzzz/deep-learning-interactive-lab/actions/workflows/pages.yml/badge.svg)](https://github.com/syzzzzzzz/deep-learning-interactive-lab/actions/workflows/pages.yml)
 
-这是一个面向零基础学习者的深度学习交互式学习网站。它把张量、梯度、CNN、RNN、Transformer、训练调参、工程框架和 CS 面试基础做成可以阅读、调参、观察、复盘的学习产品。
+这是一个面向零基础学习者的深度学习交互式学习网站。它把张量、梯度、CNN、RNN、Transformer、训练调参、工程框架和 CS 基础做成可以阅读、调参、观察、复盘的学习产品。
 
 在线体验地址：
 
@@ -13,13 +13,13 @@ https://syzzzzzzz.github.io/deep-learning-interactive-lab/
 
 如果 Pages 刚开启，第一次发布可能需要在 GitHub 仓库的 `Settings -> Pages` 中选择 `GitHub Actions` 作为发布来源。
 
-## 项目定位
+## 这个网站适合谁
 
-这个项目不是普通脚本合集，而是一个完整的交互式教学平台雏形：
+这个网站想做的事情很简单：把“看不见的模型过程”变成可以一步步观察、修改和复盘的学习体验。它不急着证明功能很多，而是先帮助学习者知道下一步该看哪里、调哪里、为什么会这样。
 
-- 给初学者：先看 3 分钟版，再看动画，再动手实验。
-- 给进阶学习者：阅读完整讲义、源码对照和工程解释。
-- 给面试官：展示课程系统设计、前端交互、Python 教学脚本、质量门、E2E 测试和部署工程。
+- 第一次学深度学习的人：先看 3 分钟版，再看动画，再动手实验。
+- 已经学过一点的人：阅读完整讲义、源码对照和工程解释，把零散概念连成一条线。
+- 想做项目实践的人：进入中央控制台拼模型、看 shape、导出代码，再回到课程页理解每个部件。
 
 ## 截图
 
@@ -48,9 +48,9 @@ npm run screenshots
 - **神经网络乐高工厂**：用模型构建器把 MLP、CNN、Transformer mini 组合成可解释结构。
 - **拖拽式节点画布**：把知识点拆成数据、模块、损失、优化和观测节点，用结构帮助学生理解模型流。
 - **训练事件总线**：一次调参事件同时更新 loss、梯度、特征/注意力和实验笔记。
-- **个人技术名片**：首页包含作品集入口、技术栈、代码墙、GitHub 链接和项目说明。
-- **硬核实验区**：包含模型可解释性、对抗样本、训练挑战、端到端案例。
-- **CS 八股文训练营**：覆盖网络、数据库、算法、操作系统、深度学习、系统设计和模拟面试。
+- **学习成果档案**：把学习路径、实验记录、源码片段和项目结构放在一起，方便复盘。
+- **深度实验室**：包含模型可解释性、对抗样本、训练挑战、端到端案例。
+- **CS 基础训练营**：覆盖网络、数据库、算法、操作系统、深度学习、系统设计和自测追问。
 - **旧脚本协议化**：38 个历史教学脚本统一纳入 `compute / render / smoke` 协议。
 - **质量门与 E2E**：Python 全量质量门 + Playwright 桌面/移动端真实浏览器测试。
 
@@ -64,7 +64,7 @@ npm run screenshots
 - `part4_transformer`：注意力机制、多头注意力、Encoder/Decoder、最小 Transformer、Flash Attention
 - `part5_toolbox`：特征可视化、梯度监控、训练动态、超参搜索、部署工具、测验系统
 - `part6_universal_framework`：统一接口、模块化结构、项目骨架、插件系统、中央控制台、学习路径
-- `part7_interview`：计算机网络、数据库 SQL、数据结构与算法、操作系统、系统设计、面试刷题
+- `part7_interview`：计算机网络、数据库 SQL、数据结构与算法、操作系统、系统设计、自测刷题
 
 ### 中央控制台
 

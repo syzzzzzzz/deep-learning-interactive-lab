@@ -1346,8 +1346,8 @@ def check_static_html_site() -> None:
         "data-event-log",
         "data-console-result",
         "data-console-note",
-        "个人技术名片",
-        "硬核实验区",
+        "学习成果档案",
+        "深度实验室",
         "模型可解释性实验室",
         "对抗样本演示",
         "小型深度学习挑战",
@@ -1433,8 +1433,8 @@ def check_static_html_site() -> None:
         failures.append("README.md: 模块列表命令仍可能误导用户使用默认入口")
     if "不要用 `streamlit run main.py` 启动主站" not in readme_text:
         failures.append("README.md: 缺少 Streamlit 不再是主站入口的说明")
-    if "个人技术名片" not in readme_text or "硬核实验区" not in readme_text:
-        failures.append("README.md: 缺少 #10 名片区/硬核实验区说明")
+    if "学习成果档案" not in readme_text or "深度实验室" not in readme_text:
+        failures.append("README.md: 缺少学习成果档案/深度实验室说明")
     if "拖拽式节点画布" not in readme_text or "训练事件总线" not in readme_text:
         failures.append("README.md: 缺少 #10 中央控制台节点画布/事件总线说明")
     if "Node 24" not in readme_text:

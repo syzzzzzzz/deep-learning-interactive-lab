@@ -104,7 +104,7 @@ LEGACY_MODULE_SEED_OVERRIDES: tuple[ModuleSeed, ...] = (
     ModuleSeed("part7/operating_system", "part7/operating_system", "操作系统", "进程线程、调度算法、虚拟内存、死锁、高频面试题。", "核心", ("操作系统", "进程", "内存", "面试")),
     ModuleSeed("part7/system_design", "part7/system_design", "系统设计", "CAP 定理、缓存三兄弟、消息队列、推荐架构、分布式训练和推理平台设计。", "核心", ("系统设计", "架构", "分布式", "面试")),
     ModuleSeed("part7/deep_learning_interview", "part7/deep_learning_interview", "深度学习面试", "梯度消失、归一化、注意力复杂度、训练排查、LoRA 微调和模型部署。", "核心", ("深度学习", "梯度", "归一化", "面试")),
-    ModuleSeed("part7/interview_quiz", "part7/interview_quiz", "面试刷题模式", "随机出题、按方向难度筛选、错题本、面试官追问。", "核心", ("刷题", "面试", "错题本")),
+    ModuleSeed("part7/interview_quiz", "part7/interview_quiz", "自测刷题模式", "随机出题、按方向难度筛选、错题本、延伸追问。", "核心", ("刷题", "自测", "错题本")),
 )
 
 

@@ -136,7 +136,7 @@ MODULES: list[ModuleInfo] = [
     ModuleInfo("part7", "part7_interview", "操作系统", "operating_system", "进程线程、调度算法、虚拟内存、死锁、高频面试题。", "核心", ("操作系统", "进程", "内存", "面试"), 73),
     ModuleInfo("part7", "part7_interview", "系统设计", "system_design", "CAP定理、缓存三兄弟、消息队列、推荐架构、分布式训练、推理平台设计与交互练习。", "核心", ("系统设计", "架构", "面试", "分布式"), 73),
     ModuleInfo("part7", "part7_interview", "深度学习", "deep_learning_interview", "梯度消失可视化、BatchNorm vs LayerNorm、注意力复杂度、训练排查清单、LoRA微调、模型部署。", "核心", ("深度学习", "梯度", "归一化", "面试"), 74),
-    ModuleInfo("part7", "part7_interview", "面试刷题模式", "interview_quiz", "随机出题、按方向难度筛选、错题本、面试官追问。", "核心", ("刷题", "面试", "错题本"), 75),
+    ModuleInfo("part7", "part7_interview", "自测刷题模式", "interview_quiz", "随机出题、按方向难度筛选、错题本、延伸追问。", "核心", ("刷题", "自测", "错题本"), 75),
 ]
 
 REGISTERED_MODULES: tuple[ModuleInfo, ...] = tuple(MODULES)

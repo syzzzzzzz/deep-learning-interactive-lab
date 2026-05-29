@@ -75,7 +75,7 @@ const MODULES = [
   ["part7", "part7_interview", "操作系统", "operating_system", "进程线程、调度算法、虚拟内存、死锁、高频面试题。", "核心", ["操作系统", "进程", "内存", "面试"]],
   ["part7", "part7_interview", "系统设计", "system_design", "CAP定理、缓存三兄弟、消息队列、推荐架构、分布式训练、推理平台设计与交互练习。", "核心", ["系统设计", "架构", "面试", "分布式"]],
   ["part7", "part7_interview", "深度学习", "deep_learning_interview", "梯度消失可视化、BatchNorm vs LayerNorm、注意力复杂度、训练排查清单、LoRA微调、模型部署。", "核心", ["深度学习", "梯度", "归一化", "面试"]],
-  ["part7", "part7_interview", "面试刷题模式", "interview_quiz", "随机出题、按方向难度筛选、错题本、面试官追问。", "核心", ["刷题", "面试", "错题本"]],
+  ["part7", "part7_interview", "自测刷题模式", "interview_quiz", "随机出题、按方向难度筛选、错题本、延伸追问。", "核心", ["刷题", "自测", "错题本"]],
 ].map(([partKey, partDir, title, module, summary, level, tags], index) => {
   const part = PARTS.find((item) => item.key === partKey);
   return {
@@ -137,7 +137,7 @@ const LLM_COOKBOOK_TRACKS = [
     failure: "多轮系统容易在历史里积累旧指令、脏工具结果和用户越权请求；如果没有状态边界，越聊越不可控。",
     acceptance: "用户改口、补充资料、撤销需求时，系统能解释当前采用哪条上下文，并能在日志里还原一次回答的来源。",
     drill: "在系统设计页把一次问答拆成入口、上下文构造、模型调用、后处理、观测日志五个节点。",
-    concept: "Chat System 是把一次模型调用放进真实产品链路：身份、状态、历史、工具、审核和展示都要分层管理。",
+    concept: "Chat System 是把一次模型调用放进真实学习链路：身份、状态、历史、工具、审核和结果呈现都要分层管理。",
     checklist: ["是否能区分系统规则、用户意图、检索证据和工具返回。", "是否有历史截断策略，避免旧上下文污染新任务。", "是否记录每次回答使用了哪些消息、工具结果和后处理规则。"],
   },
   {
@@ -1153,7 +1153,7 @@ const MODULE_TEACHING_NOTES = {
     analogy: "像看不同读书方式：BERT 双向理解全文，GPT 按顺序续写下一个词。",
     intuition: "Transformer 家族的差异，主要来自可见上下文、训练目标和输出方式。",
     variable: "双向 mask、因果 mask、位置编码、层数、头数、预训练目标和输出头",
-    elements: "结构卡展示模型类型，mask 图显示能看哪些 token，输出区显示分类或生成结果。",
+    elements: "结构卡说明模型类型，mask 图显示能看哪些 token，输出区呈现分类或生成结果。",
     controls: "模型类型、上下文长度、头数、层数、mask 方式和任务头",
     observe: "BERT 是否能看双向上下文，GPT 是否只能看左侧，位置编码改变后长文本是否稳定",
     why: "相同 block 在不同 mask 和训练目标下会形成不同能力：理解、生成或编码检索。",
@@ -1348,7 +1348,7 @@ const MODULE_TEACHING_NOTES = {
     analogy: "像装修一套房：水电、墙面、家具和验收单都要有固定位置。",
     intuition: "完整项目骨架让实验从临时代码变成可交付系统。",
     variable: "目录结构、训练入口、配置文件、实验日志、checkpoint、评估报告和 README",
-    elements: "目录树展示职责分布，流程图展示运行顺序，产物卡展示每次训练留下什么。",
+    elements: "目录树说明职责分布，流程图说明运行顺序，产物卡记录每次训练留下什么。",
     controls: "项目模板类型、配置数量、日志级别、checkpoint 策略和报告格式",
     observe: "新人能否从 README 跑通，失败后能否找到日志，模型结果能否回到具体配置",
     why: "深度学习项目结果高度依赖数据和配置，骨架把这些依赖显式保存下来。",
@@ -1569,7 +1569,7 @@ const MODULE_TEACHING_NOTES = {
     analogy: "像面试前整理工具包：每个工具都要知道用途、限制和真实项目里怎么用。",
     intuition: "深度学习面试不是背名词，而是解释机制、故障和取舍。",
     variable: "梯度流、BatchNorm/LayerNorm、注意力复杂度、训练诊断、LoRA rank 和部署延迟",
-    elements: "题卡代表问题，机制图代表解释路径，追问区代表面试官会继续深挖的点。",
+    elements: "题卡代表问题，机制图代表解释路径，追问区代表学习时应该继续追清楚的点。",
     controls: "题目方向、难度、追问类型、是否显示答案和实战场景",
     observe: "回答是否包含定义、直觉、公式/机制、工程用途和常见坑，是否能应对追问",
     why: "面试考的是能否把理论连接到工程问题，例如为什么训练不稳、为什么部署变慢。",
@@ -2003,7 +2003,7 @@ const LLM_STUDY_ORDER = [
   },
   {
     title: "选修推进：评估、微调、Agent 与交付",
-    body: "当原型能跑后，再做评估调试、语义检索优化、LoRA/微调决策、工具调用 Agent 和 Web Demo 交付。产出物是可展示、可回归、可复盘的作品集项目。",
+    body: "当原型能跑后，再做评估调试、语义检索优化、LoRA/微调决策、工具调用 Agent 和 Web Demo 交付。产出物要能回归、能复盘、能解释每一次取舍。",
   },
 ];
 
@@ -2048,7 +2048,7 @@ function renderLLMCookbookBridge(module = null) {
   const tracks = getLLMCookbookTracks(module);
   const intro = module
     ? `把 ${module.title} 接到 LLM 应用开发：先判断它属于提示、检索、评估、微调、工具调用还是交付链路。`
-    : "参考 Datawhale LLM Cookbook 的学习路线重新组织成本项目的工程入口：从 prompt 到 RAG、评估、微调、Agent 和应用交付。建议按顺序完成每一段的产出物，再回到相关课程页做对照实验，最终形成可展示项目。";
+    : "参考 Datawhale LLM Cookbook 的学习路线重新组织成本项目的工程入口：从 prompt 到 RAG、评估、微调、Agent 和应用交付。建议按顺序完成每一段的产出物，再回到相关课程页做对照实验，最终形成可复盘的项目记录。";
 
   return `
     <section ${module ? "" : 'id="llm-cookbook"'} class="${module ? "reading-section" : "view section"} llm-cookbook-section" data-llm-cookbook>
@@ -3047,18 +3047,18 @@ function renderPortfolioSection() {
     <section id="portfolio" class="view section portfolio-panel">
       <div class="section-head">
         <div>
-          <div class="eyebrow">Technical Profile</div>
-          <h2>个人技术名片</h2>
+          <div class="eyebrow">学习成果档案</div>
+          <h2>这套网站怎样陪你学习</h2>
         </div>
-        <p>把这个学习站本身作为作品集入口：能展示深度学习知识组织、交互式教学、前端工程和自动化质量检查。</p>
+        <p>这里记录网站的课程结构、交互实验、源码对照和质量检查。它不是让人匆忙翻亮点，而是帮助你知道自己学到了哪里、还能怎样继续改进。</p>
       </div>
       <div class="portfolio-layout">
         <article class="profile-card">
           <div class="profile-mark">DL</div>
           <div>
-            <span class="section-kicker">Portfolio Owner</span>
+            <span class="section-kicker">Course Builder</span>
             <h3>深度学习交互书库作者</h3>
-            <p>围绕“学生能不能看懂、能不能动手、能不能复现”来组织课程内容，兼顾课程讲义、交互演示、工程脚本与作品集展示。</p>
+            <p>围绕“学生能不能看懂、能不能动手、能不能复现”来组织课程内容，兼顾课程讲义、交互演示、工程脚本与学习成果整理。</p>
           </div>
         </article>
         <div class="portfolio-detail">
@@ -3067,9 +3067,9 @@ function renderPortfolioSection() {
           </div>
           <div class="portfolio-links">
             <a class="ghost-action" href="https://github.com/syzzzzzzz" target="_blank" rel="noreferrer">GitHub</a>
-            <a class="ghost-action" href="#hardcore-labs">硬核实验</a>
+            <a class="ghost-action" href="#hardcore-labs">深度实验</a>
             <a class="ghost-action" href="#notes">代码墙</a>
-            <a class="ghost-action" href="#home" aria-label="简历入口">简历入口</a>
+            <a class="ghost-action" href="#home" aria-label="返回学习起点">返回学习起点</a>
           </div>
         </div>
       </div>
@@ -3171,10 +3171,10 @@ function renderHardcoreLabsSection() {
     <section id="hardcore-labs" class="view section hardcore-labs">
       <div class="section-head">
         <div>
-          <div class="eyebrow">Hardcore Labs</div>
-          <h2>硬核实验区</h2>
+          <div class="eyebrow">深度实验室</div>
+          <h2>把模型现象拆开看</h2>
         </div>
-        <p>这里不只放概念介绍，而是把解释性、对抗扰动、训练挑战和端到端案例做成可调、可观察、可复盘的作品集级专区。</p>
+        <p>这里不只放概念介绍，而是把解释性、对抗扰动、训练挑战和端到端案例做成可调、可观察、可复盘的实验区。</p>
       </div>
       <div class="hardcore-workbench-grid">
         ${labs.map((lab) => `
@@ -3351,7 +3351,7 @@ function renderHardcoreCaseLab(lab) {
     </div>
   `;
   lab.querySelector("[data-hardcore-metrics]").innerHTML = [
-    hardcoreMetric("交付准备度", `${readiness}`, readiness >= 76 ? "可以进入作品集展示" : "还需要补证据"),
+    hardcoreMetric("交付准备度", `${readiness}`, readiness >= 76 ? "可以整理成学习成果" : "还需要补证据"),
     hardcoreMetric("项目风险", `${risk}%`, risk > 42 ? "优先补数据和监控" : "风险可控"),
     hardcoreMetric("部署形态", deploy.toUpperCase(), capacity === "large" && deploy === "edge" ? "容量和端侧约束冲突" : "约束基本匹配"),
   ].join("");
@@ -3396,7 +3396,7 @@ function renderHome() {
       <div>
         <div class="kicker">零基础深度学习路径</div>
         <h1>先知道下一步，<br>再开始学<em>模型</em></h1>
-        <p>这不是作品集首页，而是一条学习路线：先补数学直觉，再看神经网络、卷积、序列、注意力，最后进实验台验证。</p>
+        <p>这不是宣传首页，而是一条学习路线：先补数学直觉，再看神经网络、卷积、序列、注意力，最后进实验台验证。</p>
         <div class="hero-actions">
           <a class="action" href="#starter">从第 1 步开始</a>
           <a class="ghost-action" href="#path">先看完整路径</a>

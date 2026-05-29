@@ -245,7 +245,7 @@ def check_navigation_and_learning_ux(context: QualityCheckContext) -> None:
         "docs/screenshots/interview-camp.png",
     ]:
         if not context.exists(Path(screenshot)):
-            failures.append(f"{screenshot}: 缺少作品集截图")
+            failures.append(f"{screenshot}: 缺少学习站截图")
 
     forbidden_fragments = [
         "Course File",
