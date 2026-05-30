@@ -130,10 +130,45 @@ const SOURCE_LIBRARY = {
     authors: "PyTorch Docs",
     url: "https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html",
   },
+  PYTORCH_AUTOGRAD: {
+    title: "Autograd mechanics",
+    authors: "PyTorch Docs",
+    url: "https://pytorch.org/docs/stable/notes/autograd.html",
+  },
+  PYTORCH_NN: {
+    title: "torch.nn API",
+    authors: "PyTorch Docs",
+    url: "https://pytorch.org/docs/stable/nn.html",
+  },
   PYTORCH_TRANSFORMER: {
     title: "torch.nn.Transformer",
     authors: "PyTorch Docs",
     url: "https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html",
+  },
+  PYTORCH_RNN: {
+    title: "Recurrent layers: RNN / LSTM / GRU",
+    authors: "PyTorch Docs",
+    url: "https://pytorch.org/docs/stable/nn.html#recurrent-layers",
+  },
+  PYTORCH_ONNX: {
+    title: "torch.onnx",
+    authors: "PyTorch Docs",
+    url: "https://pytorch.org/docs/stable/onnx.html",
+  },
+  PYTORCH_QUANT: {
+    title: "Quantization",
+    authors: "PyTorch Docs",
+    url: "https://pytorch.org/docs/stable/quantization.html",
+  },
+  SKLEARN: {
+    title: "scikit-learn User Guide",
+    authors: "scikit-learn",
+    url: "https://scikit-learn.org/stable/user_guide.html",
+  },
+  MLCC: {
+    title: "Machine Learning Crash Course",
+    authors: "Google Developers",
+    url: "https://developers.google.com/machine-learning/crash-course",
   },
   VAS2017: {
     title: "Attention Is All You Need",
@@ -149,6 +184,91 @@ const SOURCE_LIBRARY = {
     title: "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
     authors: "Dao et al., 2022",
     url: "https://arxiv.org/abs/2205.14135",
+  },
+  LENET1998: {
+    title: "Gradient-Based Learning Applied to Document Recognition",
+    authors: "LeCun et al., 1998",
+    url: "http://vision.stanford.edu/cs598_spring07/papers/Lecun98.pdf",
+  },
+  ALEX2012: {
+    title: "ImageNet Classification with Deep Convolutional Neural Networks",
+    authors: "Krizhevsky, Sutskever, Hinton, 2012",
+    url: "https://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks",
+  },
+  VGG2014: {
+    title: "Very Deep Convolutional Networks for Large-Scale Image Recognition",
+    authors: "Simonyan, Zisserman, 2014",
+    url: "https://arxiv.org/abs/1409.1556",
+  },
+  HE2015: {
+    title: "Deep Residual Learning for Image Recognition",
+    authors: "He et al., 2015",
+    url: "https://arxiv.org/abs/1512.03385",
+  },
+  MOBILENET2017: {
+    title: "MobileNets: Efficient Convolutional Neural Networks for Mobile Vision Applications",
+    authors: "Howard et al., 2017",
+    url: "https://arxiv.org/abs/1704.04861",
+  },
+  EFFICIENTNET2019: {
+    title: "EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks",
+    authors: "Tan, Le, 2019",
+    url: "https://arxiv.org/abs/1905.11946",
+  },
+  GRADCAM2017: {
+    title: "Grad-CAM: Visual Explanations from Deep Networks via Gradient-based Localization",
+    authors: "Selvaraju et al., 2017",
+    url: "https://arxiv.org/abs/1610.02391",
+  },
+  BN2015: {
+    title: "Batch Normalization",
+    authors: "Ioffe, Szegedy, 2015",
+    url: "https://arxiv.org/abs/1502.03167",
+  },
+  DROPOUT2014: {
+    title: "Dropout: A Simple Way to Prevent Neural Networks from Overfitting",
+    authors: "Srivastava et al., 2014",
+    url: "https://www.jmlr.org/papers/v15/srivastava14a.html",
+  },
+  ADAM2014: {
+    title: "Adam: A Method for Stochastic Optimization",
+    authors: "Kingma, Ba, 2014",
+    url: "https://arxiv.org/abs/1412.6980",
+  },
+  LSTM1997: {
+    title: "Long Short-Term Memory",
+    authors: "Hochreiter, Schmidhuber, 1997",
+    url: "https://direct.mit.edu/neco/article/9/8/1735/6109/Long-Short-Term-Memory",
+  },
+  CHO2014: {
+    title: "Learning Phrase Representations using RNN Encoder-Decoder",
+    authors: "Cho et al., 2014",
+    url: "https://arxiv.org/abs/1406.1078",
+  },
+  SUTS2014: {
+    title: "Sequence to Sequence Learning with Neural Networks",
+    authors: "Sutskever, Vinyals, Le, 2014",
+    url: "https://arxiv.org/abs/1409.3215",
+  },
+  MDN_HTTP: {
+    title: "HTTP",
+    authors: "MDN Web Docs",
+    url: "https://developer.mozilla.org/en-US/docs/Web/HTTP",
+  },
+  POSTGRES: {
+    title: "PostgreSQL Documentation",
+    authors: "PostgreSQL",
+    url: "https://www.postgresql.org/docs/",
+  },
+  OSTEP: {
+    title: "Operating Systems: Three Easy Pieces",
+    authors: "Remzi H. Arpaci-Dusseau, Andrea C. Arpaci-Dusseau",
+    url: "https://pages.cs.wisc.edu/~remzi/OSTEP/",
+  },
+  CP_ALGORITHMS: {
+    title: "Algorithms for Competitive Programming",
+    authors: "cp-algorithms",
+    url: "https://cp-algorithms.com/",
   },
 };
 
@@ -183,6 +303,86 @@ const CONTENT_CREDIBILITY = {
       "旧脚本迁移内容可能包含简化实现、模拟数据或早期讲义口吻。",
     ],
     sources: ["D2L", "DLBOOK"],
+  },
+};
+
+const CREDIBILITY_PROFILES = {
+  foundation: {
+    level: "B",
+    label: "教学简化",
+    summary: "基础章节主要对照开放教材、PyTorch 文档和机器学习公开课程；公式和演示会保留教学化简化。",
+    boundaries: [
+      "数学图形用于建立方向、尺度、概率和梯度直觉，不替代严格数学教材。",
+      "自动求导、优化器和归一化的 API 细节以 PyTorch 官方文档为准。",
+      "经典机器学习与数据划分以 scikit-learn 文档和开放课程为主要校对来源。",
+    ],
+    sources: ["D2L", "DLBOOK", "PYTORCH_AUTOGRAD", "PYTORCH_NN", "SKLEARN", "MLCC"],
+  },
+  cnn: {
+    level: "B",
+    label: "教学简化",
+    summary: "CNN 章节对照 CS231n、经典 CNN 论文和 PyTorch API；可视化图主要用于解释局部连接、特征图和结构取舍。",
+    boundaries: [
+      "卷积、池化和特征图演示使用小图或合成数据，不能直接代表真实视觉模型的全部行为。",
+      "架构年份、结构名称和核心思想会参考原论文；简化实现不等价于论文完整模型。",
+      "Grad-CAM 与特征可视化只能作为解释线索，不是完整因果证明。",
+    ],
+    sources: ["CS231N", "PYTORCH_NN", "LENET1998", "ALEX2012", "VGG2014", "HE2015", "GRADCAM2017"],
+  },
+  rnn: {
+    level: "B",
+    label: "教学简化",
+    summary: "RNN 章节对照 D2L、PyTorch 循环层文档和 LSTM/GRU/Seq2Seq 经典论文；动画强调记忆流和梯度直觉。",
+    boundaries: [
+      "隐藏状态和门控动画是低维解释图，真实模型内部表示更高维、更难直接解释。",
+      "玩具序列任务用于暴露记忆、截断和梯度问题，不代表真实 NLP 数据集效果。",
+      "Teacher Forcing、采样和注意力对齐需要结合训练/推理口径区分。",
+    ],
+    sources: ["D2L", "PYTORCH_RNN", "LSTM1997", "CHO2014", "SUTS2014", "BAH2015"],
+  },
+  transformer: {
+    level: "B",
+    label: "教学简化",
+    summary: "Transformer 章节对照原论文、PyTorch 文档、D2L 和 FlashAttention 论文；部分热力图是教学化可视化。",
+    boundaries: [
+      "标准注意力公式和 mask 机制以论文与 PyTorch API 为准。",
+      "多头注意力图、位置编码图和 BERT/GPT 对比有教学化抽象，不等价于真实大模型内部解释。",
+      "长上下文、FlashAttention 和性能结论需要结合硬件、kernel、序列长度和实现版本判断。",
+    ],
+    sources: ["VAS2017", "BAH2015", "DAO2022", "PYTORCH_SDPA", "PYTORCH_TRANSFORMER", "D2L"],
+  },
+  toolbox: {
+    level: "B",
+    label: "教学简化",
+    summary: "工具箱章节对照 PyTorch、scikit-learn、解释性论文和部署文档；实验结果多为教学模拟或轻量数据。",
+    boundaries: [
+      "训练曲线、调参挑战和案例研究多为可控演示，不应当作真实数据集基准。",
+      "部署、量化、ONNX 和解释性内容必须结合目标硬件、模型结构和数据分布复核。",
+      "解释性图像只提供证据，不是模型因果决策的完整证明。",
+    ],
+    sources: ["PYTORCH_NN", "PYTORCH_ONNX", "PYTORCH_QUANT", "SKLEARN", "GRADCAM2017", "ADAM2014"],
+  },
+  framework: {
+    level: "B",
+    label: "工程实践整理",
+    summary: "统一框架与中央控制台章节主要是本站项目经验和 PyTorch 工程模式整理，不是通用工业标准。",
+    boundaries: [
+      "模型构建器和训练联动是教学项目实现，不能等同于成熟深度学习框架。",
+      "项目结构、插件系统和一键训练是本站当前选择，真实项目要按团队、数据和部署约束调整。",
+      "生成代码和 shape 诊断用于学习和原型验证，上线前仍需要独立测试。",
+    ],
+    sources: ["PYTORCH_NN", "PYTORCH_AUTOGRAD", "PYTORCH_ONNX", "D2L", "MLCC"],
+  },
+  cs: {
+    level: "C",
+    label: "待复核",
+    summary: "CS 基础训练营是复习和自测入口，目前优先保证交互路径，细节还需要继续对照官方文档和教材校订。",
+    boundaries: [
+      "网络、数据库、操作系统和算法解释以入门复习为目标，不替代系统教材。",
+      "题目答案需要继续补官方文档、RFC 或经典教材依据。",
+      "系统设计题没有唯一标准答案，应按约束、取舍和故障模式讨论。",
+    ],
+    sources: ["MDN_HTTP", "POSTGRES", "OSTEP", "CP_ALGORITHMS", "SKLEARN"],
   },
 };
 
@@ -2273,7 +2473,19 @@ function hasLegacyMarkdown(module) {
 }
 
 function moduleCredibility(module) {
-  return CONTENT_CREDIBILITY[module.id] || CONTENT_CREDIBILITY.default;
+  if (CONTENT_CREDIBILITY[module.id]) return CONTENT_CREDIBILITY[module.id];
+  return credibilityProfileForModule(module);
+}
+
+function credibilityProfileForModule(module) {
+  if (module.partKey === "part1") return CREDIBILITY_PROFILES.foundation;
+  if (module.partKey === "part2") return CREDIBILITY_PROFILES.cnn;
+  if (module.partKey === "part3") return CREDIBILITY_PROFILES.rnn;
+  if (module.partKey === "part4") return CREDIBILITY_PROFILES.transformer;
+  if (module.partKey === "part5") return CREDIBILITY_PROFILES.toolbox;
+  if (module.partKey === "part6") return CREDIBILITY_PROFILES.framework;
+  if (module.partKey === "part7") return CREDIBILITY_PROFILES.cs;
+  return CONTENT_CREDIBILITY.default;
 }
 
 function renderSourceReferences(sourceIds) {

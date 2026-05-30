@@ -194,6 +194,7 @@ python -X utf8 scripts\quality_check.py --skip-smoke
 - [架构说明](docs/architecture.md)
 - [教学设计说明](docs/teaching_design.md)
 - [内容可信度规范](docs/content_credibility.md)
+- [全站逐章内容校对矩阵](docs/content_audit_matrix.md)
 - [公开来源清单](docs/references/source_catalog.md)
 - [旧脚本协议审计](docs/legacy_protocol_audit.md)
 - [深模块架构 PRD](docs/prd_deep_module_architecture.md)

@@ -1482,6 +1482,7 @@ def check_content_credibility_system() -> None:
     failures: list[str] = []
     source_catalog = read_text(Path("docs/references/source_catalog.md"))
     credibility_doc = read_text(Path("docs/content_credibility.md"))
+    audit_matrix = read_text(Path("docs/content_audit_matrix.md"))
     attention_md = read_text(Path("deep_learning_book/part4_transformer/01_attention_mechanism.md"))
     attention_legacy_md = read_text(Path("docs/legacy_book/part4_transformer/01_attention_mechanism.md"))
     site_js = read_text(Path("assets/site.js"))
@@ -1492,6 +1493,10 @@ def check_content_credibility_system() -> None:
         "Neural Machine Translation by Jointly Learning to Align and Translate",
         "torch.nn.functional.scaled_dot_product_attention",
         "Dive into Deep Learning",
+        "CS231n",
+        "Long Short-Term Memory",
+        "PostgreSQL Documentation",
+        "Operating Systems: Three Easy Pieces",
         "不复制受版权保护书籍或非授权资源站正文",
     ):
         if fragment not in source_catalog:
@@ -1500,6 +1505,9 @@ def check_content_credibility_system() -> None:
     for fragment in ("已校对", "教学简化", "待复核", "强结论要有边界"):
         if fragment not in credibility_doc:
             failures.append(f"docs/content_credibility.md: 缺少可信度规范 {fragment}")
+    for fragment in ("全站逐章内容校对矩阵", "注意力机制", "卷积直觉", "RNN 直觉", "自测刷题模式"):
+        if fragment not in audit_matrix:
+            failures.append(f"docs/content_audit_matrix.md: 缺少逐章校对记录 {fragment}")
 
     for rel_path, text in (
         ("deep_learning_book/part4_transformer/01_attention_mechanism.md", attention_md),
@@ -1509,9 +1517,12 @@ def check_content_credibility_system() -> None:
             if fragment not in text:
                 failures.append(f"{rel_path}: 注意力样板缺少来源尾注 {fragment}")
 
-    for fragment in ("SOURCE_LIBRARY", "CONTENT_CREDIBILITY", "renderCredibilitySection", "data-content-credibility"):
+    for fragment in ("SOURCE_LIBRARY", "CONTENT_CREDIBILITY", "CREDIBILITY_PROFILES", "credibilityProfileForModule", "renderCredibilitySection", "data-content-credibility"):
         if fragment not in site_js:
             failures.append(f"assets/site.js: 缺少可信度渲染能力 {fragment}")
+    for source_id in ("CS231N", "LSTM1997", "GRADCAM2017", "MDN_HTTP", "POSTGRES", "OSTEP"):
+        if source_id not in site_js:
+            failures.append(f"assets/site.js: 来源库缺少 {source_id}")
     for fragment in (".credibility-section", ".credibility-badge.level-a", ".reference-list"):
         if fragment not in site_css:
             failures.append(f"assets/site.css: 缺少可信度样式 {fragment}")
