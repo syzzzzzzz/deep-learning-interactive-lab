@@ -40,7 +40,7 @@
 
 | 页面 | 状态 | 来源组 | 下一步 |
 |---|---|---|---|
-| RNN 直觉 | A | D2L / PyTorch RNN / LSTM / GRU | 已校对隐藏状态、递推、梯度消失/爆炸和门控表述；补充低维可视化边界。 |
+| RNN 直觉 | A | D2L / PyTorch RNN / LSTM / GRU | 已重写来源标注正文，校对隐藏状态、递推、梯度消失/爆炸和门控表述；补充低维可视化边界。 |
 | 隐藏状态 | B | LSTM / GRU / PyTorch | 校对门控含义和长期依赖。 |
 | 序列玩具任务 | B | D2L / PyTorch | 明确玩具任务与真实 NLP 任务差异。 |
 | RNN 超参实验 | B | D2L / PyTorch | 校对 hidden size、截断 BPTT、dropout。 |

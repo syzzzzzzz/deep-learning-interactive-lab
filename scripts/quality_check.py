@@ -1579,12 +1579,16 @@ def check_content_credibility_system() -> None:
             "https://docs.pytorch.org/docs/stable/generated/torch.nn.Conv2d.html",
         ],
         Path("deep_learning_book/part3_rnn/01_rnn_intuition.md"): [
+            "来源标注版：RNN 到底记住了什么",
+            "[S1] Dive into Deep Learning, Recurrent Neural Networks",
             "内容可信度与来源",
             "可信度：已校对",
             "https://pytorch.org/docs/stable/nn.html#recurrent-layers",
             "https://arxiv.org/abs/1406.1078",
         ],
         Path("docs/legacy_book/part3_rnn/01_rnn_intuition.md"): [
+            "来源标注版：RNN 到底记住了什么",
+            "[S1] Dive into Deep Learning, Recurrent Neural Networks",
             "内容可信度与来源",
             "可信度：已校对",
             "https://pytorch.org/docs/stable/nn.html#recurrent-layers",
@@ -1619,14 +1623,17 @@ def check_content_credibility_system() -> None:
         "为什么深度学习要先补这点数学",
         "张量与梯度到底在发生什么",
         "卷积到底在图像上找什么",
+        "RNN 到底记住了什么",
         "线性代数：看懂 shape",
         "卷积核：一个会重复使用的局部探测器",
+        "隐藏状态：RNN 的记忆不是仓库，而是压缩摘要",
         "PYTORCH_TENSOR",
         "PYTORCH_CONV2D",
+        "PYTORCH_RNN",
     ):
         if fragment not in site_js:
-            failures.append(f"assets/site.js: 缺少张量与梯度正文来源标注 {fragment}")
-    for source_id in ("PYTORCH_TENSOR", "PYTORCH_CONV2D", "CS231N", "LSTM1997", "GRADCAM2017", "MDN_HTTP", "POSTGRES", "OSTEP"):
+            failures.append(f"assets/site.js: 缺少来源标注正文 {fragment}")
+    for source_id in ("PYTORCH_TENSOR", "PYTORCH_CONV2D", "PYTORCH_RNN", "CS231N", "LSTM1997", "CHO2014", "GRADCAM2017", "MDN_HTTP", "POSTGRES", "OSTEP"):
         if source_id not in site_js:
             failures.append(f"assets/site.js: 来源库缺少 {source_id}")
     for fragment in (".credibility-section", ".credibility-badge.level-a", ".reference-list"):

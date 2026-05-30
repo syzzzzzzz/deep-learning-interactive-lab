@@ -76,4 +76,15 @@ test.describe("course learning loop", () => {
     await expect(page.locator("[data-source-annotated-lesson] .source-marker").first()).toContainText("[S1]");
     await expect(page.locator("[data-source-annotated-lesson]")).toContainText("Conv2d");
   });
+
+  test("rnn intuition lesson shows rewritten source-marked article", async ({ page }) => {
+    await page.goto("/#course/part3%2F01_rnn_intuition");
+
+    await page.getByTestId("toc-reading").click();
+    await expect(page.locator("[data-source-annotated-lesson]")).toBeVisible();
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("RNN 到底记住了什么");
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("隐藏状态");
+    await expect(page.locator("[data-source-annotated-lesson] .source-marker").first()).toContainText("[S1]");
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("GRU");
+  });
 });

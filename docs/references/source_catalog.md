@@ -21,6 +21,7 @@
 | PYTORCH | https://pytorch.org/docs/stable/ | 官方文档 | PyTorch API、autograd、nn.Module、`torch.nn.functional.scaled_dot_product_attention`、Transformer |
 | PYTORCH_TENSOR | https://docs.pytorch.org/tutorials/beginner/basics/tensorqs_tutorial.html | 官方教程 | 张量 shape、dtype、device、基础运算 |
 | PYTORCH_CONV2D | https://docs.pytorch.org/docs/stable/generated/torch.nn.Conv2d.html | 官方文档 | Conv2d 输入输出形状、stride、padding、dilation、groups |
+| PYTORCH_RNN | https://pytorch.org/docs/stable/nn.html#recurrent-layers | 官方文档 | RNN、LSTM、GRU 输入输出形状、层参数、batch 维度 |
 | SKLEARN | https://scikit-learn.org/stable/user_guide.html | 官方文档 | 经典机器学习、评估、数据预处理、模型选择 |
 | MLCC | https://developers.google.com/machine-learning/crash-course | 官方开放课程 | 机器学习直觉、梯度下降、泛化、数据拆分 |
 | MDN_HTTP | https://developer.mozilla.org/en-US/docs/Web/HTTP | 官方文档 | HTTP、缓存、状态码、Web 协议基础 |
