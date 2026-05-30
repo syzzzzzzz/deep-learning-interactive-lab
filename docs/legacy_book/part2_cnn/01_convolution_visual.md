@@ -499,3 +499,20 @@ print(CNN_DEBUG_GUIDE)
 | 边缘检测 | Sobel/Laplacian | 差分运算，检测亮度变化 |
 | 模糊 | 均值/高斯 | 平均运算，去除噪声 |
 | 锐化 | 原图+边缘 | 增强高频信息 |
+
+## 内容可信度与来源
+
+**可信度：已校对。** 本节关于卷积滑窗、卷积核、stride、padding、输出尺寸和浅层滤波器直觉的说明，已对照 CS231n、PyTorch `Conv2d` 文档、D2L 与早期 CNN 论文来源检查。页面中的固定 Sobel/Laplacian 核用于建立图像处理直觉，不代表训练后的 CNN 一定学到完全相同的核。
+
+参考来源：
+
+- CS231n Convolutional Neural Networks: https://cs231n.github.io/convolutional-networks/
+- PyTorch `torch.nn.Conv2d`: https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
+- Dive into Deep Learning, convolution chapters: https://d2l.ai/chapter_convolutional-neural-networks/index.html
+- LeCun et al., Gradient-Based Learning Applied to Document Recognition: http://vision.stanford.edu/cs598_spring07/papers/Lecun98.pdf
+
+边界说明：
+
+- 输出尺寸公式以 PyTorch Conv2d 与 CS231n 的卷积定义为准；不同框架在 padding 字符串、ceil/floor 策略上可能有接口差异。
+- 本节图像尺寸很小，是为了让滑窗过程看得清楚；真实 CNN 通常在多通道、高分辨率和多层结构中运行。
+- 固定滤波器只能说明“局部模式匹配”的思想，训练出的卷积核会随数据、任务和优化过程变化。

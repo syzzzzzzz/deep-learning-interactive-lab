@@ -351,3 +351,20 @@ mha = demo_multihead_complete()
 | 加权 | attn@V | [B,H,T,d_k] | 聚合信息 |
 | 合并 | transpose+view | [B,H,T,d_k]→[B,T,D] | 拼接所有头 |
 | 输出投影 | Linear | [B,T,D]→[B,T,D] | 融合多头信息 |
+
+## 内容可信度与来源
+
+**可信度：已校对。** 本节关于多头注意力的 Q/K/V 投影、按 head 拆分、缩放点积注意力、拼接和输出投影的说明，已对照 Transformer 原论文、PyTorch 注意力相关文档和 D2L 检查。页面中的“某个 head 看局部、某个 head 看长距离”属于教学观察语，不能保证每个真实模型的每个 head 都能被稳定命名。
+
+参考来源：
+
+- Vaswani et al., Attention Is All You Need: https://arxiv.org/abs/1706.03762
+- PyTorch `scaled_dot_product_attention`: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
+- PyTorch `nn.Transformer`: https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html
+- Dive into Deep Learning, multi-head attention: https://d2l.ai/chapter_attention-mechanisms-and-transformers/multihead-attention.html
+
+边界说明：
+
+- `d_model` 必须能被 head 数整除这一类形状约束，以 Transformer 公式和 PyTorch 实现为准。
+- 多头热力图可以帮助观察相关性分配，但注意力权重不是完整因果解释。
+- 头的专门化是可能现象，不是必然现象；训练数据、模型规模、初始化和任务都会影响 head 的分工。

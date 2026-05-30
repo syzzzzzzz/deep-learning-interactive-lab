@@ -12,8 +12,8 @@
 
 | 页面 | 状态 | 来源组 | 下一步 |
 |---|---|---|---|
-| 数学基础速查 | B | D2L / Deep Learning Book / MLCC | 校对线性代数、导数、概率例子，去掉过强工程断言。 |
-| 张量与梯度 | B | PyTorch Autograd / D2L | 校对 autograd、计算图、梯度传播图。 |
+| 数学基础速查 | A | D2L / Deep Learning Book / MLCC / PyTorch Autograd | 已对照线性代数、导数、概率直觉与梯度下降边界；低维图形明确标注为教学演示。 |
+| 张量与梯度 | A | PyTorch Autograd / D2L / Deep Learning Book / PyTorch NN | 已校对 autograd、计算图、链式法则和梯度传播图；补充梯度诊断边界。 |
 | 激活与归一化 | B | PyTorch / BatchNorm / Dropout / LayerNorm | 区分 BatchNorm、LayerNorm、Dropout 的训练/推理边界。 |
 | 数据集与优化器 | B | scikit-learn / Adam / MLCC | 校对数据划分、验证集、SGD/Adam 表述。 |
 | 机器学习基础 | B | scikit-learn / MLCC | 校对监督学习、泛化、评估指标。 |
@@ -24,7 +24,7 @@
 
 | 页面 | 状态 | 来源组 | 下一步 |
 |---|---|---|---|
-| 卷积直觉 | B | CS231n / PyTorch | 校对 padding、stride、kernel 与输出形状公式。 |
+| 卷积直觉 | A | CS231n / PyTorch Conv2d / D2L / LeNet | 已校对 padding、stride、kernel 与输出形状公式；补充固定滤波器和训练卷积核的边界。 |
 | 特征图可视化 | B | CS231n / PyTorch | 强化“特征图不是因果解释”的边界说明。 |
 | 经典 CNN 架构 | B | LeNet / AlexNet / VGG / ResNet | 校对架构年份、核心创新和简化实现差异。 |
 | CNN 调试面板 | B | CS231n / PyTorch | 校对过拟合、数据增强、train/eval 模式排查。 |
@@ -40,7 +40,7 @@
 
 | 页面 | 状态 | 来源组 | 下一步 |
 |---|---|---|---|
-| RNN 直觉 | B | D2L / PyTorch RNN | 校对隐藏状态递推、梯度消失表述。 |
+| RNN 直觉 | A | D2L / PyTorch RNN / LSTM / GRU | 已校对隐藏状态、递推、梯度消失/爆炸和门控表述；补充低维可视化边界。 |
 | 隐藏状态 | B | LSTM / GRU / PyTorch | 校对门控含义和长期依赖。 |
 | 序列玩具任务 | B | D2L / PyTorch | 明确玩具任务与真实 NLP 任务差异。 |
 | RNN 超参实验 | B | D2L / PyTorch | 校对 hidden size、截断 BPTT、dropout。 |
@@ -55,7 +55,7 @@
 | 页面 | 状态 | 来源组 | 下一步 |
 |---|---|---|---|
 | 注意力机制 | A | Vaswani 2017 / Bahdanau 2015 / PyTorch SDPA / D2L | 已完成第一版来源尾注；后续可继续精修讲义连贯性。 |
-| 多头注意力可视化 | B | Vaswani 2017 / PyTorch Transformer | 校对 head 数、维度整除、拼接投影。 |
+| 多头注意力可视化 | A | Vaswani 2017 / PyTorch SDPA / PyTorch Transformer / D2L | 已校对 head 数、维度整除、拼接投影；补充 head 专门化不是必然解释的边界。 |
 | 编码器与解码器 | B | Vaswani 2017 / D2L | 校对 causal mask、cross-attention、位置编码。 |
 | 最小 Transformer | B | Vaswani 2017 / PyTorch Transformer | 校对最小实现、残差、LayerNorm、FFN。 |
 | Flash Attention | B | Dao 2022 / PyTorch SDPA | 校对 exact attention、IO-aware、适用硬件边界。 |

@@ -590,3 +590,20 @@ demo_gradient_flow()
 | 反向传播 | 链式法则自动计算梯度 | `loss.backward()` |
 | 梯度下降 | 沿负梯度方向更新参数 | `optimizer.step()` |
 | 计算图 | 记录运算历史以便求导 | PyTorch 自动构建 |
+
+## 内容可信度与来源
+
+**可信度：已校对。** 本节关于张量形状、计算图、链式法则、`requires_grad`、`loss.backward()` 和参数更新的说明，已对照 PyTorch 官方 autograd 文档与开放教材检查。页面中的梯度流曲线、玩具网络和打印输出是教学演示，用来帮助观察“误差如何沿计算图回传”，不代表真实深层网络的完整训练诊断。
+
+参考来源：
+
+- PyTorch Autograd Mechanics: https://pytorch.org/docs/stable/notes/autograd.html
+- Dive into Deep Learning: https://d2l.ai/
+- Deep Learning Book: https://www.deeplearningbook.org/
+- PyTorch `torch.nn` documentation: https://pytorch.org/docs/stable/nn.html
+
+边界说明：
+
+- 自动求导和计算图行为以 PyTorch 官方文档为准；不同框架的动态图/静态图实现细节可能不同。
+- 梯度大小只是训练健康度线索，必须结合 loss 曲线、激活分布、参数更新幅度和验证集表现一起判断。
+- 本节示例为了可视化会使用小网络和随机数据，不能直接推出真实任务上的收敛速度或泛化能力。

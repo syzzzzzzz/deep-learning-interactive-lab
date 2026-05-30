@@ -273,6 +273,61 @@ const SOURCE_LIBRARY = {
 };
 
 const CONTENT_CREDIBILITY = {
+  "part1/math_primer": {
+    level: "A",
+    label: "已校对",
+    summary: "线性代数、微积分、概率和梯度下降的核心直觉已对照开放教材与机器学习公开课程。页面图形仍是低维教学模型，不替代严格数学教材。",
+    boundaries: [
+      "线性代数/微积分/概率演示用于深度学习直觉，不替代完整数学课程或证明。",
+      "梯度下降曲面是低维教学模型，不代表深度网络真实损失地形。",
+      "概率分布示例用于解释随机变量、采样和不确定性，不覆盖完整统计推断。",
+    ],
+    sources: ["D2L", "DLBOOK", "MLCC", "PYTORCH_AUTOGRAD"],
+  },
+  "part1/01_tensors_gradients": {
+    level: "A",
+    label: "已校对",
+    summary: "张量形状、计算图、链式法则和 PyTorch autograd 行为已对照官方文档与开放教材。梯度流图用于排查直觉，不等价于完整训练诊断。",
+    boundaries: [
+      "自动求导和计算图行为以 PyTorch autograd 文档为准。",
+      "梯度流图用小网络演示链式法则，不代表所有深层网络诊断。",
+      "梯度大小只是训练健康度线索，需要结合 loss、激活分布和验证集表现判断。",
+    ],
+    sources: ["PYTORCH_AUTOGRAD", "D2L", "DLBOOK", "PYTORCH_NN"],
+  },
+  "part2/01_convolution_visual": {
+    level: "A",
+    label: "已校对",
+    summary: "卷积滑窗、padding、stride、输出尺寸和固定滤波器直觉已对照 CS231n、PyTorch Conv2d 文档和经典 CNN 来源。",
+    boundaries: [
+      "滑窗和滤波器演示用小图/固定核建立直觉，不等同于训练出的 CNN 全部行为。",
+      "输出尺寸公式以 PyTorch Conv2d 和 CS231n 卷积定义为准。",
+      "Sobel/Laplacian 等固定滤波器是图像处理直觉，不代表 CNN 一定学到同样卷积核。",
+    ],
+    sources: ["CS231N", "PYTORCH_NN", "LENET1998", "D2L"],
+  },
+  "part3/01_rnn_intuition": {
+    level: "A",
+    label: "已校对",
+    summary: "RNN 隐藏状态递推、梯度问题、LSTM/GRU 门控直觉已对照 D2L、PyTorch 循环层文档和经典论文。",
+    boundaries: [
+      "隐藏状态图是低维可视化，真实 RNN 表示是高维向量。",
+      "LSTM/GRU 门控公式参考原论文和 PyTorch 文档；演示省略许多实现细节。",
+      "长程依赖和梯度问题需要结合任务、初始化、优化器和序列长度判断。",
+    ],
+    sources: ["D2L", "PYTORCH_RNN", "LSTM1997", "CHO2014"],
+  },
+  "part4/02_multihead_visual": {
+    level: "A",
+    label: "已校对",
+    summary: "多头注意力的维度拆分、并行注意力、拼接与输出投影已对照 Transformer 原论文、PyTorch 文档和 D2L。",
+    boundaries: [
+      "多头图用于展示维度拆分、并行注意力和合并投影，不代表每个真实 head 都有可命名功能。",
+      "head 数和维度整除以 Transformer 公式和 PyTorch 实现约束为准。",
+      "头的专门化是可能现象，不是每个模型都必然出现。",
+    ],
+    sources: ["VAS2017", "PYTORCH_SDPA", "PYTORCH_TRANSFORMER", "D2L"],
+  },
   "part4/01_attention_mechanism": {
     level: "A",
     label: "已校对样板",

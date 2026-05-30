@@ -1517,6 +1517,86 @@ def check_content_credibility_system() -> None:
             if fragment not in text:
                 failures.append(f"{rel_path}: 注意力样板缺少来源尾注 {fragment}")
 
+    a_level_modules = {
+        "part1/math_primer": ["D2L", "DLBOOK", "MLCC", "PYTORCH_AUTOGRAD"],
+        "part1/01_tensors_gradients": ["PYTORCH_AUTOGRAD", "D2L", "DLBOOK", "PYTORCH_NN"],
+        "part2/01_convolution_visual": ["CS231N", "PYTORCH_NN", "LENET1998", "D2L"],
+        "part3/01_rnn_intuition": ["D2L", "PYTORCH_RNN", "LSTM1997", "CHO2014"],
+        "part4/02_multihead_visual": ["VAS2017", "PYTORCH_SDPA", "PYTORCH_TRANSFORMER", "D2L"],
+    }
+    for module_id, source_ids in a_level_modules.items():
+        match = re.search(rf'"{re.escape(module_id)}":\s*\{{(.*?)\n  \}},', site_js, re.S)
+        if not match:
+            failures.append(f"assets/site.js: 缺少 A 级可信度模块 {module_id}")
+            continue
+        body = match.group(1)
+        for fragment in ('level: "A"', "已校对", "boundaries", "sources"):
+            if fragment not in body:
+                failures.append(f"assets/site.js: {module_id} 可信度元数据缺少 {fragment}")
+        for source_id in source_ids:
+            if source_id not in body:
+                failures.append(f"assets/site.js: {module_id} 缺少来源 {source_id}")
+
+    for page_name in ("数学基础速查", "张量与梯度", "卷积直觉", "RNN 直觉", "多头注意力可视化"):
+        if f"| {page_name} | A |" not in audit_matrix:
+            failures.append(f"docs/content_audit_matrix.md: {page_name} 未标记为 A")
+
+    checked_markdown_sources = {
+        Path("deep_learning_book/part1_foundations/01_tensors_gradients.md"): [
+            "内容可信度与来源",
+            "可信度：已校对",
+            "https://pytorch.org/docs/stable/notes/autograd.html",
+            "https://www.deeplearningbook.org/",
+        ],
+        Path("docs/legacy_book/part1_foundations/01_tensors_gradients.md"): [
+            "内容可信度与来源",
+            "可信度：已校对",
+            "https://pytorch.org/docs/stable/notes/autograd.html",
+            "https://www.deeplearningbook.org/",
+        ],
+        Path("deep_learning_book/part2_cnn/01_convolution_visual.md"): [
+            "内容可信度与来源",
+            "可信度：已校对",
+            "https://cs231n.github.io/convolutional-networks/",
+            "https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html",
+        ],
+        Path("docs/legacy_book/part2_cnn/01_convolution_visual.md"): [
+            "内容可信度与来源",
+            "可信度：已校对",
+            "https://cs231n.github.io/convolutional-networks/",
+            "https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html",
+        ],
+        Path("deep_learning_book/part3_rnn/01_rnn_intuition.md"): [
+            "内容可信度与来源",
+            "可信度：已校对",
+            "https://pytorch.org/docs/stable/nn.html#recurrent-layers",
+            "https://arxiv.org/abs/1406.1078",
+        ],
+        Path("docs/legacy_book/part3_rnn/01_rnn_intuition.md"): [
+            "内容可信度与来源",
+            "可信度：已校对",
+            "https://pytorch.org/docs/stable/nn.html#recurrent-layers",
+            "https://arxiv.org/abs/1406.1078",
+        ],
+        Path("deep_learning_book/part4_transformer/02_multihead_visual.md"): [
+            "内容可信度与来源",
+            "可信度：已校对",
+            "https://arxiv.org/abs/1706.03762",
+            "https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html",
+        ],
+        Path("docs/legacy_book/part4_transformer/02_multihead_visual.md"): [
+            "内容可信度与来源",
+            "可信度：已校对",
+            "https://arxiv.org/abs/1706.03762",
+            "https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html",
+        ],
+    }
+    for path, fragments in checked_markdown_sources.items():
+        text = read_text(path)
+        for fragment in fragments:
+            if fragment not in text:
+                failures.append(f"{path}: 主线章节来源尾注缺少 {fragment}")
+
     for fragment in ("SOURCE_LIBRARY", "CONTENT_CREDIBILITY", "CREDIBILITY_PROFILES", "credibilityProfileForModule", "renderCredibilitySection", "data-content-credibility"):
         if fragment not in site_js:
             failures.append(f"assets/site.js: 缺少可信度渲染能力 {fragment}")

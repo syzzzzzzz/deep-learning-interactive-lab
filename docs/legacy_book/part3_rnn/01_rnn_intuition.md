@@ -384,3 +384,20 @@ compare_gru_lstm_gates()
 | RNN | 0 | h_t = tanh(W·[h,x]) | 短序列，简单任务 |
 | LSTM | 4（f/i/g/o） | c_t = f⊙c + i⊙g | 长序列，需要长期记忆 |
 | GRU | 2（z/r） | h_t = (1-z)⊙h + z⊙n | 中等序列，参数更少 |
+
+## 内容可信度与来源
+
+**可信度：已校对。** 本节关于隐藏状态递推、序列记忆、梯度衰减/爆炸、LSTM 与 GRU 门控的说明，已对照 D2L、PyTorch 循环层文档和经典 RNN 论文来源检查。页面里的状态箭头和门控图是低维教学图，用来解释“信息怎样随时间传递”，不代表真实模型内部向量可以被这样逐项解释。
+
+参考来源：
+
+- Dive into Deep Learning, recurrent neural networks: https://d2l.ai/chapter_recurrent-neural-networks/index.html
+- PyTorch recurrent layers: https://pytorch.org/docs/stable/nn.html#recurrent-layers
+- Hochreiter & Schmidhuber, Long Short-Term Memory: https://direct.mit.edu/neco/article/9/8/1735/6109/Long-Short-Term-Memory
+- Cho et al., Learning Phrase Representations using RNN Encoder-Decoder: https://arxiv.org/abs/1406.1078
+
+边界说明：
+
+- 隐藏状态图是低维可视化，真实 RNN/LSTM/GRU 的状态通常是高维向量。
+- LSTM/GRU 门控公式在不同库实现里会有门顺序、偏置初始化和融合 kernel 的差异，工程细节以框架文档为准。
+- 长程依赖问题不能只看模型类型，还要结合序列长度、初始化、优化器、梯度裁剪和数据分布判断。
