@@ -1,5 +1,44 @@
 # 第一章：卷积、池化、填充、步幅——逐步数字计算与可视化
 
+## 来源标注版：卷积到底在图像上找什么
+
+**这一节真正要学的不是“卷积核在图片上滑动”这句口号，而是：同一个局部探测器在整张图上重复使用，把局部像素模式变成特征图上的响应。** 本文对照 CS231n、PyTorch `Conv2d` 文档、D2L 和 LeNet 论文；页面中的 Sobel/Laplacian 等固定核只是教学直觉，不代表训练出的 CNN 一定学到同样权重。[S1][S2][S3][S4]
+
+来源标符：
+
+- [S1] CS231n Convolutional Neural Networks: https://cs231n.github.io/convolutional-networks/
+- [S2] PyTorch `torch.nn.Conv2d`: https://docs.pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
+- [S3] Dive into Deep Learning, CNN chapters: https://d2l.ai/chapter_convolutional-neural-networks/index.html
+- [S4] LeCun et al., Gradient-Based Learning Applied to Document Recognition: http://vision.stanford.edu/cs598_spring07/papers/Lecun98.pdf
+
+### 1. 卷积核：一个会重复使用的局部探测器
+
+卷积核可以先理解成一个小模板。它每次覆盖输入图像的一小块，把窗口里的像素和自己的权重逐项相乘再求和，得到输出特征图上的一个数。如果卷积核像竖直边缘探测器，它滑到竖直边缘附近时响应更强；滑到平坦区域时响应更弱。[S1][S3]
+
+> 操作建议：切换不同卷积核，先猜它会突出边缘、模糊还是锐化，再观察特征图哪里变亮。
+
+### 2. stride 和 padding：控制窗口怎么走、边界怎么看
+
+`stride` 决定窗口每次移动几格；`padding` 决定是否给图像边缘补值。stride 大会让输出变小、计算减少，但可能跳过细节；padding 可以让边界像素也被卷积核充分看到，同时影响输出尺寸。[S1][S2]
+
+```text
+H_out = floor((H_in + 2P - K) / S) + 1
+```
+
+> 操作建议：把 stride 从 1 调到 2，再打开/关闭 padding。观察输出网格尺寸和边缘响应为什么变化。
+
+### 3. 多通道：彩色图是一组局部证据，不是一张平面
+
+彩色图像常见输入形状是 `[B, C_in, H, W]`。卷积核不是只看单张灰度图，而是跨通道汇总局部证据，生成 `[B, C_out, H_out, W_out]` 这样的输出。每个输出通道可以理解成一种探测器的响应图。[S2][S3]
+
+> 操作建议：把特征图当成“证据强度图”看。问自己：亮的地方像边缘、纹理，还是亮暗变化？
+
+### 4. CNN 为什么有效：局部连接 + 参数共享
+
+图像有明显的空间结构：附近像素往往有关。同一个边缘或纹理探测器也可能出现在图像任意位置。卷积层利用这两个事实，通过局部连接和参数共享减少参数量，也让模型更适合视觉任务。[S1][S4]
+
+> 操作建议：看完卷积动画后，去中央控制台比较 Linear 和 Conv 预设。思考为什么同样处理图像，卷积通常更省参数。
+
 ## 1.1 卷积的本质
 
 卷积核在输入上滑动，每次做**逐元素乘法再求和**（互相关运算）。

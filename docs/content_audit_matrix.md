@@ -24,7 +24,7 @@
 
 | 页面 | 状态 | 来源组 | 下一步 |
 |---|---|---|---|
-| 卷积直觉 | A | CS231n / PyTorch Conv2d / D2L / LeNet | 已校对 padding、stride、kernel 与输出形状公式；补充固定滤波器和训练卷积核的边界。 |
+| 卷积直觉 | A | CS231n / PyTorch Conv2d / D2L / LeNet | 已重写来源标注正文，校对 padding、stride、kernel 与输出形状公式；补充固定滤波器和训练卷积核的边界。 |
 | 特征图可视化 | B | CS231n / PyTorch | 强化“特征图不是因果解释”的边界说明。 |
 | 经典 CNN 架构 | B | LeNet / AlexNet / VGG / ResNet | 校对架构年份、核心创新和简化实现差异。 |
 | CNN 调试面板 | B | CS231n / PyTorch | 校对过拟合、数据增强、train/eval 模式排查。 |

@@ -65,4 +65,15 @@ test.describe("course learning loop", () => {
     await expect(page.locator("[data-source-annotated-lesson] .source-marker").first()).toContainText("[S1]");
     await expect(page.locator("[data-source-annotated-lesson]")).toContainText("梯度下降");
   });
+
+  test("convolution lesson shows rewritten source-marked article", async ({ page }) => {
+    await page.goto("/#course/part2%2F01_convolution_visual");
+
+    await page.getByTestId("toc-reading").click();
+    await expect(page.locator("[data-source-annotated-lesson]")).toBeVisible();
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("卷积到底在图像上找什么");
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("stride 和 padding");
+    await expect(page.locator("[data-source-annotated-lesson] .source-marker").first()).toContainText("[S1]");
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("Conv2d");
+  });
 });

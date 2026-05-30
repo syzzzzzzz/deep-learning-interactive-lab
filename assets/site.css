@@ -1356,8 +1356,6 @@ body[data-learning-mode="beginner"] .course-layout .advanced-only {
 
 .course-console-cta,
 .mode-switcher {
-  position: relative;
-  z-index: 1;
   display: grid;
   gap: 10px;
   margin-top: 16px;
@@ -1405,9 +1403,17 @@ body[data-learning-mode="beginner"] .course-layout .advanced-only {
   color: #fff;
 }
 
+.course-aside.motion-reveal,
+.course-aside.motion-reveal.is-visible,
+.course-aside .motion-reveal,
+.course-aside .motion-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+  animation: none;
+  transition: none;
+}
+
 .course-learning-actions {
-  position: relative;
-  z-index: 2;
   display: grid;
   gap: 10px;
   margin-top: 16px;

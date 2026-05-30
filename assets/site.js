@@ -145,6 +145,11 @@ const SOURCE_LIBRARY = {
     authors: "PyTorch Docs",
     url: "https://pytorch.org/docs/stable/nn.html",
   },
+  PYTORCH_CONV2D: {
+    title: "torch.nn.Conv2d",
+    authors: "PyTorch Docs",
+    url: "https://docs.pytorch.org/docs/stable/generated/torch.nn.Conv2d.html",
+  },
   PYTORCH_TRANSFORMER: {
     title: "torch.nn.Transformer",
     authors: "PyTorch Docs",
@@ -309,7 +314,7 @@ const CONTENT_CREDIBILITY = {
       "输出尺寸公式以 PyTorch Conv2d 和 CS231n 卷积定义为准。",
       "Sobel/Laplacian 等固定滤波器是图像处理直觉，不代表 CNN 一定学到同样卷积核。",
     ],
-    sources: ["CS231N", "PYTORCH_NN", "LENET1998", "D2L"],
+    sources: ["CS231N", "PYTORCH_CONV2D", "LENET1998", "D2L"],
   },
   "part3/01_rnn_intuition": {
     level: "A",
@@ -626,10 +631,6 @@ function applyMotionReveal(root = app, options = {}) {
     ".course-article > .summary",
     ".course-article > .tag-row",
     ".student-route-card",
-    ".course-progress-list",
-    ".course-next-actions",
-    ".course-console-cta",
-    ".mode-switcher",
     ".reading-section",
     ".lesson-card",
     ".zero-basics-card",
@@ -638,7 +639,6 @@ function applyMotionReveal(root = app, options = {}) {
     ".practice-callout",
     ".note-item",
     ".interactive-lab",
-    ".course-aside",
     ".console-hero",
     ".console-task-strip",
     ".console-purpose-strip",
@@ -2721,6 +2721,64 @@ const SOURCE_ANNOTATED_LESSONS = {
       "误区 2：backward 会自动更新参数。正确顺序是 backward 计算梯度，optimizer.step 才更新参数。",
       "误区 3：梯度越大越好。梯度太大可能爆炸，太小可能消失，要结合 loss 曲线和参数更新看。",
       "误区 4：loss 不降就一定是模型不够大。很多时候是 shape、学习率、zero_grad 或参数没有接入优化器出了问题。",
+    ],
+  },
+  "part2/01_convolution_visual": {
+    title: "来源标注版：卷积到底在图像上找什么",
+    lead: "这篇把卷积从“一个小窗口在图片上滑来滑去”讲到“为什么 CNN 能高效提取局部特征”。来源标符用于校对卷积定义、输出尺寸、PyTorch 参数含义和经典 CNN 的历史位置。",
+    sources: [
+      { marker: "S1", sourceId: "CS231N", note: "卷积层、stride、padding、感受野和 CNN 直觉" },
+      { marker: "S2", sourceId: "PYTORCH_CONV2D", note: "Conv2d 的输入输出形状、stride、padding、dilation、groups" },
+      { marker: "S3", sourceId: "D2L", note: "从图像任务解释卷积、通道和池化" },
+      { marker: "S4", sourceId: "LENET1998", note: "早期 CNN 在视觉识别中的历史位置" },
+    ],
+    sections: [
+      {
+        title: "一、卷积核：一个会重复使用的局部探测器",
+        paragraphs: [
+          { text: "卷积可以先理解成拿一个小模板在图像上逐块比较。每到一个位置，就把窗口里的像素和卷积核里的权重逐项相乘再求和，得到输出特征图上的一个数。", refs: ["S1", "S3"] },
+          { text: "如果这个卷积核像“竖直边缘探测器”，它滑到竖直边缘附近时响应会更强；滑到平坦区域时响应会弱。这就是页面里某些格子变亮的原因。", refs: ["S1"] },
+          { text: "真实 CNN 里的卷积核通常不是手工写死的 Sobel 核，而是训练过程中从数据里学出来的权重。固定核只是在入门时帮助你看懂局部模式匹配。", refs: ["S1", "S3"] },
+        ],
+        formula: "输出位置值 = Σ(输入窗口像素 × 卷积核权重)",
+        prompt: "操作建议：切换不同卷积核，观察特征图哪里变亮。先猜“它应该找边缘、模糊还是锐化”，再看输出是否支持你的猜测。",
+      },
+      {
+        title: "二、stride 和 padding：控制窗口怎么走、边界怎么看",
+        paragraphs: [
+          { text: "stride 决定卷积核每次移动几格。stride 越大，输出越小，计算更少，但也更容易跳过细节。padding 决定是否在图像边缘补一圈值，让边界像素也有机会被充分看见。", refs: ["S1", "S2"] },
+          { text: "输出尺寸不是凭感觉来的，而是由输入大小、卷积核大小、padding、stride 和 dilation 共同决定。PyTorch 的 Conv2d 文档给出了这些参数的工程定义。", refs: ["S2"] },
+          { text: "页面调 stride/padding 时，最该看的不是图漂不漂亮，而是输出尺寸是否变化、边缘信息是否被保留。", refs: ["S1", "S2"] },
+        ],
+        formula: "H_out = floor((H_in + 2P - K) / S) + 1",
+        prompt: "操作建议：把 stride 从 1 调到 2，再打开/关闭 padding。观察输出网格尺寸和边缘响应，解释为什么少走几步会让输出变小。",
+      },
+      {
+        title: "三、多通道：彩色图不是一张图，而是多层证据",
+        paragraphs: [
+          { text: "彩色图像通常有多个通道，比如 RGB 三个颜色通道。卷积核也要跨通道工作：它不是只看一张灰度图，而是把不同通道里的局部证据合起来。", refs: ["S2", "S3"] },
+          { text: "一个输出通道可以理解成一种探测器的响应图；多个输出通道就是多个探测器同时工作。浅层可能偏向边缘和纹理，深层会逐渐组合成更复杂的形状线索。", refs: ["S1", "S3"] },
+          { text: "所以特征图不是原图副本，而是模型认为“这里有某种局部证据”的地图。", refs: ["S1"] },
+        ],
+        formula: "Conv2d 输入常见形状：[B, C_in, H, W]，输出：[B, C_out, H_out, W_out]",
+        prompt: "操作建议：在页面里把输出响应当作“证据强度图”看。问自己：这个通道像是在看边缘、纹理，还是亮暗变化？",
+      },
+      {
+        title: "四、为什么 CNN 要这样设计：局部连接和参数共享",
+        paragraphs: [
+          { text: "全连接层会让每个像素都和每个输出相连，参数很多，也不利用图像的局部结构。卷积层假设局部邻域很重要，并且同一个局部探测器可以在整张图上重复使用。", refs: ["S1", "S3"] },
+          { text: "这就是参数共享：同一个卷积核在不同位置复用。它让 CNN 更适合处理图像这类有空间结构的数据，也让早期 CNN 能在视觉识别任务中取得实用效果。", refs: ["S1", "S4"] },
+          { text: "但这也是一种假设。对没有局部空间结构的数据，卷积不一定天然合适；对复杂视觉任务，也需要多层卷积、非线性和训练数据共同工作。", refs: ["S1", "S3"] },
+        ],
+        formula: "局部连接 + 参数共享 = 更少参数 + 更强空间归纳偏置",
+        prompt: "操作建议：看完卷积动画后，去中央控制台比较 Linear 和 Conv 预设。思考：为什么图像任务里卷积层通常比纯全连接更省参数？",
+      },
+    ],
+    pitfalls: [
+      "误区 1：卷积就是裁剪图片。正确理解：卷积是在每个局部窗口上计算响应。",
+      "误区 2：卷积核只能找边缘。固定边缘核是教学例子，训练出的核会随任务变化。",
+      "误区 3：padding 只是为了好看。padding 会改变边界像素参与计算的机会，也影响输出尺寸。",
+      "误区 4：stride 越大越好。stride 大会省计算，但可能丢失细节。",
     ],
   },
 };
@@ -5644,27 +5702,27 @@ async function renderCourse(id) {
             <div><dt>源码路径</dt><dd>${escapeHtml(module.sourcePath)}</dd></div>
           </dl>
         </details>
-        <div class="course-next-actions">
-          ${adjacent.previous ? `<a class="ghost-action" href="${moduleHref(adjacent.previous)}">上一节</a>` : `<a class="ghost-action" href="#starter">新手路径</a>`}
-          ${adjacent.next ? `<a class="action" data-testid="next-lesson" href="${moduleHref(adjacent.next)}">下一节</a>` : `<a class="action" data-testid="next-lesson" href="#path">回到路径</a>`}
-          <a class="ghost-action" href="#path">返回本路径</a>
-          <a class="ghost-action" href="#courses">全站课程目录</a>
+        <div class="mode-switcher" aria-label="学习模式切换">
+          <span>显示模式</span>
+          <button type="button" data-learning-mode="beginner" data-testid="mode-beginner" class="${mode === "beginner" ? "is-active" : ""}">新手模式</button>
+          <button type="button" data-learning-mode="advanced" data-testid="mode-advanced" class="${mode === "advanced" ? "is-active" : ""}">进阶模式</button>
+          <p>新手模式隐藏硬核笔记、LLM 接线图和源码；进阶模式完整展开。</p>
         </div>
         <div class="course-learning-actions" data-learning-actions data-testid="learning-actions">
           <button class="action" type="button" data-mark-understood="${escapeHtml(module.id)}" data-testid="mark-understood">${isUnderstood ? "已标记理解" : "我已理解"}</button>
           <button class="ghost-action" type="button" data-mark-review="${escapeHtml(module.id)}" data-testid="mark-review">${isReview ? "已加入复习" : "加入复习"}</button>
           <p data-learning-status data-testid="learning-status">${isUnderstood ? "这节已进入你的本地学习记录。" : "学完动画、实验和 3 分钟版讲义后，再点“我已理解”。"}</p>
         </div>
+        <div class="course-next-actions">
+          ${adjacent.previous ? `<a class="ghost-action" href="${moduleHref(adjacent.previous)}">上一节</a>` : `<a class="ghost-action" href="#starter">新手路径</a>`}
+          ${adjacent.next ? `<a class="action" data-testid="next-lesson" href="${moduleHref(adjacent.next)}">下一节</a>` : `<a class="action" data-testid="next-lesson" href="#path">回到路径</a>`}
+          <a class="ghost-action" href="#path">返回本路径</a>
+          <a class="ghost-action" href="#courses">全站课程目录</a>
+        </div>
         <div class="course-console-cta">
           <strong>什么时候去控制台？</strong>
           <p>${escapeHtml(`完成动画和动手实验后，再去控制台复现“${module.title}”的关键变量。目标不是换页面，而是验证你能预测变化。`)}</p>
           <a class="action" href="${consoleHref(module)}">去控制台完成 1 个验证</a>
-        </div>
-        <div class="mode-switcher" aria-label="学习模式切换">
-          <span>显示模式</span>
-          <button type="button" data-learning-mode="beginner" data-testid="mode-beginner" class="${mode === "beginner" ? "is-active" : ""}">新手模式</button>
-          <button type="button" data-learning-mode="advanced" data-testid="mode-advanced" class="${mode === "advanced" ? "is-active" : ""}">进阶模式</button>
-          <p>新手模式隐藏硬核笔记、LLM 接线图和源码；进阶模式完整展开。</p>
         </div>
       </aside>
     </section>
