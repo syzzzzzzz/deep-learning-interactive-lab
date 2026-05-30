@@ -1595,12 +1595,16 @@ def check_content_credibility_system() -> None:
             "https://arxiv.org/abs/1406.1078",
         ],
         Path("deep_learning_book/part4_transformer/02_multihead_visual.md"): [
+            "来源标注版：多头注意力到底多在哪里",
+            "[S1] Vaswani et al., Attention Is All You Need",
             "内容可信度与来源",
             "可信度：已校对",
             "https://arxiv.org/abs/1706.03762",
             "https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html",
         ],
         Path("docs/legacy_book/part4_transformer/02_multihead_visual.md"): [
+            "来源标注版：多头注意力到底多在哪里",
+            "[S1] Vaswani et al., Attention Is All You Need",
             "内容可信度与来源",
             "可信度：已校对",
             "https://arxiv.org/abs/1706.03762",
@@ -1624,16 +1628,19 @@ def check_content_credibility_system() -> None:
         "张量与梯度到底在发生什么",
         "卷积到底在图像上找什么",
         "RNN 到底记住了什么",
+        "多头注意力到底多在哪里",
         "线性代数：看懂 shape",
         "卷积核：一个会重复使用的局部探测器",
         "隐藏状态：RNN 的记忆不是仓库，而是压缩摘要",
+        "每个 head：不是复制粘贴，而是不同子空间的并行观察",
         "PYTORCH_TENSOR",
         "PYTORCH_CONV2D",
         "PYTORCH_RNN",
+        "PYTORCH_SDPA",
     ):
         if fragment not in site_js:
             failures.append(f"assets/site.js: 缺少来源标注正文 {fragment}")
-    for source_id in ("PYTORCH_TENSOR", "PYTORCH_CONV2D", "PYTORCH_RNN", "CS231N", "LSTM1997", "CHO2014", "GRADCAM2017", "MDN_HTTP", "POSTGRES", "OSTEP"):
+    for source_id in ("PYTORCH_TENSOR", "PYTORCH_CONV2D", "PYTORCH_RNN", "PYTORCH_SDPA", "PYTORCH_TRANSFORMER", "CS231N", "LSTM1997", "CHO2014", "VAS2017", "GRADCAM2017", "MDN_HTTP", "POSTGRES", "OSTEP"):
         if source_id not in site_js:
             failures.append(f"assets/site.js: 来源库缺少 {source_id}")
     for fragment in (".credibility-section", ".credibility-badge.level-a", ".reference-list"):

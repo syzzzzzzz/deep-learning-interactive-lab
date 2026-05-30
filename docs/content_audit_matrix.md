@@ -55,7 +55,7 @@
 | 页面 | 状态 | 来源组 | 下一步 |
 |---|---|---|---|
 | 注意力机制 | A | Vaswani 2017 / Bahdanau 2015 / PyTorch SDPA / D2L | 已完成第一版来源尾注；后续可继续精修讲义连贯性。 |
-| 多头注意力可视化 | A | Vaswani 2017 / PyTorch SDPA / PyTorch Transformer / D2L | 已校对 head 数、维度整除、拼接投影；补充 head 专门化不是必然解释的边界。 |
+| 多头注意力可视化 | A | Vaswani 2017 / PyTorch SDPA / PyTorch Transformer / D2L | 已重写来源标注正文，校对 head 数、维度整除、拼接投影；补充 head 专门化不是必然解释的边界。 |
 | 编码器与解码器 | B | Vaswani 2017 / D2L | 校对 causal mask、cross-attention、位置编码。 |
 | 最小 Transformer | B | Vaswani 2017 / PyTorch Transformer | 校对最小实现、残差、LayerNorm、FFN。 |
 | Flash Attention | B | Dao 2022 / PyTorch SDPA | 校对 exact attention、IO-aware、适用硬件边界。 |

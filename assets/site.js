@@ -2849,6 +2849,74 @@ const SOURCE_ANNOTATED_LESSONS = {
       "误区 4：LSTM/GRU 只是 RNN 的高级写法。它们的关键是用门控改善长期依赖和状态更新。",
     ],
   },
+  "part4/02_multihead_visual": {
+    title: "来源标注版：多头注意力到底多在哪里",
+    lead: "这篇把多头注意力从“多个头一起看”讲清楚为“把同一个 token 表示投影到多个子空间，分别计算 scaled dot-product attention，再拼接回模型维度”。来源标符用于校对 Transformer 原论文、PyTorch scaled_dot_product_attention、Transformer API 和 D2L 的教学解释。",
+    sources: [
+      { marker: "S1", sourceId: "VAS2017", note: "scaled dot-product attention、多头注意力和输出投影" },
+      { marker: "S2", sourceId: "PYTORCH_SDPA", note: "scaled_dot_product_attention 的输入形状、mask、dropout 和缩放" },
+      { marker: "S3", sourceId: "PYTORCH_TRANSFORMER", note: "Transformer 模块中的注意力接口和工程参数" },
+      { marker: "S4", sourceId: "D2L", note: "注意力机制和多头注意力的教学推导" },
+    ],
+    sections: [
+      {
+        title: "一、先别急着多头：单头注意力在做加权取信息",
+        paragraphs: [
+          { text: "单头注意力先让 query 和 key 做相似度匹配，再用 softmax 把分数变成权重，最后按权重汇总 value。页面热力图中，每一行是一个 query token，每一列是它正在看的 key token。", refs: ["S1", "S4"] },
+          { text: "颜色越深，表示这个 query 从对应 key/value 位置取走的信息比例越大。它不是直接说“模型因果上只靠这个词”，而是告诉你这一层这一头的加权分配。", refs: ["S1", "S2"] },
+          { text: "如果只用单头，模型同一时刻只有一套相似度空间；它可以学到关系，但表达通道比较单一。", refs: ["S1", "S4"] },
+        ],
+        formula: "Attention(Q,K,V)=softmax(QK^T / sqrt(d_k))V",
+        prompt: "操作建议：先选择一个 query token，再看热力图这一行。问自己：它主要从哪几个 token 取信息？这些 token 在句子里是什么关系？",
+      },
+      {
+        title: "二、每个 head：不是复制粘贴，而是不同子空间的并行观察",
+        paragraphs: [
+          { text: "多头注意力会把 d_model 投影成多组 Q/K/V。每个 head 都在自己的子空间里计算注意力，因此有机会关注局部邻近、语义相关、句法依赖或指代关系等不同线索。", refs: ["S1", "S4"] },
+          { text: "如果 d_model=512、head=8，那么常见拆分是每头 d_k=64。head 数必须和模型维度配合，否则无法整齐拆分和拼回。", refs: ["S1", "S3"] },
+          { text: "页面里的多头小热力图应横向比较：别只看哪个颜色最深，要看不同 head 是否形成了不同关注模式。", refs: ["S1", "S4"] },
+        ],
+        formula: "head_i = Attention(QW_i^Q, KW_i^K, VW_i^V)",
+        prompt: "操作建议：把“多头注意力锐度”从低调到高，再逐个看每个 head。观察它们是都盯同一列，还是分散到不同关系。",
+      },
+      {
+        title: "三、为什么要除以 sqrt(d_k)：防止 softmax 过早变尖",
+        paragraphs: [
+          { text: "Q 和 K 的点积会随维度变大而变大。如果不缩放，softmax 很容易变得极尖，导致少数位置权重接近 1，其他位置几乎没有梯度。", refs: ["S1", "S2"] },
+          { text: "除以 sqrt(d_k) 是 scaled dot-product attention 的关键细节。它不是装饰项，而是在维度增大时保持分数尺度更稳定。", refs: ["S1", "S2"] },
+          { text: "页面中的锐度控件相当于让你感受 softmax 温度变化：权重太平，信息选择不明确；权重太尖，又可能过早忽略其他上下文。", refs: ["S2", "S4"] },
+        ],
+        formula: "scores = QK^T / sqrt(d_k)",
+        prompt: "操作建议：把锐度调到最低和最高各看一次。最低时注意力是否太平均？最高时是否几乎只剩一个格子发亮？",
+      },
+      {
+        title: "四、拼接与输出投影：多头结果还要重新混合",
+        paragraphs: [
+          { text: "每个 head 得到的是一个局部上下文表示。多头注意力会把这些表示 concat 到一起，再通过输出投影 W_O 混合，回到模型主干需要的维度。", refs: ["S1", "S3"] },
+          { text: "所以多头不是简单投票，也不是把几个热力图摆出来就结束。真正进入下一层的是拼接并投影后的向量。", refs: ["S1", "S3"] },
+          { text: "看源码时，最容易漏掉的是 transpose、view/reshape、contiguous 这些形状操作；它们决定 [B, H, T, d_k] 能否正确变回 [B, T, d_model]。", refs: ["S2", "S3"] },
+        ],
+        formula: "MultiHead(Q,K,V)=Concat(head_1,...,head_h)W_O",
+        prompt: "操作建议：在源码对照里找 split heads、merge heads 和输出投影。把每一步的 shape 写在旁边，确认没有把 head 维和 token 维混掉。",
+      },
+      {
+        title: "五、热力图能解释一些现象，但不是完整因果解释",
+        paragraphs: [
+          { text: "注意力权重很适合作为学习线索：它告诉你某一层某一头在这次前向里怎样分配 value。但它不能单独证明模型为什么给出最终答案。", refs: ["S1", "S4"] },
+          { text: "不同 head 可能学到可命名模式，也可能只是分担计算。把每个 head 都强行解释成语法、语义、位置，会让初学者误以为可视化比模型本身更确定。", refs: ["S1", "S4"] },
+          { text: "工程上更稳的做法是同时看 mask、位置编码、层数、残差、输出变化和任务指标。热力图是入口，不是判决书。", refs: ["S2", "S3"] },
+        ],
+        formula: "可视化线索 ≠ 完整因果解释",
+        prompt: "操作建议：切换 query token 后比较热力图。如果两个 head 看起来相似，不要急着说它们冗余，先看输出和下一层是否仍有差异。",
+      },
+    ],
+    pitfalls: [
+      "误区 1：head 越多越好。head 多会增加并行子空间，但每头维度变小，也会带来计算和调参成本。",
+      "误区 2：颜色越深就一定是最终答案原因。注意力权重是线索，不是完整因果解释。",
+      "误区 3：多头只是重复计算。正确理解是不同投影子空间的并行信息选择。",
+      "误区 4：scaled dot-product attention 的缩放可有可无。缩放会影响 softmax 尖锐程度和训练稳定性。",
+    ],
+  },
 };
 
 function renderSourceMarker(article, marker) {

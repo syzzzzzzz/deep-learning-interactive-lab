@@ -1,5 +1,58 @@
 # 第二章：Multi-Head Attention 完整实现与权重可视化
 
+## 来源标注版：多头注意力到底多在哪里
+
+**这一节真正要学的不是“多个头一起看”这句口号，而是：同一组 token 表示会被投影到多个子空间，每个 head 各自计算 scaled dot-product attention，最后再拼接并投影回模型维度。** 这份正文对照 Transformer 原论文、PyTorch `scaled_dot_product_attention`、PyTorch `Transformer` API 和 D2L；页面中的多头热力图是教学切片，不能单独当成完整因果解释。[S1][S2][S3][S4]
+
+来源标符：
+
+- [S1] Vaswani et al., Attention Is All You Need: https://arxiv.org/abs/1706.03762
+- [S2] PyTorch `torch.nn.functional.scaled_dot_product_attention`: https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
+- [S3] PyTorch `torch.nn.Transformer`: https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html
+- [S4] Dive into Deep Learning, Attention Mechanisms: https://d2l.ai/chapter_attention-mechanisms-and-transformers/index.html
+
+### 1. 单头注意力：先把“看谁”变成权重
+
+单头注意力会让 query 和 key 做相似度匹配，再用 softmax 把分数变成权重，最后按权重汇总 value。页面热力图中，每一行是一个 query token，每一列是它正在看的 key token；颜色越深，表示这一格的权重越大。[S1][S2][S4]
+
+> 操作建议：先选择一个 query token，只盯热力图对应的一行。问自己：它主要从哪几个 token 取信息？这些 token 在句子里是什么关系？
+
+### 2. 每个 head：不同子空间里的并行观察
+
+多头注意力会把 `d_model` 投影成多组 Q/K/V。每个 head 都在自己的子空间里计算注意力，因此有机会关注局部邻近、语义相关、句法依赖或指代关系等不同线索。如果 `d_model=512`、`head=8`，常见拆分就是每头 `d_k=64`。[S1][S3][S4]
+
+```text
+head_i = Attention(QW_i^Q, KW_i^K, VW_i^V)
+```
+
+> 操作建议：把“多头注意力锐度”从低调到高，再逐个看每个 head。观察它们是都盯同一列，还是分散到不同关系。
+
+### 3. 缩放：为什么要除以 sqrt(d_k)
+
+Q 和 K 的点积会随维度变大而变大。如果不缩放，softmax 很容易过早变尖，少数位置权重接近 1，其他位置几乎没有梯度。除以 `sqrt(d_k)` 是 scaled dot-product attention 的关键细节，不是公式里的装饰项。[S1][S2]
+
+```text
+Attention(Q,K,V)=softmax(QK^T / sqrt(d_k))V
+```
+
+> 操作建议：把锐度调到最低和最高各看一次。最低时注意力是否太平均？最高时是否几乎只剩一个格子发亮？
+
+### 4. 拼接与输出投影：多头结果还要重新混合
+
+每个 head 得到一个局部上下文表示。多头注意力会把这些表示 concat 到一起，再通过输出投影 `W_O` 混合，回到模型主干需要的维度。真正进入下一层的不是几张热力图，而是拼接并投影后的向量。[S1][S3]
+
+```text
+MultiHead(Q,K,V)=Concat(head_1,...,head_h)W_O
+```
+
+> 操作建议：在源码对照里找 split heads、merge heads 和输出投影。把每一步的 shape 写在旁边，确认没有把 head 维和 token 维混掉。
+
+### 5. 热力图是线索，不是判决书
+
+注意力权重很适合作为学习线索：它告诉你某一层某一头在这次前向里怎样分配 value。但不同 head 可能学到可命名模式，也可能只是分担计算。把每个 head 都强行解释成语法、语义、位置，会让初学者误以为可视化比模型本身更确定。[S1][S4]
+
+> 操作建议：切换 query token 后比较热力图。如果两个 head 看起来相似，不要急着说它们冗余，先看输出和下一层是否仍有差异。
+
 ## 2.1 为什么需要多头？
 
 单头 Attention 只能关注一种"关系模式"。多头让模型同时关注多种不同的关系：

@@ -87,4 +87,15 @@ test.describe("course learning loop", () => {
     await expect(page.locator("[data-source-annotated-lesson] .source-marker").first()).toContainText("[S1]");
     await expect(page.locator("[data-source-annotated-lesson]")).toContainText("GRU");
   });
+
+  test("multihead attention lesson shows rewritten source-marked article", async ({ page }) => {
+    await page.goto("/#course/part4%2F02_multihead_visual");
+
+    await page.getByTestId("toc-reading").click();
+    await expect(page.locator("[data-source-annotated-lesson]")).toBeVisible();
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("多头注意力到底多在哪里");
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("每个 head");
+    await expect(page.locator("[data-source-annotated-lesson] .source-marker").first()).toContainText("[S1]");
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("scaled_dot_product_attention");
+  });
 });
