@@ -104,6 +104,88 @@ let motionObserver = null;
 const LEARNING_PROGRESS_KEY = "deep-learning-book-progress-v1";
 const LEARNING_MODE_KEY = "deep-learning-book-mode-v1";
 
+const SOURCE_LIBRARY = {
+  DLBOOK: {
+    title: "Deep Learning",
+    authors: "Goodfellow, Bengio, Courville",
+    url: "https://www.deeplearningbook.org/",
+  },
+  D2L: {
+    title: "Dive into Deep Learning",
+    authors: "Zhang, Lipton, Li, Smola",
+    url: "https://d2l.ai/",
+  },
+  CS231N: {
+    title: "CS231n: Convolutional Neural Networks for Visual Recognition",
+    authors: "Stanford",
+    url: "https://cs231n.github.io/",
+  },
+  CS224N: {
+    title: "CS224n: Natural Language Processing with Deep Learning",
+    authors: "Stanford",
+    url: "https://web.stanford.edu/class/cs224n/",
+  },
+  PYTORCH_SDPA: {
+    title: "torch.nn.functional.scaled_dot_product_attention",
+    authors: "PyTorch Docs",
+    url: "https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html",
+  },
+  PYTORCH_TRANSFORMER: {
+    title: "torch.nn.Transformer",
+    authors: "PyTorch Docs",
+    url: "https://pytorch.org/docs/stable/generated/torch.nn.Transformer.html",
+  },
+  VAS2017: {
+    title: "Attention Is All You Need",
+    authors: "Vaswani et al., 2017",
+    url: "https://arxiv.org/abs/1706.03762",
+  },
+  BAH2015: {
+    title: "Neural Machine Translation by Jointly Learning to Align and Translate",
+    authors: "Bahdanau, Cho, Bengio, 2015",
+    url: "https://arxiv.org/abs/1409.0473",
+  },
+  DAO2022: {
+    title: "FlashAttention: Fast and Memory-Efficient Exact Attention with IO-Awareness",
+    authors: "Dao et al., 2022",
+    url: "https://arxiv.org/abs/2205.14135",
+  },
+};
+
+const CONTENT_CREDIBILITY = {
+  "part4/01_attention_mechanism": {
+    level: "A",
+    label: "已校对样板",
+    summary: "公式、历史脉络和 PyTorch API 已对照公开来源。页面中的热力图仍是教学演示，不等价于完整因果解释。",
+    boundaries: [
+      "Q/K/V 与缩放点积公式以 Transformer 原论文和 PyTorch scaled_dot_product_attention 文档为基准。",
+      "页面中的随机张量和热力图用于说明形状、归一化和 mask，不代表真实训练好的模型权重。",
+      "注意力权重只能提供线索；残差、MLP、LayerNorm 和后续层也会继续改写表示。",
+    ],
+    sources: ["VAS2017", "BAH2015", "PYTORCH_SDPA", "D2L"],
+  },
+  "part4/transformer_models": {
+    level: "B",
+    label: "教学简化",
+    summary: "页面覆盖自注意力、多头、位置编码和 BERT/GPT 对比，但部分热力图和多头模式是教学化生成。",
+    boundaries: [
+      "适合建立机制直觉，不适合作为真实模型解释结论。",
+      "BERT/GPT 对比需要继续补论文和官方实现来源。",
+    ],
+    sources: ["VAS2017", "PYTORCH_TRANSFORMER", "D2L"],
+  },
+  default: {
+    level: "C",
+    label: "待复核",
+    summary: "这一页已完成教学结构整理，但还没有逐条对照公开来源校订。",
+    boundaries: [
+      "请把页面内容当作学习笔记和交互演示，关键结论建议再对照公开教材、论文或官方文档。",
+      "旧脚本迁移内容可能包含简化实现、模拟数据或早期讲义口吻。",
+    ],
+    sources: ["D2L", "DLBOOK"],
+  },
+};
+
 const images = [
   "https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=900&auto=format&fit=crop",
   "https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=900&auto=format&fit=crop",
@@ -2188,6 +2270,57 @@ function legacyMarkdownPath(module) {
 
 function hasLegacyMarkdown(module) {
   return legacyMarkdownCandidates(module).length > 0;
+}
+
+function moduleCredibility(module) {
+  return CONTENT_CREDIBILITY[module.id] || CONTENT_CREDIBILITY.default;
+}
+
+function renderSourceReferences(sourceIds) {
+  return sourceIds
+    .map((id) => {
+      const source = SOURCE_LIBRARY[id];
+      if (!source) return "";
+      return `
+        <li>
+          <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">${escapeHtml(id)} · ${escapeHtml(source.title)}</a>
+          <span>${escapeHtml(source.authors)}</span>
+        </li>
+      `;
+    })
+    .join("");
+}
+
+function renderCredibilitySection(module) {
+  const credibility = moduleCredibility(module);
+  const levelClass = `level-${credibility.level.toLowerCase()}`;
+  return `
+    <section id="course-credibility" class="reading-section credibility-section course-anchor-section" data-content-credibility>
+      <div class="credibility-head">
+        <div>
+          <div class="section-kicker">内容可信度</div>
+          <h2>这页内容可信到什么程度？</h2>
+        </div>
+        <span class="credibility-badge ${levelClass}">${escapeHtml(credibility.level)} · ${escapeHtml(credibility.label)}</span>
+      </div>
+      <p class="summary">${escapeHtml(credibility.summary)}</p>
+      <div class="credibility-grid">
+        <article>
+          <strong>边界说明</strong>
+          <ul>
+            ${credibility.boundaries.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+          </ul>
+        </article>
+        <article>
+          <strong>本页参考来源</strong>
+          <ol class="reference-list">
+            ${renderSourceReferences(credibility.sources)}
+          </ol>
+          <p class="source-note">来源用于校对定义、公式、历史和 API 边界；本站文字为重新整理的学习讲义，不复制外部书籍正文。</p>
+        </article>
+      </div>
+    </section>
+  `;
 }
 
 function renderLessonDeepDiveShell(module) {
@@ -4977,6 +5110,7 @@ async function renderCourse(id) {
     ["course-animation", "概念动画"],
     ["course-lab", "动手实验"],
     ["course-reading", "章节精读"],
+    ["course-credibility", "可信度与来源"],
     ...(mode === "advanced" ? [["course-source", "开发者信息"]] : []),
   ];
   app.innerHTML = `
@@ -5018,6 +5152,7 @@ async function renderCourse(id) {
         <section id="course-reading" class="course-anchor-section">
           ${renderLessonDeepDiveShell(module)}
         </section>
+        ${renderCredibilitySection(module)}
         ${renderKnowledgeSections(module)}
         ${isLLMCookbookRelevant(module) ? `<div class="advanced-only">${renderLLMCookbookBridge(module)}</div>` : ""}
 

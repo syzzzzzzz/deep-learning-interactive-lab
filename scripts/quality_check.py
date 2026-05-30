@@ -1270,6 +1270,14 @@ def check_static_html_site() -> None:
         "function renderConceptAnimation",
         "function renderKnowledgeSections",
         "function renderLessonDeepDiveShell",
+        "SOURCE_LIBRARY",
+        "CONTENT_CREDIBILITY",
+        "function renderCredibilitySection",
+        "data-content-credibility",
+        "内容可信度",
+        "本页参考来源",
+        "Attention Is All You Need",
+        "torch.nn.functional.scaled_dot_product_attention",
         "function parseLegacyMarkdown",
         "function extractSourceTexts",
         "function parseSourceLessonNotes",
@@ -1470,6 +1478,49 @@ def check_static_html_site() -> None:
     print("[通过] 静态 HTML 站点检查：首页、CSS、JS 路由、原生交互实验、返回入口、启动脚本和配色约束均正常")
 
 
+def check_content_credibility_system() -> None:
+    failures: list[str] = []
+    source_catalog = read_text(Path("docs/references/source_catalog.md"))
+    credibility_doc = read_text(Path("docs/content_credibility.md"))
+    attention_md = read_text(Path("deep_learning_book/part4_transformer/01_attention_mechanism.md"))
+    attention_legacy_md = read_text(Path("docs/legacy_book/part4_transformer/01_attention_mechanism.md"))
+    site_js = read_text(Path("assets/site.js"))
+    site_css = read_text(Path("assets/site.css"))
+
+    for fragment in (
+        "Attention Is All You Need",
+        "Neural Machine Translation by Jointly Learning to Align and Translate",
+        "torch.nn.functional.scaled_dot_product_attention",
+        "Dive into Deep Learning",
+        "不复制受版权保护书籍或非授权资源站正文",
+    ):
+        if fragment not in source_catalog:
+            failures.append(f"docs/references/source_catalog.md: 缺少来源或版权边界 {fragment}")
+
+    for fragment in ("已校对", "教学简化", "待复核", "强结论要有边界"):
+        if fragment not in credibility_doc:
+            failures.append(f"docs/content_credibility.md: 缺少可信度规范 {fragment}")
+
+    for rel_path, text in (
+        ("deep_learning_book/part4_transformer/01_attention_mechanism.md", attention_md),
+        ("docs/legacy_book/part4_transformer/01_attention_mechanism.md", attention_legacy_md),
+    ):
+        for fragment in ("内容可信度与来源", "已校对样板", "https://arxiv.org/abs/1706.03762", "https://arxiv.org/abs/1409.0473"):
+            if fragment not in text:
+                failures.append(f"{rel_path}: 注意力样板缺少来源尾注 {fragment}")
+
+    for fragment in ("SOURCE_LIBRARY", "CONTENT_CREDIBILITY", "renderCredibilitySection", "data-content-credibility"):
+        if fragment not in site_js:
+            failures.append(f"assets/site.js: 缺少可信度渲染能力 {fragment}")
+    for fragment in (".credibility-section", ".credibility-badge.level-a", ".reference-list"):
+        if fragment not in site_css:
+            failures.append(f"assets/site.css: 缺少可信度样式 {fragment}")
+
+    if failures:
+        raise CheckFailure("内容可信度系统检查失败：\n" + "\n".join(failures))
+    print("[通过] 内容可信度系统检查：来源库、可信度规范、注意力样板和前端来源区均已接入")
+
+
 def check_zero_basics_teaching_notes() -> None:
     js_text = read_text(Path("assets/site.js"))
     failures: list[str] = []
@@ -1484,7 +1535,12 @@ def check_zero_basics_teaching_notes() -> None:
             modules_match.group(1),
         )
     ]
-    note_ids = set(re.findall(r'"(part\d+/[^"]+)":\s*\{', js_text))
+    notes_match = re.search(r"const MODULE_TEACHING_NOTES = \{(.*?)\n\};\n\nfunction lessonDomain", js_text, re.S)
+    if not notes_match:
+        raise CheckFailure("零基础十二问覆盖检查失败：assets/site.js 缺少 MODULE_TEACHING_NOTES 块")
+    notes_text = notes_match.group(1)
+
+    note_ids = set(re.findall(r'"(part\d+/[^"]+)":\s*\{', notes_text))
     missing = [module_id for module_id in module_ids if module_id not in note_ids]
     if missing:
         failures.append("缺少 MODULE_TEACHING_NOTES 人工答案种子：" + "、".join(missing))
@@ -1503,7 +1559,7 @@ def check_zero_basics_teaching_notes() -> None:
         "consoleTask",
     ]
     for module_id in module_ids:
-        block_match = re.search(rf'"{re.escape(module_id)}":\s*\{{(.*?)\n\s*\}},', js_text, re.S)
+        block_match = re.search(rf'"{re.escape(module_id)}":\s*\{{(.*?)\n\s*\}},', notes_text, re.S)
         if not block_match:
             continue
         block = block_match.group(1)
@@ -2253,6 +2309,7 @@ def run_checks(include_smoke: bool) -> None:
     check_expected_controls()
     check_expected_content()
     check_static_html_site()
+    check_content_credibility_system()
     check_zero_basics_teaching_notes()
     check_visual_system_integration()
     check_playground_codegen()

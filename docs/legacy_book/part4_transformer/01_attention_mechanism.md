@@ -405,3 +405,14 @@ demonstrate_causal_mask()
 | 3 | / √d_k | [B,T,T] | [B,T,T] | 防止 softmax 饱和 |
 | 4 | softmax | [B,T,T] | [B,T,T] | 归一化为概率 |
 | 5 | A @ V | [B,T,T] @ [B,T,d_v] | [B,T,d_v] | 加权聚合信息 |
+
+## 内容可信度与来源
+
+**可信度：已校对样板。** 本节公式、Q/K/V 解释、缩放点积注意力和因果 mask 的主线，已对照 Transformer 原论文、早期注意力论文和 PyTorch 官方 API。页面中的随机张量、热力图和 mask 图是教学演示，用来说明形状、归一化和信息可见性，不代表某个真实训练模型的完整解释。
+
+参考来源：
+
+- Vaswani et al., 2017. *Attention Is All You Need*. https://arxiv.org/abs/1706.03762
+- Bahdanau, Cho, Bengio, 2015. *Neural Machine Translation by Jointly Learning to Align and Translate*. https://arxiv.org/abs/1409.0473
+- PyTorch Docs. `torch.nn.functional.scaled_dot_product_attention`. https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html
+- Dive into Deep Learning. https://d2l.ai/
