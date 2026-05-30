@@ -54,4 +54,15 @@ test.describe("course learning loop", () => {
     await expect(page.locator("[data-source-annotated-lesson] .source-marker").first()).toContainText("[S1]");
     await expect(page.locator("[data-source-annotated-lesson]")).toContainText("PyTorch");
   });
+
+  test("math primer shows rewritten source-marked article", async ({ page }) => {
+    await page.goto("/#course/part1%2Fmath_primer");
+
+    await page.getByTestId("toc-reading").click();
+    await expect(page.locator("[data-source-annotated-lesson]")).toBeVisible();
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("为什么深度学习要先补这点数学");
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("线性代数：看懂 shape");
+    await expect(page.locator("[data-source-annotated-lesson] .source-marker").first()).toContainText("[S1]");
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("梯度下降");
+  });
 });

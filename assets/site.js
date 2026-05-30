@@ -2596,6 +2596,64 @@ function renderCredibilitySection(module) {
 }
 
 const SOURCE_ANNOTATED_LESSONS = {
+  "part1/math_primer": {
+    title: "来源标注版：为什么深度学习要先补这点数学",
+    lead: "这篇不是把数学教材压缩成几段，而是把后面真正会反复用到的四个工具先放到桌面上：shape、变化率、不确定性、下降方向。每个来源标符都对应公开教材或官方课程，用来校对定义、公式和教学边界。",
+    sources: [
+      { marker: "S1", sourceId: "D2L", note: "线性代数、微积分、概率、自动微分和优化章节" },
+      { marker: "S2", sourceId: "DLBOOK", note: "深度学习数学基础、优化和概率背景" },
+      { marker: "S3", sourceId: "MLCC", note: "梯度下降、损失曲线和机器学习直觉" },
+      { marker: "S4", sourceId: "PYTORCH_AUTOGRAD", note: "自动求导如何把数学导数落到代码计算图" },
+    ],
+    sections: [
+      {
+        title: "一、线性代数：看懂 shape，模型才不会像玄学",
+        paragraphs: [
+          { text: "深度学习里的大多数数据都会先变成向量、矩阵或更高维张量。线性代数在这里不是为了炫公式，而是告诉你：这一排数字代表一个样本、一个通道、一组特征，还是一整批输入。", refs: ["S1", "S2"] },
+          { text: "矩阵乘法可以理解成“把一组特征重新混合成另一组特征”。输入维度和权重矩阵维度必须对得上，否则模型不是学不会，而是根本算不下去。", refs: ["S1"] },
+          { text: "所以数学基础速查页的矩阵网格和向量箭头，应该先被当作 shape 检查工具，而不是抽象符号墙。", refs: ["S1", "S2"] },
+        ],
+        formula: "X ∈ R^{B×D},  W ∈ R^{D×H},  XW ∈ R^{B×H}",
+        prompt: "操作建议：把矩阵尺寸调到不能相乘的组合，再调回能相乘。观察页面提示如何变化，思考：哪一轴是样本数，哪一轴是特征数？",
+      },
+      {
+        title: "二、微积分：导数不是考试题，而是“变一点会怎样”",
+        paragraphs: [
+          { text: "导数回答一个非常朴素的问题：如果输入只变一点点，输出会跟着怎么变。神经网络训练时，我们关心的就是参数变一点，loss 会不会变小。", refs: ["S1", "S2"] },
+          { text: "梯度是多变量函数里的导数集合。它不是最终答案，而是当前位置附近最陡的上升方向；做下降时，我们通常往反方向走。", refs: ["S1", "S3"] },
+          { text: "页面里的曲线斜率和损失地形，就是为了把“局部变化率”从公式变成可观察的坡度。", refs: ["S3"] },
+        ],
+        formula: "梯度下降：θ ← θ - η∇_θ L(θ)",
+        prompt: "操作建议：拖动学习率滑块。小学习率看速度，大学习率看震荡。不要急着记公式，先说清楚“为什么它会慢/会炸”。",
+      },
+      {
+        title: "三、概率：模型输出的不是真相，而是不确定性分配",
+        paragraphs: [
+          { text: "分类模型常输出一组分数或概率。对初学者来说，概率最重要的作用是承认不确定性：模型可能更偏向猫，但这不等于它“知道真相”。", refs: ["S1", "S2"] },
+          { text: "概率分布要求总量可解释，常见分类任务会把多个类别的置信度组织起来，再用损失函数衡量预测分布和真实标签之间的差距。", refs: ["S1", "S2"] },
+          { text: "所以页面里的概率柱状图，不应该被读成绝对事实，而应该读成“当前模型把注意力和信心分给了哪些候选”。", refs: ["S2"] },
+        ],
+        formula: "p(y=k|x) 表示给定输入 x 时类别 k 的预测概率",
+        prompt: "操作建议：改变概率演示中的分布形状，观察哪一类更高、整体是否仍能归一化。思考：最高柱子是“确定正确”，还是“当前最相信”？",
+      },
+      {
+        title: "四、梯度下降：训练不是魔法，是反复试小步",
+        paragraphs: [
+          { text: "训练模型可以先理解成在损失地形上找低处。当前位置由参数决定，高度是 loss，梯度给出局部坡度，学习率决定每次迈多大。", refs: ["S1", "S3"] },
+          { text: "这个图是教学简化：真实深度网络的损失地形维度极高，不会像页面上的 2D 或 3D 曲面那么容易看清。但低维图能帮你建立第一层直觉。", refs: ["S2", "S3"] },
+          { text: "PyTorch 等框架里的自动求导，会把“求坡度”这件事连接到实际计算图上，让你不用手写每个参数的偏导。", refs: ["S4"] },
+        ],
+        formula: "loss 下降需要同时满足：方向可用、步长合适、数据和目标没有明显错位",
+        prompt: "操作建议：把起点放在不同位置，再分别调学习率和迭代次数。观察轨迹是接近谷底、绕远，还是来回跳。把现象写成一句因果解释。",
+      },
+    ],
+    pitfalls: [
+      "误区 1：数学基础就是背公式。正确做法是把公式翻译成 shape、方向、尺度和概率。",
+      "误区 2：看见梯度下降图就以为真实训练也是二维小球。真实模型是高维参数空间，页面只是直觉模型。",
+      "误区 3：概率最高就一定正确。概率是模型当前的信心分配，不是事实本身。",
+      "误区 4：学不会数学就不能学深度学习。入门阶段先会读 shape、斜率、分布和 loss 曲线，就已经能看懂很多页面。",
+    ],
+  },
   "part1/01_tensors_gradients": {
     title: "来源标注版：张量与梯度到底在发生什么",
     lead: "这版正文是重新写给零基础读者看的，不复制外部教材正文。每个来源标符都对应一个可公开访问的教材、论文或官方文档，用来校对定义、公式、API 行为和边界。",
@@ -3243,6 +3301,7 @@ function renderSourceLessonNotes(parsed, module) {
     <div class="lesson-outline">
       ${outline.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
     </div>
+    ${renderSourceAnnotatedLesson(module)}
     ${renderThreeMinuteBrief(sections, module)}
     ${renderKnowledgePointIndex(sections, module)}
     <details class="deep-dive-details">
@@ -5591,6 +5650,11 @@ async function renderCourse(id) {
           <a class="ghost-action" href="#path">返回本路径</a>
           <a class="ghost-action" href="#courses">全站课程目录</a>
         </div>
+        <div class="course-learning-actions" data-learning-actions data-testid="learning-actions">
+          <button class="action" type="button" data-mark-understood="${escapeHtml(module.id)}" data-testid="mark-understood">${isUnderstood ? "已标记理解" : "我已理解"}</button>
+          <button class="ghost-action" type="button" data-mark-review="${escapeHtml(module.id)}" data-testid="mark-review">${isReview ? "已加入复习" : "加入复习"}</button>
+          <p data-learning-status data-testid="learning-status">${isUnderstood ? "这节已进入你的本地学习记录。" : "学完动画、实验和 3 分钟版讲义后，再点“我已理解”。"}</p>
+        </div>
         <div class="course-console-cta">
           <strong>什么时候去控制台？</strong>
           <p>${escapeHtml(`完成动画和动手实验后，再去控制台复现“${module.title}”的关键变量。目标不是换页面，而是验证你能预测变化。`)}</p>
@@ -5601,11 +5665,6 @@ async function renderCourse(id) {
           <button type="button" data-learning-mode="beginner" data-testid="mode-beginner" class="${mode === "beginner" ? "is-active" : ""}">新手模式</button>
           <button type="button" data-learning-mode="advanced" data-testid="mode-advanced" class="${mode === "advanced" ? "is-active" : ""}">进阶模式</button>
           <p>新手模式隐藏硬核笔记、LLM 接线图和源码；进阶模式完整展开。</p>
-        </div>
-        <div class="course-learning-actions" data-learning-actions data-testid="learning-actions">
-          <button class="action" type="button" data-mark-understood="${escapeHtml(module.id)}" data-testid="mark-understood">${isUnderstood ? "已标记理解" : "我已理解"}</button>
-          <button class="ghost-action" type="button" data-mark-review="${escapeHtml(module.id)}" data-testid="mark-review">${isReview ? "已加入复习" : "加入复习"}</button>
-          <p data-learning-status data-testid="learning-status">${isUnderstood ? "这节已进入你的本地学习记录。" : "学完动画、实验和 3 分钟版讲义后，再点“我已理解”。"}</p>
         </div>
       </aside>
     </section>

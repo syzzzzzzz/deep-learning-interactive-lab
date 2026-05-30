@@ -1607,7 +1607,15 @@ def check_content_credibility_system() -> None:
     for fragment in ("SOURCE_LIBRARY", "CONTENT_CREDIBILITY", "CREDIBILITY_PROFILES", "credibilityProfileForModule", "renderCredibilitySection", "data-content-credibility"):
         if fragment not in site_js:
             failures.append(f"assets/site.js: 缺少可信度渲染能力 {fragment}")
-    for fragment in ("SOURCE_ANNOTATED_LESSONS", "data-source-annotated-lesson", "正文重写 · 来源标注版", "张量与梯度到底在发生什么", "PYTORCH_TENSOR"):
+    for fragment in (
+        "SOURCE_ANNOTATED_LESSONS",
+        "data-source-annotated-lesson",
+        "正文重写 · 来源标注版",
+        "为什么深度学习要先补这点数学",
+        "张量与梯度到底在发生什么",
+        "线性代数：看懂 shape",
+        "PYTORCH_TENSOR",
+    ):
         if fragment not in site_js:
             failures.append(f"assets/site.js: 缺少张量与梯度正文来源标注 {fragment}")
     for source_id in ("PYTORCH_TENSOR", "CS231N", "LSTM1997", "GRADCAM2017", "MDN_HTTP", "POSTGRES", "OSTEP"):
