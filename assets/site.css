@@ -1819,6 +1819,175 @@ body[data-learning-mode="beginner"] .course-layout .advanced-only {
   outline: none;
 }
 
+.source-annotated-lesson {
+  margin-top: 24px;
+  border: 1px solid rgba(29, 92, 79, 0.28);
+  background: linear-gradient(180deg, #ffffff 0%, #f7fffb 100%);
+  padding: clamp(20px, 3vw, 30px);
+}
+
+.source-annotated-lesson h3 {
+  margin: 0;
+  font-family: "Noto Serif SC", serif;
+  font-size: clamp(26px, 3.6vw, 42px);
+  font-weight: 500;
+  line-height: 1.22;
+}
+
+.source-annotated-lead {
+  max-width: 760px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.source-marker-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.source-marker-strip a {
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 12px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.source-marker-strip a:hover,
+.source-marker-strip a:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid rgba(29, 92, 79, 0.18);
+  outline-offset: 2px;
+}
+
+.source-marker-strip strong,
+.source-marker-strip span,
+.source-marker-strip em {
+  display: block;
+}
+
+.source-marker-strip strong {
+  color: var(--accent-dark);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 13px;
+}
+
+.source-marker-strip span {
+  margin-top: 6px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.source-marker-strip em {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.55;
+}
+
+.source-article-sections {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.source-article-sections section {
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: clamp(18px, 2.4vw, 24px);
+}
+
+.source-article-sections h4 {
+  margin: 0 0 12px;
+  font-family: "Noto Serif SC", serif;
+  font-size: clamp(21px, 2.4vw, 28px);
+  font-weight: 500;
+  line-height: 1.32;
+}
+
+.source-article-sections p,
+.source-article-sections blockquote,
+.source-article-pitfalls li {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.82;
+}
+
+.source-article-sections p {
+  margin: 0;
+}
+
+.source-article-sections p + p,
+.source-article-sections p + .article-formula,
+.source-article-sections .article-formula + blockquote {
+  margin-top: 12px;
+}
+
+.source-marker {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid rgba(29, 92, 79, 0.26);
+  background: #eef8f2;
+  padding: 0 6px;
+  color: var(--accent-dark);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  vertical-align: baseline;
+}
+
+a.source-marker:hover,
+a.source-marker:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-dark);
+  color: #fff;
+  outline: none;
+}
+
+.article-formula {
+  overflow-x: auto;
+  border: 1px solid rgba(29, 92, 79, 0.2);
+  background: #f7fbf8;
+  padding: 12px 14px;
+  color: var(--accent-dark);
+  font-family: "JetBrains Mono", Consolas, monospace;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.source-article-sections blockquote {
+  margin: 12px 0 0;
+  border-left: 3px solid var(--accent);
+  background: #fffdf8;
+  padding: 12px 14px;
+}
+
+.source-article-pitfalls {
+  margin-top: 18px;
+  border: 1px solid var(--border);
+  background: #fffdf8;
+  padding: 18px;
+}
+
+.source-article-pitfalls strong {
+  display: block;
+  color: var(--accent-dark);
+  font-size: 17px;
+}
+
+.source-article-pitfalls ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+
 .three-minute-brief {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

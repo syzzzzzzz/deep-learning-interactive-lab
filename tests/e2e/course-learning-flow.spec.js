@@ -43,4 +43,15 @@ test.describe("course learning loop", () => {
     await page.getByTestId("mode-beginner").click();
     await expect(page.getByTestId("developer-source")).toBeHidden();
   });
+
+  test("tensor lesson shows rewritten source-marked article", async ({ page }) => {
+    await page.goto("/#course/part1%2F01_tensors_gradients");
+
+    await page.getByTestId("toc-reading").click();
+    await expect(page.locator("[data-source-annotated-lesson]")).toBeVisible();
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("来源标注版");
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("张量：先看 shape，再看数字");
+    await expect(page.locator("[data-source-annotated-lesson] .source-marker").first()).toContainText("[S1]");
+    await expect(page.locator("[data-source-annotated-lesson]")).toContainText("PyTorch");
+  });
 });

@@ -1492,6 +1492,7 @@ def check_content_credibility_system() -> None:
         "Attention Is All You Need",
         "Neural Machine Translation by Jointly Learning to Align and Translate",
         "torch.nn.functional.scaled_dot_product_attention",
+        "PYTORCH_TENSOR",
         "Dive into Deep Learning",
         "CS231n",
         "Long Short-Term Memory",
@@ -1519,7 +1520,7 @@ def check_content_credibility_system() -> None:
 
     a_level_modules = {
         "part1/math_primer": ["D2L", "DLBOOK", "MLCC", "PYTORCH_AUTOGRAD"],
-        "part1/01_tensors_gradients": ["PYTORCH_AUTOGRAD", "D2L", "DLBOOK", "PYTORCH_NN"],
+        "part1/01_tensors_gradients": ["PYTORCH_TENSOR", "PYTORCH_AUTOGRAD", "D2L", "DLBOOK", "PYTORCH_NN"],
         "part2/01_convolution_visual": ["CS231N", "PYTORCH_NN", "LENET1998", "D2L"],
         "part3/01_rnn_intuition": ["D2L", "PYTORCH_RNN", "LSTM1997", "CHO2014"],
         "part4/02_multihead_visual": ["VAS2017", "PYTORCH_SDPA", "PYTORCH_TRANSFORMER", "D2L"],
@@ -1543,14 +1544,20 @@ def check_content_credibility_system() -> None:
 
     checked_markdown_sources = {
         Path("deep_learning_book/part1_foundations/01_tensors_gradients.md"): [
+            "来源标注版：先把这篇换成一条主线",
+            "[S1] PyTorch Tensors",
             "内容可信度与来源",
             "可信度：已校对",
+            "https://docs.pytorch.org/tutorials/beginner/basics/tensorqs_tutorial.html",
             "https://pytorch.org/docs/stable/notes/autograd.html",
             "https://www.deeplearningbook.org/",
         ],
         Path("docs/legacy_book/part1_foundations/01_tensors_gradients.md"): [
+            "来源标注版：先把这篇换成一条主线",
+            "[S1] PyTorch Tensors",
             "内容可信度与来源",
             "可信度：已校对",
+            "https://docs.pytorch.org/tutorials/beginner/basics/tensorqs_tutorial.html",
             "https://pytorch.org/docs/stable/notes/autograd.html",
             "https://www.deeplearningbook.org/",
         ],
@@ -1600,7 +1607,10 @@ def check_content_credibility_system() -> None:
     for fragment in ("SOURCE_LIBRARY", "CONTENT_CREDIBILITY", "CREDIBILITY_PROFILES", "credibilityProfileForModule", "renderCredibilitySection", "data-content-credibility"):
         if fragment not in site_js:
             failures.append(f"assets/site.js: 缺少可信度渲染能力 {fragment}")
-    for source_id in ("CS231N", "LSTM1997", "GRADCAM2017", "MDN_HTTP", "POSTGRES", "OSTEP"):
+    for fragment in ("SOURCE_ANNOTATED_LESSONS", "data-source-annotated-lesson", "正文重写 · 来源标注版", "张量与梯度到底在发生什么", "PYTORCH_TENSOR"):
+        if fragment not in site_js:
+            failures.append(f"assets/site.js: 缺少张量与梯度正文来源标注 {fragment}")
+    for source_id in ("PYTORCH_TENSOR", "CS231N", "LSTM1997", "GRADCAM2017", "MDN_HTTP", "POSTGRES", "OSTEP"):
         if source_id not in site_js:
             failures.append(f"assets/site.js: 来源库缺少 {source_id}")
     for fragment in (".credibility-section", ".credibility-badge.level-a", ".reference-list"):

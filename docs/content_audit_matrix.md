@@ -13,7 +13,7 @@
 | 页面 | 状态 | 来源组 | 下一步 |
 |---|---|---|---|
 | 数学基础速查 | A | D2L / Deep Learning Book / MLCC / PyTorch Autograd | 已对照线性代数、导数、概率直觉与梯度下降边界；低维图形明确标注为教学演示。 |
-| 张量与梯度 | A | PyTorch Autograd / D2L / Deep Learning Book / PyTorch NN | 已校对 autograd、计算图、链式法则和梯度传播图；补充梯度诊断边界。 |
+| 张量与梯度 | A | PyTorch Tensor / PyTorch Autograd / D2L / Deep Learning Book / PyTorch NN | 已重写来源标注正文，校对 shape、autograd、计算图、链式法则和梯度传播图；补充梯度诊断边界。 |
 | 激活与归一化 | B | PyTorch / BatchNorm / Dropout / LayerNorm | 区分 BatchNorm、LayerNorm、Dropout 的训练/推理边界。 |
 | 数据集与优化器 | B | scikit-learn / Adam / MLCC | 校对数据划分、验证集、SGD/Adam 表述。 |
 | 机器学习基础 | B | scikit-learn / MLCC | 校对监督学习、泛化、评估指标。 |

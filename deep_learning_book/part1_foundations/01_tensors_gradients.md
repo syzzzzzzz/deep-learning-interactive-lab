@@ -2,6 +2,49 @@
 
 ---
 
+## 来源标注版：先把这篇换成一条主线
+
+**这一节真正要学的不是“张量、梯度、反向传播”三个孤立名词，而是一条训练链路：数据以张量形式进入模型，前向传播得到预测，损失函数衡量错误，自动求导沿计算图把错误拆回参数，优化器再根据梯度更新参数。** 这条主线对照了 PyTorch 张量教程、PyTorch Autograd 文档、D2L 和 Deep Learning Book；页面里的动画和代码是教学化演示，不代表真实大模型的完整训练过程。[S1][S2][S3][S4]
+
+来源标符：
+
+- [S1] PyTorch Tensors: https://docs.pytorch.org/tutorials/beginner/basics/tensorqs_tutorial.html
+- [S2] PyTorch Autograd mechanics: https://pytorch.org/docs/stable/notes/autograd.html
+- [S3] Dive into Deep Learning: https://d2l.ai/
+- [S4] Deep Learning Book: https://www.deeplearningbook.org/
+- [S5] PyTorch torch.nn API: https://pytorch.org/docs/stable/nn.html
+
+### 1. 张量：先看 shape，再看数字
+
+张量可以先理解成“带维度的数字容器”。标量是 0 维，向量是 1 维，矩阵是 2 维，图像批次常写成 `[B, C, H, W]`。对初学者来说，最重要的不是背这些名字，而是看懂每一轴代表什么：`B` 是样本数，`C` 是通道数，`H/W` 是空间尺寸。shape 对不上，后面的梯度和优化都谈不上。[S1][S3]
+
+> 操作建议：在页面里先看张量格子和 shape 变化，再看数值。把输入维度改一次，观察哪一层开始需要 reshape 或 flatten。
+
+### 2. 计算图：模型不是一行公式，而是一条可回放的计算链
+
+前向传播会把输入、参数、矩阵乘法、激活函数和损失函数连成计算图。只要张量参与了需要梯度的运算，PyTorch Autograd 就能记录这些依赖，并在 `loss.backward()` 时沿图反向计算梯度。[S2]
+
+> 操作建议：在源码里找 `requires_grad`、`loss.backward()`、`optimizer.step()`。它们分别对应“记录可求导关系”“计算梯度”“更新参数”。
+
+### 3. 梯度：它不是答案，而是当前位置的方向提示
+
+梯度回答的是：如果参数只改变一点点，损失会怎样变化。梯度为正，说明参数往增大方向动会让 loss 上升；梯度下降通常沿负梯度方向移动。学习率决定这一步迈多大：太小会慢，太大可能震荡甚至发散。[S3][S4]
+
+```text
+∂L/∂w 表示 loss 对参数 w 的局部敏感度
+w ← w - η · ∂L/∂w
+```
+
+> 操作建议：把学习率调小、调大各试一次。观察 loss 曲线是缓慢下降、稳定下降，还是直接震荡。
+
+### 4. 反向传播：把一个总错误拆回每个参数
+
+反向传播本质上是在计算图上反复使用链式法则。PyTorch 会把梯度写入参数的 `.grad` 字段；梯度默认会累积，所以训练循环里通常先 `optimizer.zero_grad()`，再 forward、loss、backward、step。[S2][S5]
+
+> 操作建议：盯住训练循环顺序：`zero_grad -> forward -> loss -> backward -> step`。如果 loss 不降，先别急着换大模型，先查这条链有没有断。
+
+---
+
 ## 1.1 什么是张量
 
 张量是深度学习的基本数据结构。你可以把它理解为"多维数组"：

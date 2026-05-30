@@ -135,6 +135,11 @@ const SOURCE_LIBRARY = {
     authors: "PyTorch Docs",
     url: "https://pytorch.org/docs/stable/notes/autograd.html",
   },
+  PYTORCH_TENSOR: {
+    title: "Tensors",
+    authors: "PyTorch Tutorials",
+    url: "https://docs.pytorch.org/tutorials/beginner/basics/tensorqs_tutorial.html",
+  },
   PYTORCH_NN: {
     title: "torch.nn API",
     authors: "PyTorch Docs",
@@ -293,7 +298,7 @@ const CONTENT_CREDIBILITY = {
       "梯度流图用小网络演示链式法则，不代表所有深层网络诊断。",
       "梯度大小只是训练健康度线索，需要结合 loss、激活分布和验证集表现判断。",
     ],
-    sources: ["PYTORCH_AUTOGRAD", "D2L", "DLBOOK", "PYTORCH_NN"],
+    sources: ["PYTORCH_TENSOR", "PYTORCH_AUTOGRAD", "D2L", "DLBOOK", "PYTORCH_NN"],
   },
   "part2/01_convolution_visual": {
     level: "A",
@@ -2590,6 +2595,130 @@ function renderCredibilitySection(module) {
   `;
 }
 
+const SOURCE_ANNOTATED_LESSONS = {
+  "part1/01_tensors_gradients": {
+    title: "来源标注版：张量与梯度到底在发生什么",
+    lead: "这版正文是重新写给零基础读者看的，不复制外部教材正文。每个来源标符都对应一个可公开访问的教材、论文或官方文档，用来校对定义、公式、API 行为和边界。",
+    sources: [
+      { marker: "S1", sourceId: "PYTORCH_TENSOR", note: "张量 shape、dtype、device 和基础运算" },
+      { marker: "S2", sourceId: "PYTORCH_AUTOGRAD", note: "计算图、requires_grad、backward 和梯度累积" },
+      { marker: "S3", sourceId: "D2L", note: "张量操作、自动微分、优化直觉" },
+      { marker: "S4", sourceId: "DLBOOK", note: "梯度下降、链式法则、反向传播的理论位置" },
+      { marker: "S5", sourceId: "PYTORCH_NN", note: "nn.Module、参数、损失函数和优化器接口边界" },
+    ],
+    sections: [
+      {
+        title: "一、张量：先看 shape，再看数字",
+        paragraphs: [
+          { text: "张量可以先粗略理解成“带维度的数字容器”：标量是 0 维，向量是 1 维，矩阵是 2 维，图像批次常写成 [B, C, H, W]。但真正写深度学习代码时，最重要的不是背维度名字，而是能读懂每一轴在任务里代表什么。", refs: ["S1", "S3"] },
+          { text: "例如 [32, 3, 224, 224] 不是一串神秘数字，而是 32 张图片、3 个颜色通道、高和宽都是 224。只要某一层期望 [B, D]，你却喂进去 [B, C, H, W]，模型不是“笨”，而是形状契约没对上。", refs: ["S1"] },
+          { text: "所以本页看张量动画时，先盯格子怎么排、箭头怎么连接，再看具体数值大小。shape 对了，数值才有继续讨论的意义。", refs: ["S1", "S3"] },
+        ],
+        formula: "图像批次：X ∈ R^{B×C×H×W}",
+        prompt: "操作建议：切到“概念动画”或中央控制台，把输入维度从小到大改一次。观察哪一步开始出现 shape 变化，思考：这一轴代表样本数、通道数，还是特征数？",
+      },
+      {
+        title: "二、计算图：模型不是一行公式，而是一条可回放的计算链",
+        paragraphs: [
+          { text: "一次前向传播会把输入、参数、矩阵乘法、激活函数、损失函数连接成一条计算链。只要某些张量设置了 requires_grad，PyTorch autograd 就会记录这些运算，方便之后从 loss 往回计算梯度。", refs: ["S2"] },
+          { text: "初学者常误以为 loss.backward() 是“重新训练一次”。不是。它做的是沿着已经建好的计算图，从最终损失开始，把每一步的局部导数按链式法则传回去。", refs: ["S2", "S4"] },
+          { text: "这也是为什么页面里会把损失点、箭头和参数节点画出来：它们不是装饰，而是在回答“这个错误到底能追溯到哪些可学习参数”。", refs: ["S2", "S4"] },
+        ],
+        formula: "loss = L(f(x; θ), y)",
+        prompt: "操作建议：打开本页“章节精读”后再跳到源码对照，找 requires_grad、loss.backward()、optimizer.step() 三个位置。它们分别对应“记录图”“算梯度”“改参数”。",
+      },
+      {
+        title: "三、梯度：它不是答案，而是当前位置的方向提示",
+        paragraphs: [
+          { text: "梯度回答的问题是：如果某个参数只改变一点点，loss 会朝哪个方向变化、变化有多敏感。梯度为正，表示参数往增大方向动会让 loss 上升；做梯度下降时通常要朝负梯度方向移动。", refs: ["S3", "S4"] },
+          { text: "这就是为什么梯度不能被理解成“模型学到的知识”。它更像当前位置附近的一张坡度图：告诉你下一小步该往哪里试，但不保证一步到最低点。", refs: ["S4"] },
+          { text: "如果学习率太大，即使梯度方向大体正确，也可能一步跨过谷底；如果学习率太小，loss 会下降得很慢。页面里的 loss 曲线和梯度箭头就是为了让你看见这个取舍。", refs: ["S3", "S4"] },
+        ],
+        formula: "∂L/∂w 表示 loss 对参数 w 的局部敏感度",
+        prompt: "操作建议：把学习率先调小，再调大。观察 loss 是缓慢下降、稳定下降，还是震荡上升。不要只问“哪个学习率最好”，先问“为什么曲线会这样动”。",
+      },
+      {
+        title: "四、反向传播：把一个总错误拆回每个参数",
+        paragraphs: [
+          { text: "反向传播的核心是链式法则：后面节点的误差，会乘上中间每一步的局部导数，一层一层传回前面的参数。深度学习不是手写每个偏导，而是让自动微分系统替你沿图执行这件事。", refs: ["S2", "S4"] },
+          { text: "PyTorch 的一个重要工程细节是：梯度默认会累积。也就是说，如果你每轮训练前不清空旧梯度，新梯度会叠在旧梯度上，参数更新就会混入上一轮的残留。", refs: ["S2"] },
+          { text: "所以训练循环里的常见顺序是 zero_grad -> forward -> loss -> backward -> step。顺序错了，页面可能仍然有输出，但训练含义已经变了。", refs: ["S2", "S5"] },
+        ],
+        formula: "∂L/∂w = ∂L/∂y · ∂y/∂w",
+        prompt: "操作建议：在源码对照里找 optimizer.zero_grad()。思考：如果去掉它，页面上的梯度范数会越来越可信，还是越来越混乱？",
+      },
+      {
+        title: "五、优化器：真正改参数的是 step",
+        paragraphs: [
+          { text: "backward 只负责把梯度写到参数的 grad 字段里；真正修改参数的是优化器的 step。对于最基本的 SGD，可以理解成把参数沿负梯度方向移动一小步。", refs: ["S3", "S5"] },
+          { text: "这一步把“数学上的方向”变成“代码里的参数更新”。如果参数没有被 optimizer 管理，或者 loss 没有连到这些参数，step 再运行也不会产生你期待的学习。", refs: ["S2", "S5"] },
+          { text: "因此排查训练失败时，别只看 loss 数字。要同时看：参数有没有梯度、梯度是不是 0 或 NaN、优化器是否拿到了正确参数、学习率是否合理。", refs: ["S2", "S5"] },
+        ],
+        formula: "w ← w - η · ∂L/∂w",
+        prompt: "操作建议：看页面中的控制台输出时，把 loss、grad、参数值三者连起来读。只有 loss 下降而参数也在合理更新，才算训练链路真的闭合。",
+      },
+    ],
+    pitfalls: [
+      "误区 1：张量就是数组。更准确地说，张量是带 shape、dtype、device 和计算关系的数值对象。",
+      "误区 2：backward 会自动更新参数。正确顺序是 backward 计算梯度，optimizer.step 才更新参数。",
+      "误区 3：梯度越大越好。梯度太大可能爆炸，太小可能消失，要结合 loss 曲线和参数更新看。",
+      "误区 4：loss 不降就一定是模型不够大。很多时候是 shape、学习率、zero_grad 或参数没有接入优化器出了问题。",
+    ],
+  },
+};
+
+function renderSourceMarker(article, marker) {
+  const sourceInfo = article.sources.find((item) => item.marker === marker);
+  const source = sourceInfo ? SOURCE_LIBRARY[sourceInfo.sourceId] : null;
+  if (!sourceInfo || !source) return `<span class="source-marker">[${escapeHtml(marker)}]</span>`;
+  return `<a class="source-marker" href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer" title="${escapeHtml(source.title)}">[${escapeHtml(marker)}]</a>`;
+}
+
+function renderParagraphWithMarkers(paragraph, article) {
+  const refs = paragraph.refs || [];
+  return `<p>${escapeHtml(paragraph.text)} ${refs.map((marker) => renderSourceMarker(article, marker)).join(" ")}</p>`;
+}
+
+function renderSourceAnnotatedLesson(module) {
+  const article = SOURCE_ANNOTATED_LESSONS[module.id];
+  if (!article) return "";
+  return `
+    <article class="source-annotated-lesson" data-source-annotated-lesson>
+      <div class="section-kicker">正文重写 · 来源标注版</div>
+      <h3>${escapeHtml(article.title)}</h3>
+      <p class="source-annotated-lead">${escapeHtml(article.lead)}</p>
+      <div class="source-marker-strip" aria-label="本节来源标符">
+        ${article.sources.map((item) => {
+          const source = SOURCE_LIBRARY[item.sourceId];
+          return `
+            <a href="${escapeHtml(source.url)}" target="_blank" rel="noreferrer">
+              <strong>[${escapeHtml(item.marker)}]</strong>
+              <span>${escapeHtml(source.title)}</span>
+              <em>${escapeHtml(item.note)}</em>
+            </a>
+          `;
+        }).join("")}
+      </div>
+      <div class="source-article-sections">
+        ${article.sections.map((section) => `
+          <section>
+            <h4>${escapeHtml(section.title)}</h4>
+            ${section.paragraphs.map((paragraph) => renderParagraphWithMarkers(paragraph, article)).join("")}
+            ${section.formula ? `<div class="article-formula">${escapeHtml(section.formula)}</div>` : ""}
+            <blockquote>${escapeHtml(section.prompt)}</blockquote>
+          </section>
+        `).join("")}
+      </div>
+      <div class="source-article-pitfalls">
+        <strong>这篇先记住的排查清单</strong>
+        <ul>
+          ${article.pitfalls.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+        </ul>
+      </div>
+    </article>
+  `;
+}
+
 function renderLessonDeepDiveShell(module) {
   return `
     <section class="reading-section lesson-deep-dive" data-lesson-notes data-legacy-path="${legacyMarkdownPath(module)}">
@@ -2915,6 +3044,7 @@ function renderParsedLessonNotes(parsed, module) {
     <div class="lesson-outline">
       ${outline.map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
     </div>
+    ${renderSourceAnnotatedLesson(module)}
     ${renderThreeMinuteBrief(sections, module)}
     ${renderKnowledgePointIndex(sections, module)}
     <details class="deep-dive-details">
@@ -2937,6 +3067,7 @@ function renderFallbackLessonNotes(module) {
     <div class="lesson-outline">
       ${[...profile.steps, profile.focus].map((item) => `<span>${escapeHtml(item)}</span>`).join("")}
     </div>
+    ${renderSourceAnnotatedLesson(module)}
     ${renderThreeMinuteBrief(sections, module)}
     ${renderKnowledgePointIndex(sections, module)}
     <details class="deep-dive-details">

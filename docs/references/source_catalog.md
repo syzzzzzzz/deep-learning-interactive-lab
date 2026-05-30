@@ -19,6 +19,7 @@
 | CS231N | https://cs231n.github.io/ | 公开课程笔记 | CNN、优化、反向传播、可视化、训练技巧 |
 | CS224N | https://web.stanford.edu/class/cs224n/ | 公开课程资料 | NLP、RNN、注意力、Transformer |
 | PYTORCH | https://pytorch.org/docs/stable/ | 官方文档 | PyTorch API、autograd、nn.Module、`torch.nn.functional.scaled_dot_product_attention`、Transformer |
+| PYTORCH_TENSOR | https://docs.pytorch.org/tutorials/beginner/basics/tensorqs_tutorial.html | 官方教程 | 张量 shape、dtype、device、基础运算 |
 | SKLEARN | https://scikit-learn.org/stable/user_guide.html | 官方文档 | 经典机器学习、评估、数据预处理、模型选择 |
 | MLCC | https://developers.google.com/machine-learning/crash-course | 官方开放课程 | 机器学习直觉、梯度下降、泛化、数据拆分 |
 | MDN_HTTP | https://developer.mozilla.org/en-US/docs/Web/HTTP | 官方文档 | HTTP、缓存、状态码、Web 协议基础 |
